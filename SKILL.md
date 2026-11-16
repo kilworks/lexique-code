@@ -1,18 +1,19 @@
 ---
 name: lexique-code
-description: "Lexique de kil : plusieurs centaines de mots qui changent la facon de coder, de raisonner et de piloter Claude (idempotent, atomique, TOCTOU, backpressure, cause racine, pre-mortem, test temoin, blast radius, ultrathink, plan d'abord, conclusion d'abord...), ranges par domaine dans LEXIQUE.md : pour chaque mot, son sens en une ligne et ce que Claude fait concretement quand kil l'emploie. Use when kil asks for the lexicon or /lexique, asks what one of these words means, looks for a word to name a quality he wants in code or in the way Claude works, or wants to add words to it."
+description: "Lexique de kil : plusieurs centaines de mots qui changent la facon de coder, de raisonner et de piloter Claude (idempotent, atomique, TOCTOU, backpressure, cause racine, pre-mortem, test temoin, blast radius, ultrathink, plan d'abord, conclusion d'abord...), ranges par domaine dans LEXIQUE.md (francais) et LEXICON.md (meme lexique en anglais, ligne pour ligne) : pour chaque mot, son sens en une ligne et ce que Claude fait concretement quand kil l'emploie. Use when kil asks for the lexicon or /lexique, asks what one of these words means, looks for a word to name a quality he wants in code or in the way Claude works, or wants to add words to it."
 ---
 
 # lexique-code
 
 Un mot dans le prompt = un comportement dans le code.
 Le lexique est dans `LEXIQUE.md` (même dossier) : une ligne par mot, trois colonnes (mot, sens, ce que je fais quand le mot est là). Je ne le charge jamais en entier : je cherche dedans.
+`LEXICON.md` est sa traduction anglaise, mêmes sections, mêmes lignes, même ordre : un mot donné en anglais (« fencing token », « scope creep ») se cherche là, et la ligne de même rang dans la même section de `LEXIQUE.md` est son original.
 
 ## Comment je m'en sers
 
 | Demande de kil | Ce que je fais |
 |---|---|
-| le sens d'un mot | `Grep` du mot dans `LEXIQUE.md`, sans tenir compte de la casse, et je rends sa ligne |
+| le sens d'un mot | `Grep` du mot dans `LEXIQUE.md` et `LEXICON.md`, sans tenir compte de la casse, et je rends sa ligne |
 | un domaine (« le lexique réseau ») | `Grep "^## "` pour situer la section, `Read` de cette plage seule, je l'affiche |
 | une qualité à nommer (« comment on dit quand... ») | `Grep` de 2 ou 3 mots-clés du besoin dans les colonnes sens et geste, je propose 1 à 3 mots avec leur ligne |
 | le lexique entier | le chemin de `LEXIQUE.md` et la liste des sections ci-dessous, pas de copie dans le chat |
@@ -51,8 +52,9 @@ Le lexique est dans `LEXIQUE.md` (même dossier) : une ligne par mot, trois colo
 ## Ajouter des mots
 
 - Une ligne par mot, dans la bonne section : `| mot | sens | ce que je fais |`. La colonne 3 est un geste concret et vérifiable, pas une intention.
+- Chaque ligne ajoutée dans `LEXIQUE.md` l'est aussi, traduite, dans `LEXICON.md`, même section, même position. Un mot anglais doit rester distinct de tous les autres du fichier anglais.
 - Un mot = une seule ligne. Un synonyme va dans la ligne existante (`mot / synonyme`), jamais dans une seconde ligne.
 - Pas de `|` dans une cellule, pas de tiret cadratin, pas de guillemet courbe.
 - Une nouvelle section s'ajoute aussi au tableau Sections ci-dessus.
-- Puis `python check.py` dans ce dossier (format, doublons, sections, compte par section). Code de sortie 0 exigé, lu à part, jamais à travers un pipe.
-- Ce dossier est la source. Deux copies en dépendent : le dépôt `claude-skills` (par son `sync.ps1`) et le dépôt privé `lexique-code` (clone dans `~/Downloads/02 - Projects/lexique-code`). Après un changement : recopier `SKILL.md`, `LEXIQUE.md` et `check.py` dans le clone, commiter, pousser.
+- Puis `python check.py` dans ce dossier (format, doublons, sections, parité français/anglais, compte par fichier). Code de sortie 0 exigé, lu à part, jamais à travers un pipe.
+- Ce dossier est la source. Deux copies en dépendent : le dépôt `claude-skills` (par son `sync.ps1`) et le dépôt public `kilworks/lexique-code` (clone dans `~/Downloads/02 - Projects/lexique-code`, README en plus). Après un changement : recopier `SKILL.md`, `LEXIQUE.md`, `LEXICON.md` et `check.py` dans le clone, commiter en anglais, pousser.
