@@ -19,7 +19,7 @@ def parse(path):
     """Sections as [(title, cells, [rows])]; the cell count comes from each section's header row."""
     sections, header_due = [], False
     for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if re.search("[–—‘’“”]", line):
+        if re.search("[\u2013\u2014\u2018\u2019\u201c\u201d]", line):
             errors.append(f"{path.name}:{n}: em/en dash or curly quote")
         if line.startswith("## "):
             sections.append((line[3:], 0, []))
