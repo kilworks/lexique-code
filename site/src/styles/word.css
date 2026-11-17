@@ -41,6 +41,10 @@
   overflow-wrap: normal;
 }
 
+/* interactive diagram slot: reserve some height while its chunk loads */
+.word__diagram { min-width: 0; }
+.word__diagram-wait { min-height: 22rem; border: var(--border-hairline) solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+
 .pitfall {
   display: flex;
   flex-direction: column;

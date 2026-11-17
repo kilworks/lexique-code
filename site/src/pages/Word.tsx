@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useLexicon } from '../components/data';
+import { Diagram, DIAGRAM_IDS } from '../components/diagrams';
 import { Icon } from '../components/Icon';
 import { Inline } from '../components/Inline';
 import { usePrefs } from '../components/prefs';
@@ -80,6 +81,12 @@ export default function Word() {
                 <h2 id="example-title" className="h3" lang="en">Example</h2>
                 <ExampleBlock ex={enrich.example} />
               </section>
+              {DIAGRAM_IDS.includes(word.id) && (
+                <section className="word__block word__diagram" aria-labelledby="diagram-title">
+                  <h2 id="diagram-title" className="h3" lang="en">See it happen</h2>
+                  <Diagram key={word.id} id={word.id} />
+                </section>
+              )}
               <section className="pitfall" aria-labelledby="pitfall-title">
                 <h2 id="pitfall-title" className="pitfall__title" lang="en">
                   <Icon name="alert-triangle" /> Common pitfall

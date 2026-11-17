@@ -39,6 +39,13 @@ export default function Glossary() {
   };
   const toggleSection = (id: string) => update({ s: selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id] });
 
+  // the result list enters once per filter (chips, language); after a keystroke it stops animating,
+  // so groups that appear while typing just appear
+  const filterKey = `${selected.join(',')}|${lang}`;
+  const entrance = useRef({ key: '', q, typed: false });
+  if (entrance.current.key !== filterKey) entrance.current = { key: filterKey, q, typed: false };
+  else if (entrance.current.q !== q) entrance.current.typed = true;
+
   const wordSections = lex.sections.filter((s) => s.kind === 'words');
   const nothing = result.count === 0 && result.combinations.length === 0;
 
@@ -97,7 +104,7 @@ export default function Glossary() {
           </div>
         </div>
       ) : (
-        <div className="results" lang={lang}>
+        <div key={filterKey} className="results" data-enter={!entrance.current.typed || undefined} lang={lang}>
           {result.groups.map((g) => (
             <section key={g.section.id} className="result-group" aria-labelledby={`g-${g.section.id}`}>
               <h2 className="result-group__title" id={`g-${g.section.id}`}>

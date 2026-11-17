@@ -114,7 +114,8 @@ export function makeQuiz(lex: Lexicon, sectionId: string, seed: number, length =
     if (out.length >= length) break;
     if (used.has(answer)) continue;
     const k = KINDS[Math.floor(rand() * KINDS.length)];
-    const options = pickOptions(answer, k.show, new Set());
+    // a step check: the other step words stay out of the options, so one question never hands out another's answer
+    const options = pickOptions(answer, k.show, only ? new Set(answers) : new Set());
     if (!options) continue;
     used.add(answer);
     out.push({ kind: k.kind, answer, prompt: k.prompt, show: k.show, options });

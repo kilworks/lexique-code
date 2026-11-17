@@ -65,7 +65,6 @@ export default function Workshop() {
   return (
     <div className="page workshop">
       <header className="page-head">
-        <p className="eyebrow">Prompt workshop</p>
         <h1 className="h1">Check a prompt against the lexicon</h1>
         <p className="lead">Paste or write a prompt. Every lexicon word it uses (English or French) shows up with what it triggers, and the combinations it could complete.</p>
       </header>

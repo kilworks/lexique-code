@@ -9,6 +9,7 @@ const NAV = [
   { to: '/cards', label: 'Cards' },
   { to: '/learn', label: 'Learn' },
   { to: '/workshop', label: 'Workshop' },
+  { to: '/map', label: 'Map' },
 ];
 
 const THEMES = [

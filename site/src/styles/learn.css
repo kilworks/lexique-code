@@ -49,6 +49,9 @@
 .steps__dot--done { background: var(--color-accent); }
 
 .lesson__step { display: flex; flex-direction: column; gap: var(--space-4); }
+/* step change: the new step slides in from the side of the button pressed; the old one is gone at once */
+.lesson__step[data-enter='next'] { animation: step-in-next var(--duration-base) var(--ease-out) both; }
+.lesson__step[data-enter='back'] { animation: step-in-back var(--duration-base) var(--ease-out) both; }
 /* headings that receive focus: keep the ring around the text, not the full row */
 .lesson__step > h2, .quiz__head > h1, .quiz .page-head > h1 { align-self: flex-start; }
 .lesson__words { display: grid; gap: var(--space-4); }
@@ -156,25 +159,34 @@
 .qopt__text { flex: 1; min-width: 0; }
 .qopt--right { border-color: var(--color-accent); background: var(--color-accent-soft); box-shadow: inset calc(var(--border-hairline) * 4) 0 0 var(--color-accent); }
 .qopt--right .qopt__mark { color: var(--color-accent); }
-.qopt--wrong { border-color: var(--color-warn); box-shadow: inset calc(var(--border-hairline) * 4) 0 0 var(--color-warn); }
+.qopt--wrong { border-color: var(--color-warn); box-shadow: inset calc(var(--border-hairline) * 4) 0 0 var(--color-warn); animation: shake 200ms var(--ease-out); }
 .qopt--wrong .qopt__mark { color: var(--color-warn); }
 .qopt--dim { color: var(--color-text-muted); }
 .quiz__hint { font-size: var(--text-sm); }
 
-.qfeedback { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border: var(--border-hairline) solid var(--color-border); border-radius: var(--radius-sm); }
+.qfeedback { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border: var(--border-hairline) solid var(--color-border); border-radius: var(--radius-sm); transition: opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out); }
+/* the explanation arrives under the answers instead of popping in */
+@starting-style { .qfeedback { opacity: 0; transform: translateY(0.25rem); } }
+/* the check mark on the right answer fades in with the colour change */
+.qopt__mark { transition: opacity var(--duration-fast) var(--ease-out); }
+@starting-style { .qopt__mark { opacity: 0; } }
+/* answered with keys 1 to 4: no motion on the keyboard path */
+[data-instant] .qopt--wrong { animation: none; }
+[data-instant] .qfeedback, [data-instant] .qopt__mark { transition: none; }
 .qfeedback--right { border-left: calc(var(--border-hairline) * 4) solid var(--color-accent); }
 .qfeedback--wrong { border-left: calc(var(--border-hairline) * 4) solid var(--color-warn); }
 .qfeedback__verdict { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); }
 .qfeedback--right .qfeedback__verdict { color: var(--color-accent); }
 .qfeedback--wrong .qfeedback__verdict { color: var(--color-warn); }
-.qfeedback__picked { display: flex; flex-direction: column; gap: var(--space-1); padding-top: var(--space-3); border-top: var(--border-hairline) solid var(--color-border); }
+.qfeedback__picked { padding-top: var(--space-3); border-top: var(--border-hairline) solid var(--color-border); }
 
 .answer-rows { display: flex; flex-direction: column; border-top: var(--border-hairline) solid var(--color-border); }
 .answer-rows .answer-row { padding: var(--space-3) 0; border-bottom: var(--border-hairline) solid var(--color-border); }
 .answer-row { display: grid; gap: var(--space-1); min-width: 0; }
 .answer-row__word { font-family: var(--font-serif); font-size: var(--text-lg); }
 .answer-row__meaning { color: var(--color-text-muted); }
-.answer-row__action { font-size: var(--text-sm); }
+/* meaning and action share one type step */
+.answer-row__action { font-size: var(--text-base); }
 
 @media (min-width: 52em) {
   .answer-row { grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 5fr); gap: var(--space-4); align-items: baseline; }

@@ -15,13 +15,54 @@
 
 .cards__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
 
+/* a thrown card is cut at the screen edge instead of widening the page (no horizontal scroll mid-swipe) */
+.flashcard-lane { overflow-x: clip; margin-inline: calc(-1 * var(--gutter)); padding-inline: var(--gutter); }
+
 /* the card: both faces share one grid cell, so the card is as tall as its longest face */
-.flashcard { perspective: 80rem; max-width: 44rem; width: 100%; }
+.flashcard {
+  position: relative;
+  perspective: 80rem;
+  max-width: 44rem;
+  width: 100%;
+  /* vertical scroll stays with the page, the horizontal drag is the swipe */
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+  /* a new card fades in (no movement: the swipe owns this element's transform) */
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+@starting-style { .flashcard { opacity: 0; } }
+.flashcard[data-flipped='true'] { cursor: grab; }
+.flashcard[data-flipped='true']:active { cursor: grabbing; }
 .flashcard__inner {
   display: grid;
   transform-style: preserve-3d;
-  transition: transform calc(var(--duration-base) * 2) var(--ease-out);
+  transition: transform var(--duration-flip) var(--ease-in-out);
 }
+.flashcard[data-instant], .flashcard[data-instant] .flashcard__inner { transition: none; }
+
+/* stamps that grow with the drag; opacity is written from the drag distance in Cards.tsx */
+.flashcard__hint {
+  position: absolute;
+  /* sits on the top edge so it never hides the card's text */
+  top: 0;
+  translate: 0 -50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: calc(var(--border-hairline) * 2) solid currentColor;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  opacity: 0;
+  pointer-events: none;
+}
+.flashcard__hint--yes { left: var(--space-3); color: var(--color-accent); }
+.flashcard__hint--no { right: var(--space-3); color: var(--color-warn); }
 .flashcard[data-flipped='true'] .flashcard__inner { transform: rotateY(180deg); }
 .flashcard__face {
   grid-area: 1 / 1;
@@ -58,6 +99,8 @@
 }
 
 .cards__controls { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+/* touch targets: 44px */
+.cards__controls .btn { min-height: 2.75rem; }
 .cards__kbd {
   padding: 0 var(--space-1);
   border: var(--border-hairline) solid currentColor;

@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { Inline } from '../components/Inline';
 import { usePrefs } from '../components/prefs';
 import { answer, BOXES, dueCards, nextDue, parseState, type SrsState } from '../lib/srs';
+import { cancel, down, flyMs, IDLE, move, progress, release, type Swipe } from '../lib/swipe';
 import { KEYS, read, write } from '../lib/storage';
 import type { Row } from '../lib/types';
 import '../styles/cards.css';
@@ -27,6 +28,10 @@ interface Session {
 }
 
 const plain = (s: string) => s.replaceAll('`', '');
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+/** the card leans a little toward where it is thrown */
+const tilt = (dx: number, width: number) => `translateX(${dx}px) rotate(${(dx / Math.max(1, width)) * 6}deg)`;
 const loadSrs = () => parseState(read<unknown>(KEYS.srs, null));
 
 function formatDay(key: string): string {
@@ -187,6 +192,13 @@ interface ReviewProps {
 function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: ReviewProps) {
   const lex = useLexicon();
   const controls = useRef<HTMLDivElement>(null);
+  const card = useRef<HTMLDivElement>(null);
+  const hintYes = useRef<HTMLSpanElement>(null);
+  const hintNo = useRef<HTMLSpanElement>(null);
+  const drag = useRef<Swipe>(IDLE);
+  const flying = useRef<Animation | null>(null);
+  // keyboard actions are repeated fast: they skip every animation (no flip turn, no fly-out, no fade-in)
+  const instant = useRef(false);
   const id = session.queue[session.pos];
   const word = lex.words[id];
   const row = word[lang];
@@ -201,20 +213,115 @@ function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: Revi
     controls.current?.querySelector('button')?.focus();
   }, [session.pos, session.flipped]);
 
-  const latest = useRef({ flipped: session.flipped, flip, onAnswer });
-  latest.current = { flipped: session.flipped, flip, onAnswer };
+  // an answer leaving mid-flight when the session ends must not grade a card that is gone
+  useEffect(() => () => flying.current?.cancel(), []);
+
+  /** card position and the two hint labels, always from the same dx */
+  const paint = (dx: number) => {
+    const el = card.current;
+    if (!el) return;
+    const p = progress(dx, el.offsetWidth);
+    el.style.transform = dx ? tilt(dx, el.offsetWidth) : '';
+    if (hintYes.current) hintYes.current.style.opacity = dx > 0 ? String(p) : '';
+    if (hintNo.current) hintNo.current.style.opacity = dx < 0 ? String(p) : '';
+  };
+
+  /** below the threshold, or cancelled: back to the middle, fast, no grade */
+  const snapBack = () => {
+    const el = card.current;
+    const dx = drag.current.dx;
+    drag.current = IDLE;
+    if (!el) return;
+    const from = el.style.transform;
+    const hints = [hintYes.current, hintNo.current].map((h) => h && [h, h.style.opacity] as const);
+    paint(0);
+    if (!dx || reducedMotion()) return;
+    const timing = { duration: 200, easing: EASE_OUT };
+    el.animate([{ transform: from }, { transform: 'none' }], timing);
+    for (const h of hints) if (h && h[1]) h[0].animate([{ opacity: h[1] }, { opacity: 0 }], timing);
+  };
+
+  /** the one way to answer: keys, buttons and swipes all end here */
+  const grade = (knew: boolean, via: 'key' | 'button' | 'swipe') => {
+    if (flying.current) return;
+    const el = card.current;
+    instant.current = via === 'key';
+    if (!el || via === 'key' || reducedMotion()) {
+      drag.current = IDLE;
+      onAnswer(knew);
+      return;
+    }
+    const w = el.offsetWidth;
+    const { dx, t0 } = drag.current;
+    const ms = via === 'swipe' ? flyMs(dx, performance.now() - t0, w) : 200;
+    const to = (knew ? 1 : -1) * (w + 64);
+    const anim = el.animate([{ transform: tilt(dx, w) }, { transform: tilt(to, w), opacity: 0 }], { duration: ms, easing: EASE_OUT, fill: 'forwards' });
+    flying.current = anim;
+    anim.finished.then(
+      () => {
+        flying.current = null;
+        drag.current = IDLE;
+        onAnswer(knew);
+      },
+      () => {}, // cancelled on unmount
+    );
+  };
+
+  const flipBy = (via: 'key' | 'pointer') => {
+    if (flying.current) return;
+    instant.current = via === 'key';
+    flip();
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (flying.current || e.button !== 0) return;
+    const next = down(drag.current, e.pointerId, e.clientX, performance.now());
+    if (next === drag.current) return;
+    drag.current = next;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const next = move(drag.current, e.pointerId, e.clientX);
+    if (next === drag.current) return;
+    drag.current = next;
+    // the question side only flips on tap; grading needs the answer shown, so a drag there only
+    // leans the card against heavy resistance (0.2x, at most 24px) and snaps back on release
+    if (session.flipped) paint(next.dx);
+    else if (card.current) card.current.style.transform = `translateX(${Math.max(-24, Math.min(24, next.dx * 0.2))}px)`;
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = release(drag.current, e.pointerId, performance.now(), e.currentTarget.offsetWidth);
+    if (!r) return;
+    if (r.outcome === 'tap') {
+      drag.current = IDLE;
+      flipBy('pointer');
+    } else if (r.outcome === 'snap' || !session.flipped) snapBack();
+    else {
+      drag.current = r.state;
+      grade(r.outcome === 'right', 'swipe');
+    }
+  };
+  const onPointerCancel = () => {
+    if (drag.current.phase !== 'tracking') return;
+    drag.current = cancel(drag.current);
+    snapBack();
+  };
+
+  const latest = useRef({ flipped: session.flipped, flipBy, grade, onPointerCancel });
+  latest.current = { flipped: session.flipped, flipBy, grade, onPointerCancel };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.closest('input, textarea, select, a, [contenteditable="true"]') || (t.tagName === 'BUTTON' && !controls.current?.contains(t)))) return;
-      const { flipped, flip, onAnswer } = latest.current;
-      if (e.key === ' ') {
+      const { flipped, flipBy, grade, onPointerCancel } = latest.current;
+      if (e.key === 'Escape') onPointerCancel();
+      else if (e.key === ' ') {
         e.preventDefault();
-        flip();
+        flipBy('key');
       } else if (flipped && (e.key === '1' || e.key === '2')) {
         e.preventDefault();
-        onAnswer(e.key === '1');
+        grade(e.key === '1', 'key');
       }
     };
     window.addEventListener('keydown', onKey);
@@ -230,7 +337,22 @@ function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: Revi
         </button>
       </header>
 
-      <div className="flashcard" data-flipped={session.flipped} lang={lang}>
+      <div className="flashcard-lane">
+      <div
+        key={session.pos}
+        ref={card}
+        className="flashcard"
+        data-flipped={session.flipped}
+        data-instant={instant.current || undefined}
+        lang={lang}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onPointerCancel}
+      >
+        <span className="flashcard__hint flashcard__hint--yes" ref={hintYes} aria-hidden="true" lang="en"><Icon name="check" className="ico ico--sm" /> I knew it</span>
+        <span className="flashcard__hint flashcard__hint--no" ref={hintNo} aria-hidden="true" lang="en">Not yet</span>
         <div className="flashcard__inner">
           <section className="flashcard__face" aria-hidden={session.flipped} aria-label="Question">
             <p className="label" lang="en">{front}</p>
@@ -248,6 +370,7 @@ function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: Revi
           <span>{box ? `Box ${box} of ${BOXES}` : 'New card'}</span>
         </p>
       </div>
+      </div>
 
       <p className="sr-only" aria-live="polite">
         {session.flipped ? `Answer: ${plain(row.word)}. ${plain(row.meaning)}. ${plain(row.action)}` : ''}
@@ -256,20 +379,20 @@ function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: Revi
       <div className="cards__controls" ref={controls}>
         {session.flipped ? (
           <>
-            <button type="button" className="btn btn--primary" onClick={() => onAnswer(true)}>
+            <button type="button" className="btn btn--primary" onClick={(e) => grade(true, e.detail === 0 ? 'key' : 'button')}>
               <Icon name="check" /> I knew it <kbd className="cards__kbd">1</kbd>
             </button>
-            <button type="button" className="btn btn--secondary" onClick={() => onAnswer(false)}>
+            <button type="button" className="btn btn--secondary" onClick={(e) => grade(false, e.detail === 0 ? 'key' : 'button')}>
               Not yet <kbd className="cards__kbd">2</kbd>
             </button>
           </>
         ) : (
-          <button type="button" className="btn btn--primary" onClick={flip}>
+          <button type="button" className="btn btn--primary" onClick={(e) => flipBy(e.detail === 0 ? 'key' : 'pointer')}>
             Show answer <kbd className="cards__kbd">Space</kbd>
           </button>
         )}
       </div>
-      <p className="muted cards__hint">Keyboard: Space flips the card, 1 for I knew it, 2 for Not yet.</p>
+      <p className="muted cards__hint">Tap the card to flip it, then swipe right for I knew it, left for Not yet. Keyboard: Space flips, 1 and 2 answer.</p>
       {!saved && (
         <p className="cards__warn" role="status">
           <Icon name="alert-circle" className="ico ico--sm" /> Your browser blocked storage: progress will not be kept after this visit.

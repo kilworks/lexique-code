@@ -11,14 +11,14 @@ import NotFound from './NotFound';
 import { ASK } from './Quiz';
 import '../styles/learn.css';
 
-/** Two quick questions on the words of one step, answered in place; nothing is stored. */
+/** Two quick questions on the words of the previous step, asked once its cards are gone (retrieval, not copying); nothing is stored. */
 function StepCheck({ lex, lang, sectionId, words, seed }: { lex: Lexicon; lang: Lang; sectionId: string; words: string[]; seed: number }) {
   const questions = makeQuiz(lex, sectionId, seed, 2, words);
   const [picks, setPicks] = useState<Record<number, string>>({});
   if (!questions.length) return null;
   return (
     <section className="check" aria-labelledby="check-title">
-      <h3 id="check-title" className="label">Quick check</h3>
+      <h3 id="check-title" className="label">Quick check on the last step</h3>
       {questions.map((q, n) => {
         const picked = picks[n];
         const right = picked === q.answer;
@@ -67,6 +67,9 @@ export default function Lesson() {
   const step = Number.isInteger(raw) && raw >= 1 && raw <= steps.length ? raw : 1;
 
   const shown = useRef<number | null>(null);
+  // read before the effect below updates it: the step we come from gives the direction of the entrance
+  const from = shown.current;
+  const enter = from === null || from === step ? undefined : step > from ? 'next' : 'back';
   // on a step change (not the first paint), bring the reader to the new step
   useEffect(() => {
     const before = shown.current;
@@ -100,10 +103,11 @@ export default function Lesson() {
         {steps.map((_, i) => <span key={i} className={`steps__dot${i + 1 <= step ? ' steps__dot--done' : ''}`} />)}
       </div>
 
-      <section className="lesson__step" aria-labelledby="step-title">
+      <section key={step} className="lesson__step" data-enter={enter} aria-labelledby="step-title">
         <h2 id="step-title" className="label" ref={headRef} tabIndex={-1}>
           Step {step} of {steps.length}
         </h2>
+        {step > 1 && <StepCheck key={`${section.id}-${step}-${lang}`} lex={lex} lang={lang} sectionId={section.id} words={steps[step - 2]} seed={pos * 100 + step} />}
         <ol className="lesson__words" lang={lang}>
           {words.map((wid) => {
             const w = lex.words[wid];
@@ -123,7 +127,6 @@ export default function Lesson() {
             );
           })}
         </ol>
-        <StepCheck key={`${section.id}-${step}-${lang}`} lex={lex} lang={lang} sectionId={section.id} words={words} seed={pos * 100 + step} />
       </section>
 
       <nav className="lesson__nav" aria-label="Lesson steps">

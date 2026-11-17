@@ -1,0 +1,17 @@
+/* Motion: shared curves and one-shot keyframes. Page rules that use them live in each page's css.
+   Only transform and opacity move. Under prefers-reduced-motion, app.css turns movement off (only state fades
+   keep their opacity) and Cards.tsx skips its Web Animations, so every screen works with zero motion. */
+
+/* lesson step: Next enters from the right, Back from the left */
+@keyframes step-in-next { from { opacity: 0; transform: translateX(1.5rem); } }
+@keyframes step-in-back { from { opacity: 0; transform: translateX(-1.5rem); } }
+
+/* wrong quiz answer: a short "no" */
+@keyframes shake {
+  25% { transform: translateX(-0.25rem); }
+  50% { transform: translateX(0.25rem); }
+  75% { transform: translateX(-0.125rem); }
+}
+
+/* glossary groups arriving */
+@keyframes rise { from { opacity: 0; transform: translateY(0.5rem); } }

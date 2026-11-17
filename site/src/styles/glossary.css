@@ -31,6 +31,12 @@
 .count strong { color: var(--color-text); }
 
 .results { display: flex; flex-direction: column; gap: var(--space-10); }
+/* one entrance for the result list: the first five groups rise in a short, tapering wave (0, 40, 70, 90, 105 ms) */
+.results[data-enter] > .result-group:nth-child(-n + 5) { animation: rise var(--duration-base) var(--ease-out) both; }
+.results > .result-group:nth-child(2) { animation-delay: 40ms; }
+.results > .result-group:nth-child(3) { animation-delay: 70ms; }
+.results > .result-group:nth-child(4) { animation-delay: 90ms; }
+.results > .result-group:nth-child(5) { animation-delay: 105ms; }
 .result-group { display: flex; flex-direction: column; gap: var(--space-2); }
 .result-group__title {
   font-family: var(--font-serif);

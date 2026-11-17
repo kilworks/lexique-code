@@ -59,15 +59,14 @@ code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
 .h2 { font-family: var(--font-serif); font-size: var(--text-2xl); font-weight: var(--weight-regular); line-height: var(--leading-snug); }
 .h3 { font-size: var(--text-lg); font-weight: var(--weight-semibold); line-height: var(--leading-snug); }
 .lead { font-size: var(--text-lg); color: var(--color-text-muted); max-width: var(--measure); }
+/* page kicker: sentence case in the body face, never an uppercase tracked label */
 .eyebrow {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 .muted { color: var(--color-text-muted); }
-/* block label: sentence case in the sans face (the uppercase eyebrow is kept for page kickers only) */
+/* block label: sentence case in the sans face */
 .label { font-family: var(--font-sans); font-size: var(--text-base); font-weight: var(--weight-semibold); line-height: var(--leading-snug); color: var(--color-text); }
 .prose { max-width: var(--measure); }
 
@@ -119,6 +118,12 @@ code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
 .nav__link.active:focus-visible { box-shadow: var(--shadow-focus-ring); }
 .prefs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
+/* phone: the five links fit on one row */
+@media (max-width: 30em) {
+  .nav { gap: 0; }
+  .nav__link { padding: 0 var(--space-2); font-size: var(--text-sm); }
+}
+
 @media (min-width: 52em) {
   .logo { margin-right: 0; }
   .nav { order: 0; width: auto; margin-right: auto; }
@@ -162,8 +167,9 @@ code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
   font-weight: var(--weight-medium);
   text-decoration: none;
   cursor: pointer;
-  transition: var(--transition-color);
+  transition: var(--transition-color), transform 160ms var(--ease-out);
 }
+.btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
 .btn--primary { background: var(--color-accent); color: var(--color-on-accent); }
 .btn--primary:hover:not(:disabled) { background: var(--color-accent-hover); color: var(--color-on-accent); }
@@ -221,6 +227,16 @@ code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
 }
 .link-ext { display: inline-flex; align-items: center; gap: var(--space-1); }
 
+/* touch: the small controls (map zoom, list view, EN/FR, theme) still give a 44px target */
+@media (pointer: coarse) {
+  .btn--sm, .segmented__btn { min-height: 2.75rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  /* gentler, not zero: fades that carry state keep their opacity change, nothing moves */
+  .flashcard, .qfeedback, .qopt__mark, .hit { transition: opacity var(--duration-fast) var(--ease-out) !important; }
+  @starting-style { .qfeedback { transform: none; } }
+  /* the keyboard paths (data-instant) stay instant */
+  .flashcard[data-instant], [data-instant] .qfeedback, [data-instant] .qopt__mark { transition: none !important; }
 }

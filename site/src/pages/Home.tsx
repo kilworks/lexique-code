@@ -12,6 +12,7 @@ const WAYS: { to: string; icon: IconName; title: string; text: string }[] = [
   { to: '/cards', icon: 'archive', title: 'Cards', text: 'Flashcards in five Leitner boxes. A word you know comes back later, a word you miss comes back tomorrow.' },
   { to: '/learn', icon: 'dashboard', title: 'Learn', text: 'One lesson per section, in a recommended order, each closed by a ten question quiz.' },
   { to: '/workshop', icon: 'pencil', title: 'Workshop', text: 'Paste a prompt and see which words it already uses, what each one triggers, and what to add.' },
+  { to: '/map', icon: 'share', title: 'Map', text: 'All the words on one map, grouped by section and linked by the combinations they form. Explore by neighbours.' },
 ];
 
 export default function Home() {
@@ -62,7 +63,7 @@ export default function Home() {
       </section>
 
       <section className="ways" aria-labelledby="ways-title">
-        <h2 id="ways-title" className="h2">Three ways to learn</h2>
+        <h2 id="ways-title" className="h2">Four ways to learn</h2>
         <ol className="ways__list">
           {WAYS.map((w) => (
             <li key={w.to}>

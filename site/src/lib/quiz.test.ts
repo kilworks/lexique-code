@@ -164,6 +164,15 @@ describe('lesson step check', () => {
       }
     }
   });
+
+  it('never offers the answer of one question as a distractor of another question of the same check', () => {
+    const lex = lexicon({ a: ids('a', 12) }, []);
+    for (let s = 0; s < 40; s++) {
+      const qs = makeQuiz(lex, 'a', s, 2, ['a3', 'a4', 'a5']);
+      const answers = new Set(qs.map((q) => q.answer));
+      for (const q of qs) for (const o of q.options) if (o !== q.answer) expect(answers.has(o)).toBe(false);
+    }
+  });
 });
 
 describe('mistakes', () => {

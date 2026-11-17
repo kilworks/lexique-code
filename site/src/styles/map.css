@@ -1,0 +1,86 @@
+/* Word map page. Only opacity and the one world transform change at runtime; nothing drifts. */
+.wordmap__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.wordmap__tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.wordmap__tools .segmented__btn { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+.wordmap__box {
+  position: relative;
+  height: clamp(22rem, 68vh, 46rem);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.wordmap__box:focus-visible { border-radius: var(--radius-md); }
+
+.map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; user-select: none; }
+.map:active { cursor: grabbing; }
+.map__world { transform-origin: 0 0; }
+.map__world--glide { transition: transform 250ms var(--ease-out); }
+
+.map__cluster { fill: var(--color-sunken); stroke: var(--color-border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.map__title {
+  fill: var(--color-text-muted);
+  font-family: var(--font-serif);
+  font-size: calc(0.8125rem / var(--k, 1)); /* 13px on screen at any zoom; long titles wrap on two lines */
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: calc(0.25rem / var(--k, 1));
+  stroke-linejoin: round;
+}
+
+@media (max-width: 40em) { .map__title { font-size: calc(0.75rem / var(--k, 1)); } }
+
+.map__edge { stroke: var(--color-accent); stroke-width: 1.5; stroke-opacity: 0.45; vector-effect: non-scaling-stroke; }
+
+.map__node { cursor: pointer; }
+.map__hit { fill: transparent; }
+.map__dot { fill: var(--color-text-muted); }
+.map__node.is-linked .map__dot { fill: var(--color-text); }
+.map__label {
+  fill: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: calc(0.8125rem / var(--k, 1));
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: calc(0.25rem / var(--k, 1));
+  /* hidden labels are out of the layout tree: Chrome re-lays out every SVG text on each zoom step
+     (its glyphs follow the screen scale), so only the labels on show may pay for it */
+  display: none;
+  pointer-events: none;
+}
+.map--labels .map__label,
+.map__node.is-hot .map__label,
+.map__node.is-focus .map__label { display: inline; }
+
+/* filter: non-matches fade, positions never change */
+.map__node, .map__edge, .map__title { transition: opacity var(--duration-fast) var(--ease-out); }
+.is-dim { opacity: 0.18; }
+.map__node.is-match .map__dot { fill: var(--color-accent); }
+/* search hits always carry their name, at screen size with a paper halo */
+.map__node.is-found .map__label { display: inline; font-weight: var(--weight-semibold); }
+.wordmap__found { padding-left: var(--space-3); border-left: calc(var(--border-hairline) * 2) solid var(--color-accent); }
+
+/* hover or keyboard focus: the word and its neighbours stay, the rest steps back */
+.map--hl .map__node:not(.is-hot), .map--hl .map__edge:not(.is-hot) { opacity: 0.25; }
+.map--hl .map__node.is-hot { opacity: 1; }
+.map__node.is-hot .map__dot { fill: var(--color-accent); }
+.map__edge.is-hot { stroke-opacity: 1; opacity: 1; }
+.map__node.is-center .map__dot { fill: var(--color-text); }
+.map--hl.map--labels .map__node:not(.is-hot) .map__label,
+.map__node.is-dim .map__label { display: none; }
+.map__node.is-focus .map__hit { fill: none; stroke: var(--color-accent); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+
+.wordmap__keys { font-size: var(--text-sm); }
+.wordmap__keys kbd {
+  padding: 0 var(--space-1);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+.wordmap__detail { min-height: 6.5rem; display: flex; flex-direction: column; gap: var(--space-1); }
+.wordmap__word { font-weight: var(--weight-semibold); }
+.wordmap__links { font-size: var(--text-sm); }
+
+.wordmap__list { display: flex; flex-direction: column; gap: var(--space-6); }
+.wordmap__list section { display: flex; flex-direction: column; gap: var(--space-2); }
+.wordmap__words { display: flex; flex-direction: column; gap: var(--space-1); }

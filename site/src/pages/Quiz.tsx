@@ -61,6 +61,8 @@ export default function Quiz() {
   const nextRef = useRef<HTMLButtonElement>(null);
   const headRef = useRef<HTMLHeadingElement>(null);
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  // the last answer came from keys 1 to 4: show the feedback without motion
+  const byKey = useRef(false);
   // same component, other section (history back and forth): start a fresh attempt
   const [forId, setForId] = useState(id);
   if (forId !== id) {
@@ -85,8 +87,9 @@ export default function Quiz() {
   const total = questions.length;
   const score = answers.filter((a, i) => a === questions[i]?.answer).length;
 
-  const choose = (opt: string) => {
+  const choose = (opt: string, viaKey = false) => {
     if (picked) return;
+    byKey.current = viaKey;
     const next = [...answers];
     next[index] = opt;
     setAnswers(next);
@@ -126,7 +129,7 @@ export default function Quiz() {
     const n = Number(e.key);
     if (Number.isInteger(n) && n >= 1 && n <= q.options.length) {
       e.preventDefault();
-      choose(q.options[n - 1]);
+      choose(q.options[n - 1], true);
     }
   };
 
@@ -205,7 +208,7 @@ export default function Quiz() {
         <span className="pbar" aria-hidden="true"><span className="pbar__fill" style={{ width: `${(index / total) * 100}%` }} /></span>
       </header>
 
-      <section className="quiz__card" aria-labelledby="ask">
+      <section className="quiz__card" aria-labelledby="ask" data-instant={byKey.current || undefined}>
         <h2 id="ask" className="h2">{ASK[q.kind]}</h2>
         <Prompt q={q} lex={lex} lang={lang} />
         <ul className="qopts" lang={lang}>
@@ -213,7 +216,7 @@ export default function Quiz() {
             const state = !picked ? '' : o === q.answer ? ' qopt--right' : o === picked ? ' qopt--wrong' : ' qopt--dim';
             return (
               <li key={o}>
-                <button type="button" className={`qopt${state}`} onClick={() => choose(o)} disabled={!!picked && o !== picked && o !== q.answer} aria-disabled={!!picked}>
+                <button type="button" className={`qopt${state}`} onClick={(e) => choose(o, e.detail === 0)} disabled={!!picked && o !== picked && o !== q.answer} aria-disabled={!!picked}>
                   <span className="qopt__key" aria-hidden="true">{i + 1}</span>
                   <span className="qopt__text"><Inline text={lex.words[o][lang][q.show]} /></span>
                   {picked && o === q.answer && <><Icon name="check" className="ico qopt__mark" /><span className="sr-only" lang="en"> (correct answer)</span></>}
@@ -236,22 +239,18 @@ export default function Quiz() {
                 <span className="answer-row__meaning"><Inline text={w[lang].meaning} /></span>
                 <span className="answer-row__action"><Inline text={w[lang].action} /></span>
               </div>
-              {p && (
-                <div className="qfeedback__picked">
-                  <p lang={lang}>
-                    <span lang="en">You picked </span><strong><Inline text={p[lang].word} /></strong>
-                    <span lang="en">: it means </span><Inline text={p[lang].meaning} />
-                    <span lang="en">, and triggers </span><Inline text={p[lang].action} />.
+              {p && (() => {
+                // one sentence that sets the picked word against the answer, on the field the question asked about
+                const f = q.show === 'action' || q.prompt === 'action' ? 'action' : 'meaning';
+                const verb = f === 'action' ? ' triggers ' : ' means ';
+                return (
+                  <p className="qfeedback__picked" lang={lang}>
+                    <strong><Inline text={p[lang].word} /></strong><span lang="en">{verb}</span><Inline text={p[lang][f]} />;{' '}
+                    <strong><Inline text={w[lang].word} /></strong><span lang="en">{verb}</span><Inline text={w[lang][f]} />.
+                    {q.kind === 'complete-combination' && <span lang="en"> Only the second is part of this combination.</span>}
                   </p>
-                  <p className="muted" lang="en">
-                    {q.kind === 'complete-combination'
-                      ? <>Both are real words, but only <strong lang={lang}><Inline text={w[lang].word} /></strong> is part of this combination.</>
-                      : q.show === 'word'
-                        ? <>That is a neighbour, not the word this {q.prompt} describes: <strong lang={lang}><Inline text={w[lang].word} /></strong> is.</>
-                        : <>That {q.show} belongs to <strong lang={lang}><Inline text={p[lang].word} /></strong>, not to <strong lang={lang}><Inline text={w[lang].word} /></strong>.</>}
-                  </p>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </div>

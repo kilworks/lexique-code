@@ -27,6 +27,9 @@
 
 .hits, .suggs { display: flex; flex-direction: column; }
 .hit, .sugg { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) 0; border-top: var(--border-hairline) solid var(--color-border); }
+/* a word newly detected while typing fades in where it lands: fast, no movement (fires on every keystroke) */
+.hit { transition: opacity var(--duration-fast) var(--ease-out); }
+@starting-style { .hit { opacity: 0; } }
 .hit__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); }
 .hit__word { font-family: var(--font-serif); font-size: var(--text-lg); }
 .hit__seen { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
