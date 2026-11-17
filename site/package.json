@@ -10,7 +10,8 @@
     "prebuild": "node scripts/build-data.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

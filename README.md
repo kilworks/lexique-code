@@ -10,7 +10,7 @@ A lexicon of 528 words that turn a vague prompt into a precise one. For each wor
 
 `LEXICON.md` is the English lexicon and `LEXIQUE.md` the French original. They match row for row: same 24 sections, same rows, same order.
 
-To learn the words rather than read them, use the site: https://kilworks.github.io/lexique-code/ (glossary, a page per word with an example, flashcards, lessons with quizzes, and a prompt workshop). Its code is in `site/`, its per-word examples in `enrich/`.
+To learn the words rather than read them, use the site: https://kilworks.github.io/lexique-code/ (glossary, a page per word with an example, swipeable flashcards, lessons with quizzes, a prompt workshop, a map of the words, and interactive diagrams). Its code is in `site/`, documented in `site/README.md`; its per-word examples are in `enrich/`.
 
 ## Contents
 
@@ -145,3 +145,5 @@ python check.py
 ```
 
 It prints the counts for each file and exits 1 on a malformed row, an empty cell, a duplicate word or alias, an em dash or curly quote, a section missing from `SKILL.md`, or a parity gap between the two files (a section or a row present in one and not the other). Each of those failures was injected on purpose and seen to turn the check red before it was trusted.
+
+Each new word also needs its entry in `enrich/<section>.json` (why, example, pitfall, in English and French), in the same commit: the site is built from these files and its build fails on a word without one. `npm run verify` in `site/` runs every check of the site, this one included.
