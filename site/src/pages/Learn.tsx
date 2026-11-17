@@ -19,7 +19,6 @@ export default function Learn() {
   return (
     <div className="page learn">
       <header className="page-head">
-        <p className="eyebrow">Learning path</p>
         <h1 className="display">Learn the lexicon, one section at a time</h1>
         <p className="lead">
           Each lesson walks through a section in short steps: the word, what it means, what it triggers and why it matters.
@@ -30,7 +29,7 @@ export default function Learn() {
         </p>
         {current && (
           <Link to={`/learn/${current.id}`} className="btn btn--primary learn__cta">
-            {done ? 'Continue' : 'Start'}: <span lang={lang}>{shortTitle(current.title[lang])}</span> <Icon name="chevron-right" />
+            <span>{done ? 'Continue' : 'Start'}: <span lang={lang}>{shortTitle(current.title[lang])}</span></span> <Icon name="chevron-right" />
           </Link>
         )}
       </header>

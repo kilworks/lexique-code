@@ -71,17 +71,10 @@ export default function Glossary() {
           spellCheck={false}
           aria-describedby="search-hint"
         />
-        <kbd className="searchbar__kbd" aria-hidden="true">/</kbd>
+        {q ? (
+          <button type="button" className="btn btn--ghost btn--sm searchbar__clear" aria-label="Clear search" onClick={() => { update({ q: '' }); input.current?.focus(); }}><Icon name="x" /></button>
+        ) : <kbd className="searchbar__kbd" aria-hidden="true">/</kbd>}
         <span id="search-hint" className="sr-only">Press slash anywhere on this page to come back to the search field.</span>
-      </div>
-
-      <div className="chips" role="group" aria-label="Filter by section">
-        <button type="button" className="chip" aria-pressed={selected.length === 0} onClick={() => update({ s: [] })}>All sections</button>
-        {wordSections.map((s) => (
-          <button key={s.id} type="button" className="chip" aria-pressed={selected.includes(s.id)} onClick={() => toggleSection(s.id)} lang={lang}>
-            {s.title[lang].split(' (')[0]}
-          </button>
-        ))}
       </div>
 
       <p className="count" role="status" aria-live="polite">
@@ -89,6 +82,17 @@ export default function Glossary() {
         {result.combinations.length > 0 && `, ${result.combinations.length} ${result.combinations.length === 1 ? 'combination' : 'combinations'}`}
         {q && <> for <strong>&quot;{q}&quot;</strong></>}
       </p>
+
+      <div className="chips chips--row chips--phone-row" role="group" aria-label="Filter by section">
+        <button type="button" className="chip" aria-pressed={selected.length === 0} onClick={() => update({ s: [] })}>
+          All sections
+        </button>
+        {wordSections.map((s) => (
+          <button key={s.id} type="button" className="chip" aria-pressed={selected.includes(s.id)} onClick={() => toggleSection(s.id)} lang={lang}>
+            {s.title[lang].split(' (')[0]}
+          </button>
+        ))}
+      </div>
 
       {nothing ? (
         <div className="empty">

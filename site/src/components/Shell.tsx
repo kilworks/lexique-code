@@ -21,7 +21,7 @@ const THEMES = [
 export const REPO_URL = 'https://github.com/kilworks/lexique-code';
 
 export function Header() {
-  const { lang, setLang, theme, setTheme } = usePrefs();
+  const { lang, setLang } = usePrefs();
   return (
     <header className="site-header">
       <div className="site-header__inner">
@@ -40,13 +40,6 @@ export function Header() {
               </button>
             ))}
           </div>
-          <div className="segmented" role="group" aria-label="Theme">
-            {THEMES.map((t) => (
-              <button key={t.value} type="button" className="segmented__btn" aria-pressed={theme === t.value} onClick={() => setTheme(t.value)}>
-                {t.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
     </header>
@@ -54,10 +47,16 @@ export function Header() {
 }
 
 export function Footer() {
+  const { theme, setTheme } = usePrefs();
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
         <p>Words that change how code gets written and how an agent works, in English and French.</p>
+        <div className="segmented" role="group" aria-label="Theme">
+          {THEMES.map((t) => (
+            <button key={t.value} type="button" className="segmented__btn" aria-pressed={theme === t.value} onClick={() => setTheme(t.value)}>{t.label}</button>
+          ))}
+        </div>
         <a href={REPO_URL} className="link-ext" rel="noreferrer" target="_blank">
           Source on GitHub <Icon name="external-link" className="ico ico--sm" />
           <span className="sr-only">(opens in a new tab)</span>

@@ -11,7 +11,6 @@
   padding: var(--space-6);
   background: var(--color-surface);
   border: var(--border-hairline) solid var(--color-border);
-  border-top: calc(var(--border-hairline) * 3) solid var(--color-accent);
   border-radius: var(--radius-md);
 }
 .wotd__word { font-family: var(--font-serif); font-size: var(--text-2xl); line-height: var(--leading-snug); }
@@ -22,25 +21,21 @@
 .wotd__section { font-size: var(--text-sm); color: var(--color-text-muted); }
 
 .ways, .progress, .sections { display: flex; flex-direction: column; gap: var(--space-4); }
-.ways__list { display: grid; gap: var(--space-3); }
+/* an index, like the learning path: rows split by hairline rules, the whole row is the link */
+.ways__list { display: flex; flex-direction: column; border-top: var(--border-hairline) solid var(--color-border-strong); }
 .ways__item {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: 'icon title chev' 'icon text chev';
-  column-gap: var(--space-3);
-  padding: var(--space-4);
-  height: 100%;
-  background: var(--color-surface);
-  border: var(--border-hairline) solid var(--color-border);
-  border-radius: var(--radius-md);
+  gap: var(--space-1) var(--space-8);
+  padding: var(--space-4) 0;
+  border-bottom: var(--border-hairline) solid var(--color-border);
   color: var(--color-text);
   text-decoration: none;
 }
-.ways__item:hover { border-color: var(--color-accent); color: var(--color-text); }
-.ways__item > .ico:first-child { grid-area: icon; color: var(--color-accent); margin-top: var(--space-1); }
-.ways__title { grid-area: title; font-weight: var(--weight-semibold); }
-.ways__text { grid-area: text; color: var(--color-text-muted); font-size: var(--text-sm); }
-.ways__chev { grid-area: chev; align-self: center; color: var(--color-text-muted); }
+.ways__item:hover { color: var(--color-text); }
+.ways__item:hover .ways__title { color: var(--color-accent); text-decoration: underline; }
+.ways__title { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-serif); font-size: var(--text-xl); line-height: var(--leading-snug); }
+.ways__title .ico { color: var(--color-accent); }
+.ways__text { max-width: var(--measure); }
 
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .stats > div { padding: var(--space-4); border: var(--border-hairline) solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
@@ -60,6 +55,6 @@
 
 @media (min-width: 52em) {
   .hero { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
-  .ways__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ways__item { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); align-items: baseline; }
   .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

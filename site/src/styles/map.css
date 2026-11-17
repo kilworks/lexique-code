@@ -1,7 +1,7 @@
 /* Word map page. Only opacity and the one world transform change at runtime; nothing drifts. */
 .wordmap__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.wordmap__tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.wordmap__tools .segmented__btn { display: inline-flex; align-items: center; gap: var(--space-1); }
+.wordmap__canvas { position: relative; }
+.wordmap__zoom { position: absolute; top: var(--space-2); right: var(--space-2); background: var(--color-surface); }
 
 .wordmap__box {
   position: relative;

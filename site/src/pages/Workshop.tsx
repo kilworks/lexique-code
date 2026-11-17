@@ -100,9 +100,9 @@ export default function Workshop() {
         </section>
 
         <div className="workshop__results">
-          <p className="workshop__count" role="status">
+          <p className={`workshop__count${deferred.trim() ? '' : ' workshop__count--empty'}`} role="status">
             {!deferred.trim()
-              ? 'Start typing to see the words your prompt uses.'
+              ? 'Start typing, or try a sample, to see the words your prompt uses.'
               : found.length === 0
                 ? 'No lexicon word found yet.'
                 : `${found.length} ${found.length === 1 ? 'word' : 'words'} found (${hitCount} ${hitCount === 1 ? 'use' : 'uses'})`}

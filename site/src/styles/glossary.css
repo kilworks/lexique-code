@@ -16,6 +16,9 @@
   color: var(--color-text);
   font: inherit;
 }
+.searchbar__input::-webkit-search-cancel-button { appearance: none; -webkit-appearance: none; }
+.searchbar__clear { position: absolute; right: var(--space-1); color: var(--color-text-muted); }
+.searchbar__clear:hover:not(:disabled) { color: var(--color-text); }
 .searchbar__input::placeholder { color: var(--color-text-muted); opacity: 1; }
 .searchbar__kbd {
   position: absolute;
@@ -26,6 +29,8 @@
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
+/* the slash shortcut means nothing on a touch screen */
+@media (hover: none) { .searchbar__kbd { display: none; } }
 
 .count { color: var(--color-text-muted); }
 .count strong { color: var(--color-text); }
@@ -54,8 +59,9 @@
   border-bottom: var(--border-hairline) solid var(--color-border);
 }
 .word-row__word { font-weight: var(--weight-semibold); }
-.word-row__meaning { color: var(--color-text-muted); }
-.word-row__action { font-size: var(--text-sm); }
+.word-row__meaning { color: var(--color-text-muted); font-size: var(--text-sm); }
+/* the action is the highlight (spec): body size, full ink */
+.word-row__action { color: var(--color-text); }
 
 @media (min-width: 52em) {
   .word-row { grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 5fr); gap: var(--space-6); }

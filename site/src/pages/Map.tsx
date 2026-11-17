@@ -338,8 +338,7 @@ export default function WordMap() {
       <header className="page-head">
         <h1 className="h1">Word map</h1>
         <p className="lead">
-          All {graph.nodes.length} words, grouped by section. A line joins two words that appear together in one of the {lex.combinations.length} combinations.
-          Point at a word to see its links, select it to open its page.
+          All {graph.nodes.length} words by section; a line joins two words that share one of the {lex.combinations.length} combinations.
         </p>
       </header>
 
@@ -361,33 +360,26 @@ export default function WordMap() {
         <span id="map-search-hint" className="sr-only">Press Enter to go to the first match on the map.</span>
       </div>
 
-      <div className="chips" role="group" aria-label="Filter by section">
-        <button type="button" className="chip" aria-pressed={selected.length === 0} onClick={() => { update({ s: [] }); if (!listView) fit(true); }}>All sections</button>
-        {wordSections.map((s) => (
-          <button key={s.id} type="button" className="chip" aria-pressed={selected.includes(s.id)} onClick={() => toggleSection(s.id)} lang={lang}>
-            {s.title[lang].split(' (')[0]}
-          </button>
-        ))}
-      </div>
-
       <div className="wordmap__bar">
         <p className="count" role="status" aria-live="polite">
           {filtering
             ? <><strong>{matches.size}</strong> of {graph.nodes.length} words match{q && <> &quot;{q}&quot;</>}</>
             : <><strong>{graph.nodes.length}</strong> words, {graph.edges.length} links</>}
         </p>
-        <div className="wordmap__tools">
-          {!listView && (
-            <div className="segmented" role="group" aria-label="Zoom">
-              <button type="button" className="segmented__btn" onClick={() => zoomCenter(1.4)}><Icon name="plus" className="ico ico--sm" /> Zoom in</button>
-              <button type="button" className="segmented__btn" onClick={() => zoomCenter(1 / 1.4)}>Zoom out</button>
-              <button type="button" className="segmented__btn" onClick={() => fit(true)}>Reset</button>
-            </div>
-          )}
-          <button type="button" className="btn btn--secondary btn--sm" aria-pressed={listView} onClick={() => { setListView(!listView); setActive(null); setHover(null); }}>
-            <Icon name="file-text" className="ico ico--sm" /> List view
+        <button type="button" className="btn btn--secondary btn--sm" aria-pressed={listView} onClick={() => { setListView(!listView); setActive(null); setHover(null); }}>
+          <Icon name="file-text" className="ico ico--sm" /> List view
+        </button>
+      </div>
+
+      <div className="chips chips--row" role="group" aria-label="Filter by section">
+        <button type="button" className="chip" aria-pressed={selected.length === 0} onClick={() => { update({ s: [] }); if (!listView) fit(true); }}>
+          All sections
+        </button>
+        {wordSections.map((s) => (
+          <button key={s.id} type="button" className="chip" aria-pressed={selected.includes(s.id)} onClick={() => toggleSection(s.id)} lang={lang}>
+            {s.title[lang].split(' (')[0]}
           </button>
-        </div>
+        ))}
       </div>
 
       {searching && matches.size > 0 && matches.size <= 12 && (
@@ -403,6 +395,7 @@ export default function WordMap() {
 
       {!listView && (
         <>
+          <div className="wordmap__canvas">
           <div
             ref={box}
             className="wordmap__box"
@@ -427,6 +420,12 @@ export default function WordMap() {
             >
               <g ref={world} className="map__world" lang={lang}>{scene}</g>
             </svg>
+          </div>
+          <div className="segmented wordmap__zoom" role="group" aria-label="Zoom">
+            <button type="button" className="segmented__btn" onClick={() => zoomCenter(1.4)}><Icon name="plus" className="ico ico--sm" /> Zoom in</button>
+            <button type="button" className="segmented__btn" onClick={() => zoomCenter(1 / 1.4)}>Zoom out</button>
+            <button type="button" className="segmented__btn" onClick={() => fit(true)}>Reset</button>
+          </div>
           </div>
           <p id="map-keys" className="wordmap__keys muted">
             Keys on the map: <kbd>arrows</kbd> move between words, <kbd>Enter</kbd> opens the word, <kbd>Shift</kbd> + <kbd>arrows</kbd> pan,

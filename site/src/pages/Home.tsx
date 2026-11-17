@@ -68,10 +68,8 @@ export default function Home() {
           {WAYS.map((w) => (
             <li key={w.to}>
               <Link to={w.to} className="ways__item">
-                <Icon name={w.icon} className="ico ico--md" />
-                <span className="ways__title">{w.title}</span>
+                <span className="ways__title"><Icon name={w.icon} className="ico ico--sm" />{w.title}</span>
                 <span className="ways__text">{w.text}</span>
-                <Icon name="chevron-right" className="ico ways__chev" />
               </Link>
             </li>
           ))}

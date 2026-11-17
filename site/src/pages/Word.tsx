@@ -64,6 +64,15 @@ export default function Word() {
           <header className="word__head">
             <h1 className="display word__title"><Inline text={row.word} /></h1>
             <p className="lead word__meaning"><Inline text={row.meaning} /></p>
+            <div className="word__actions" lang="en">
+              <button type="button" className="btn btn--secondary" aria-pressed={inCards} onClick={() => toggleCard(word.id)}>
+                <Icon name={inCards ? 'check' : 'plus'} /> {inCards ? 'In my cards' : 'Add to my cards'}
+              </button>
+              {inCards && <Link to="/cards" className="btn btn--ghost">Review my cards</Link>}
+              <p className="word__saved" role="status">
+                {!saved && <><Icon name="alert-circle" className="ico ico--sm" /> Your browser blocked storage: cards will not be kept after this visit.</>}
+              </p>
+            </div>
           </header>
 
           <section className="action" aria-labelledby="action-title">
@@ -97,16 +106,6 @@ export default function Word() {
           ) : (
             <p className="muted" lang="en">No worked example for this word yet.</p>
           )}
-
-          <div className="word__actions" lang="en">
-            <button type="button" className={`btn ${inCards ? 'btn--secondary' : 'btn--primary'}`} aria-pressed={inCards} onClick={() => toggleCard(word.id)}>
-              <Icon name={inCards ? 'check' : 'plus'} /> {inCards ? 'In my cards' : 'Add to my cards'}
-            </button>
-            {inCards && <Link to="/cards" className="btn btn--ghost">Review my cards</Link>}
-            <p className="word__saved" role="status">
-              {!saved && <><Icon name="alert-circle" className="ico ico--sm" /> Your browser blocked storage: cards will not be kept after this visit.</>}
-            </p>
-          </div>
         </div>
 
         <aside className="word__side">
