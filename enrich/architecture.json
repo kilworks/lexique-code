@@ -1,0 +1,398 @@
+{
+  "separation-of-concerns": {
+    "en": {
+      "why": "When file reading, business rules and display live in the same function, you cannot test the rule without a file and you cannot change the output without risking the rule. Splitting them lets each part change, be tested and be reused on its own. It matters as soon as a function does more than one verb.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def report(path):\n    total = 0\n    for line in open(path):\n        total += float(line.split(\",\")[1])\n    print(f\"Total: {total:.2f}\")",
+        "after": "def read_amounts(path):\n    with open(path) as f:\n        return [float(line.split(\",\")[1]) for line in f]\n\ndef total(amounts):\n    return sum(amounts)\n\ndef render(value):\n    return f\"Total: {value:.2f}\"\n\nprint(render(total(read_amounts(\"sales.csv\"))))"
+      },
+      "pitfall": "Splitting by technical layer out of habit, then ending up with a change that still touches all three files because the cut did not follow what actually changes together."
+    },
+    "fr": {
+      "why": "Quand la lecture du fichier, la règle métier et l'affichage vivent dans la même fonction, on ne peut pas tester la règle sans fichier ni changer le rendu sans risquer la règle. Les séparer permet de modifier, tester et réutiliser chaque partie seule. Ça compte dès qu'une fonction fait plus d'un verbe.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def report(path):\n    total = 0\n    for line in open(path):\n        total += float(line.split(\",\")[1])\n    print(f\"Total: {total:.2f}\")",
+        "after": "def read_amounts(path):\n    with open(path) as f:\n        return [float(line.split(\",\")[1]) for line in f]\n\ndef total(amounts):\n    return sum(amounts)\n\ndef render(value):\n    return f\"Total: {value:.2f}\"\n\nprint(render(total(read_amounts(\"sales.csv\"))))"
+      },
+      "pitfall": "Découper par couche technique par réflexe, puis se retrouver avec un changement qui touche quand même les trois fichiers, parce que le découpage ne suit pas ce qui change ensemble."
+    }
+  },
+  "ports-and-adapters-hexagonal": {
+    "en": {
+      "why": "The business code should not know which mail provider, database or queue sits behind it. The core declares the interface it needs (the port) and each external service gets one adapter that implements it. You can then swap a provider or test the core with a fake without touching the rules.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import requests\n\ndef notify(user, msg):\n    requests.post(\"https://api.mail.example/send\",\n                  json={\"to\": user.email, \"text\": msg})",
+        "after": "from typing import Protocol\nimport requests\n\nclass Mailer(Protocol):\n    def send(self, to: str, text: str) -> None: ...\n\ndef notify(user, msg, mailer: Mailer):\n    mailer.send(user.email, msg)\n\nclass HttpMailer:\n    def send(self, to, text):\n        requests.post(\"https://api.mail.example/send\",\n                      json={\"to\": to, \"text\": text})"
+      },
+      "pitfall": "Creating a port for every function call, including things that will never have a second implementation, which only adds indirection."
+    },
+    "fr": {
+      "why": "Le code métier ne doit pas savoir quel fournisseur de mail, quelle base ou quelle file se cache derrière. Le coeur déclare l'interface dont il a besoin (le port) et chaque service externe a un adaptateur qui l'implémente. On change de fournisseur, ou on teste le coeur avec un faux, sans toucher aux règles.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import requests\n\ndef notify(user, msg):\n    requests.post(\"https://api.mail.example/send\",\n                  json={\"to\": user.email, \"text\": msg})",
+        "after": "from typing import Protocol\nimport requests\n\nclass Mailer(Protocol):\n    def send(self, to: str, text: str) -> None: ...\n\ndef notify(user, msg, mailer: Mailer):\n    mailer.send(user.email, msg)\n\nclass HttpMailer:\n    def send(self, to, text):\n        requests.post(\"https://api.mail.example/send\",\n                      json={\"to\": to, \"text\": text})"
+      },
+      "pitfall": "Créer un port pour chaque appel de fonction, y compris pour ce qui n'aura jamais de seconde implémentation, ce qui ajoute seulement de l'indirection."
+    }
+  },
+  "deep-module": {
+    "en": {
+      "why": "A deep module offers a small interface and does a lot of work behind it, so callers have little to learn and little to get wrong. A shallow module exposes nearly as many steps as it performs, and every caller must repeat the same sequence. Prefer one well-chosen function over seven steps the caller must chain.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cfg = ConfigReader(path)\ncfg.open()\nraw = cfg.read_bytes()\ntext = cfg.decode(raw, \"utf-8\")\ndata = cfg.parse_toml(text)\ncfg.apply_defaults(data)\ncfg.close()",
+        "after": "cfg = load_config(path)"
+      },
+      "pitfall": "Hiding complexity by moving it behind a name without simplifying it, so the interface is small but the caller still has to know the hidden rules to use it."
+    },
+    "fr": {
+      "why": "Un module profond offre une petite interface et fait beaucoup de travail derrière, donc l'appelant a peu à apprendre et peu à rater. Un module superficiel expose presque autant d'étapes qu'il en exécute, et chaque appelant doit refaire la même séquence. Mieux vaut une fonction bien choisie que sept étapes à enchaîner à la main.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cfg = ConfigReader(path)\ncfg.open()\nraw = cfg.read_bytes()\ntext = cfg.decode(raw, \"utf-8\")\ndata = cfg.parse_toml(text)\ncfg.apply_defaults(data)\ncfg.close()",
+        "after": "cfg = load_config(path)"
+      },
+      "pitfall": "Cacher la complexité derrière un nom sans la simplifier : l'interface est petite, mais l'appelant doit quand même connaître les règles cachées pour s'en servir."
+    }
+  },
+  "leaky-abstraction": {
+    "en": {
+      "why": "Every abstraction hides a detail, and sooner or later that detail shows up as a slow query, a timeout or a surprising error. When it does, the reader needs to know the limit exists and where it bites. Write it down next to the code instead of adding another layer to paper over it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# Django: looks like plain attribute access\nfor post in Post.objects.all():\n    print(post.author.name)   # one query per post",
+        "after": "# The ORM hides SQL, but the N+1 limit leaks: documented, then handled.\n# LIMIT: touching post.author in a loop issues one query per row.\nfor post in Post.objects.select_related(\"author\"):\n    print(post.author.name)"
+      },
+      "pitfall": "Stacking a wrapper on top to hide the leak, which gives you two layers to understand and the same leak underneath."
+    },
+    "fr": {
+      "why": "Chaque abstraction cache un détail, et tôt ou tard ce détail remonte sous forme de requête lente, de timeout ou d'erreur surprenante. Le lecteur doit alors savoir que la limite existe et où elle pose problème. On l'écrit à côté du code au lieu d'ajouter une couche pour la masquer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# Django : ressemble à un simple accès d'attribut\nfor post in Post.objects.all():\n    print(post.author.name)   # une requête par post",
+        "after": "# L'ORM cache le SQL, mais la limite N+1 fuit : documentée, puis traitée.\n# LIMITE : toucher post.author dans une boucle fait une requête par ligne.\nfor post in Post.objects.select_related(\"author\"):\n    print(post.author.name)"
+      },
+      "pitfall": "Empiler un wrapper par-dessus pour cacher la fuite : on obtient deux couches à comprendre et la même fuite dessous."
+    }
+  },
+  "composition-inheritance": {
+    "en": {
+      "why": "Inheritance fixes the combinations at design time: each new behaviour multiplies the classes and ties a child to its parent's internals. Small pieces passed as parameters can be combined freely and replaced without touching a hierarchy. Reach for inheritance only when the child truly is a kind of the parent.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "class Notifier: ...\nclass EmailNotifier(Notifier): ...\nclass RetryingEmailNotifier(EmailNotifier): ...\nclass RetryingLoggedEmailNotifier(RetryingEmailNotifier): ...",
+        "after": "def with_retry(send, tries=3):\n    def wrapped(msg):\n        for i in range(tries):\n            try:\n                return send(msg)\n            except OSError:\n                if i == tries - 1:\n                    raise\n    return wrapped\n\nsend = with_retry(send_email)"
+      },
+      "pitfall": "Replacing every subclass by a composition of tiny objects, then spreading one simple idea over a dozen files."
+    },
+    "fr": {
+      "why": "L'héritage fige les combinaisons à la conception : chaque nouveau comportement multiplie les classes et lie l'enfant aux internes du parent. De petites pièces passées en paramètre se combinent librement et se remplacent sans toucher à une hiérarchie. L'héritage reste pour le cas où l'enfant est vraiment un cas particulier du parent.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "class Notifier: ...\nclass EmailNotifier(Notifier): ...\nclass RetryingEmailNotifier(EmailNotifier): ...\nclass RetryingLoggedEmailNotifier(RetryingEmailNotifier): ...",
+        "after": "def with_retry(send, tries=3):\n    def wrapped(msg):\n        for i in range(tries):\n            try:\n                return send(msg)\n            except OSError:\n                if i == tries - 1:\n                    raise\n    return wrapped\n\nsend = with_retry(send_email)"
+      },
+      "pitfall": "Remplacer chaque sous-classe par une composition de mini-objets, et éparpiller une idée simple sur une douzaine de fichiers."
+    }
+  },
+  "anticorruption-layer": {
+    "en": {
+      "why": "An external service has its own names, units and quirks. If those spread through your code, every change on their side breaks you in many places and their vocabulary slowly replaces yours. One translation module at the border keeps the damage in one file.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def invoice_total(order):\n    return order[\"amt_ttc_cts\"] / 100 * (1 - order[\"rmse_pct\"] / 100)",
+        "after": "from dataclasses import dataclass\n\n@dataclass\nclass Order:\n    total: float\n    discount: float\n\ndef from_vendor(raw):  # the only module that knows their format\n    return Order(total=raw[\"amt_ttc_cts\"] / 100,\n                 discount=raw[\"rmse_pct\"] / 100)\n\ndef invoice_total(order: Order):\n    return order.total * (1 - order.discount)"
+      },
+      "pitfall": "Translating only some fields and letting raw vendor dictionaries slip through to the rest of the code anyway."
+    },
+    "fr": {
+      "why": "Un service externe a ses propres noms, unités et bizarreries. S'ils se répandent dans le code, chaque changement chez eux casse plusieurs endroits et leur vocabulaire remplace peu à peu le nôtre. Un module de traduction à la frontière garde les dégâts dans un seul fichier.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def invoice_total(order):\n    return order[\"amt_ttc_cts\"] / 100 * (1 - order[\"rmse_pct\"] / 100)",
+        "after": "from dataclasses import dataclass\n\n@dataclass\nclass Order:\n    total: float\n    discount: float\n\ndef from_vendor(raw):  # le seul module qui connaît leur format\n    return Order(total=raw[\"amt_ttc_cts\"] / 100,\n                 discount=raw[\"rmse_pct\"] / 100)\n\ndef invoice_total(order: Order):\n    return order.total * (1 - order.discount)"
+      },
+      "pitfall": "Ne traduire que certains champs et laisser quand même passer les dictionnaires bruts du fournisseur dans le reste du code."
+    }
+  },
+  "ubiquitous-language": {
+    "en": {
+      "why": "When the code says 'account', the logs say 'user' and the interface says 'member', every conversation needs a translation step and bugs hide in the gaps. Using the same business words everywhere, including in your prompts to Claude, makes the code readable by the people who know the domain. It also makes searching the codebase for a concept actually work.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Update the thing that handles the people who pay so they get their stuff earlier.",
+        "after": "In the billing module, a Subscriber has one Invoice per Billing Period.\nChange Invoice.issue() so an Invoice is issued 3 days before its Billing Period ends.\nUse exactly these names in the code, the log lines and the UI strings."
+      },
+      "pitfall": "Choosing the names on your own in the code and never checking them with the people who use the business words."
+    },
+    "fr": {
+      "why": "Quand le code dit 'account', les logs disent 'user' et l'interface dit 'membre', chaque discussion demande une traduction et les bugs se cachent dans les écarts. Utiliser les mêmes mots du métier partout, y compris dans les prompts à Claude, rend le code lisible par ceux qui connaissent le domaine. Chercher un concept dans le dépôt marche alors vraiment.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Mets à jour le truc qui gère les gens qui paient pour qu'ils aient leur affaire plus tôt.",
+        "after": "Dans le module facturation, un Abonné a une Facture par Période de facturation.\nChange Facture.emettre() pour qu'une Facture soit émise 3 jours avant la fin de sa Période de facturation.\nUtilise exactement ces noms dans le code, les logs et les textes de l'interface."
+      },
+      "pitfall": "Choisir les noms tout seul dans le code, sans jamais les vérifier avec les gens qui emploient les mots du métier."
+    }
+  },
+  "bounded-context": {
+    "en": {
+      "why": "The word 'customer' does not mean the same thing to billing and to support, and one shared class ends up carrying every team's fields and rules. Giving each domain its own model keeps each one small and coherent. Where two models meet, an explicit translation says exactly what crosses.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "class User:            # shared by billing and support\n    email: str\n    plan: str          # billing cares\n    open_tickets: int  # support cares\n    vat_number: str    # billing cares",
+        "after": "from dataclasses import dataclass\n\n@dataclass\nclass Customer:      # billing/models.py\n    email: str\n    plan: str\n    vat_number: str\n\n@dataclass\nclass Requester:     # support/models.py\n    email: str\n    open_tickets: int\n\ndef requester_from_customer(c: Customer, tickets: int) -> Requester:\n    return Requester(email=c.email, open_tickets=tickets)"
+      },
+      "pitfall": "Drawing the boundary on the org chart or the folder structure instead of where the meaning of the words actually changes."
+    },
+    "fr": {
+      "why": "Le mot 'client' ne veut pas dire la même chose pour la facturation et pour le support, et une classe partagée finit par porter les champs et les règles de chaque équipe. Donner à chaque domaine son modèle le garde petit et cohérent. Là où deux modèles se touchent, une traduction explicite dit exactement ce qui passe.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "class User:            # partagé par facturation et support\n    email: str\n    plan: str          # pour la facturation\n    open_tickets: int  # pour le support\n    vat_number: str    # pour la facturation",
+        "after": "from dataclasses import dataclass\n\n@dataclass\nclass Customer:      # billing/models.py\n    email: str\n    plan: str\n    vat_number: str\n\n@dataclass\nclass Requester:     # support/models.py\n    email: str\n    open_tickets: int\n\ndef requester_from_customer(c: Customer, tickets: int) -> Requester:\n    return Requester(email=c.email, open_tickets=tickets)"
+      },
+      "pitfall": "Tracer la frontière sur l'organigramme ou l'arborescence de dossiers, au lieu de l'endroit où le sens des mots change vraiment."
+    }
+  },
+  "monolith-first": {
+    "en": {
+      "why": "Splitting into services early buys network calls, versioned contracts and distributed debugging before you know where the real borders are. A single program, with clean module borders, is cheaper to change while the design is still moving. You can carve a service out later when a measured need (load, team size, deploy rhythm) shows up.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git init orders-service\ngit init billing-service\ngit init users-service\n# three repos, three deploys, three sets of versions",
+        "after": "mkdir -p app/orders app/billing app/users\n# one repo, one deploy, three modules with clear borders\n# split later, only if a measurement asks for it"
+      },
+      "pitfall": "Building a monolith with no internal borders, so that when the split is finally needed everything depends on everything."
+    },
+    "fr": {
+      "why": "Découper en services trop tôt coûte des appels réseau, des contrats versionnés et du debug distribué avant de savoir où sont les vraies frontières. Un seul programme, avec des modules bien séparés, est moins cher à faire évoluer tant que la conception bouge. On sortira un service plus tard, quand un besoin mesuré (charge, taille d'équipe, rythme de déploiement) apparaîtra.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git init orders-service\ngit init billing-service\ngit init users-service\n# trois dépôts, trois déploiements, trois jeux de versions",
+        "after": "mkdir -p app/orders app/billing app/users\n# un dépôt, un déploiement, trois modules aux frontières nettes\n# découper plus tard, seulement si une mesure le demande"
+      },
+      "pitfall": "Faire un monolithe sans aucune frontière interne : quand le découpage devient nécessaire, tout dépend de tout."
+    }
+  },
+  "staged-pipeline": {
+    "en": {
+      "why": "When one script does everything, any failure forces a full rerun and you cannot see what each step produced. With stages that each read one file and write one, you can replay a single stage and inspect the data between them. It is especially useful when an early stage is slow, rate-limited or expensive.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python run_all.py   # downloads, cleans and uploads in one go\n# a failure at the upload means redoing the download",
+        "after": "python fetch.py > raw.json\npython clean.py raw.json > clean.json\npython load.py clean.json\n# the upload failed? rerun only: python load.py clean.json"
+      },
+      "pitfall": "Letting a stage read something other than the previous stage's artifact (a global, a side file), so replaying it alone gives a different result."
+    },
+    "fr": {
+      "why": "Quand un seul script fait tout, chaque échec impose de tout relancer et on ne voit pas ce que chaque étape a produit. Avec des étapes qui lisent chacune un fichier et en écrivent un, on rejoue une seule étape et on inspecte les données entre elles. C'est surtout utile quand une étape amont est lente, limitée en débit ou coûteuse.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python run_all.py   # télécharge, nettoie et envoie d'un coup\n# un échec à l'envoi oblige à retélécharger",
+        "after": "python fetch.py > raw.json\npython clean.py raw.json > clean.json\npython load.py clean.json\n# l'envoi a échoué ? relancer seulement : python load.py clean.json"
+      },
+      "pitfall": "Laisser une étape lire autre chose que l'artefact de la précédente (une globale, un fichier annexe) : la rejouer seule donne alors un autre résultat."
+    }
+  },
+  "pub-sub": {
+    "en": {
+      "why": "The code that pays an order should not have to know who cares about it. With publish and subscribe, the sender announces a named event and each interested part subscribes on its own, so adding a reaction never touches the sender. It keeps modules decoupled as the number of reactions grows.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "function payOrder(order: Order) {\n  markPaid(order);\n  sendReceipt(order);\n  updateStock(order);\n  logAudit(order);\n}",
+        "after": "import { EventEmitter } from \"node:events\";\nconst bus = new EventEmitter();\n\nfunction payOrder(order: Order) {\n  markPaid(order);\n  bus.emit(\"order.paid\", order);\n}\n\nbus.on(\"order.paid\", sendReceipt);\nbus.on(\"order.paid\", updateStock);\nbus.on(\"order.paid\", logAudit);"
+      },
+      "pitfall": "Using events for flows that really are a sequence, which hides the order of operations and makes the code very hard to follow."
+    },
+    "fr": {
+      "why": "Le code qui paie une commande ne devrait pas savoir qui s'y intéresse. Avec la publication/abonnement, l'émetteur annonce un événement nommé et chaque partie intéressée s'abonne de son côté : ajouter une réaction ne touche jamais l'émetteur. Les modules restent découplés quand le nombre de réactions grandit.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "function payOrder(order: Order) {\n  markPaid(order);\n  sendReceipt(order);\n  updateStock(order);\n  logAudit(order);\n}",
+        "after": "import { EventEmitter } from \"node:events\";\nconst bus = new EventEmitter();\n\nfunction payOrder(order: Order) {\n  markPaid(order);\n  bus.emit(\"order.paid\", order);\n}\n\nbus.on(\"order.paid\", sendReceipt);\nbus.on(\"order.paid\", updateStock);\nbus.on(\"order.paid\", logAudit);"
+      },
+      "pitfall": "Utiliser des événements pour un flux qui est en fait une séquence : l'ordre des opérations disparaît et le code devient très difficile à suivre."
+    }
+  },
+  "event-sourcing": {
+    "en": {
+      "why": "Instead of storing only the current state, you store every fact that happened and compute the state from them. You get a full audit trail, the ability to rebuild the state at any past moment, and a way to fix a bad computation by replaying. It fits domains where the history itself is valuable, such as money or orders.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "account.balance += 50   # the previous value is gone",
+        "after": "events = [(\"deposited\", 100), (\"withdrawn\", 30)]\nevents.append((\"deposited\", 50))   # append only\n\ndef balance(events):\n    return sum(a if kind == \"deposited\" else -a for kind, a in events)\n\nbalance(events)   # 120"
+      },
+      "pitfall": "Editing or deleting an old event to fix a mistake, instead of appending a compensating event."
+    },
+    "fr": {
+      "why": "Au lieu de ne stocker que l'état courant, on stocke chaque fait survenu et on calcule l'état à partir d'eux. On obtient une piste d'audit complète, la possibilité de reconstruire l'état à n'importe quel moment passé, et un moyen de corriger un mauvais calcul en rejouant. Ça convient aux domaines où l'historique a de la valeur, comme l'argent ou les commandes.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "account.balance += 50   # l'ancienne valeur est perdue",
+        "after": "events = [(\"deposited\", 100), (\"withdrawn\", 30)]\nevents.append((\"deposited\", 50))   # ajout seul\n\ndef balance(events):\n    return sum(a if kind == \"deposited\" else -a for kind, a in events)\n\nbalance(events)   # 120"
+      },
+      "pitfall": "Modifier ou supprimer un ancien événement pour corriger une erreur, au lieu d'ajouter un événement de compensation."
+    }
+  },
+  "cqrs": {
+    "en": {
+      "why": "Writing and reading often want different shapes: writes need strict rules and normalized data, reads need fast, ready-to-display data. CQRS separates the two models, with the read side derived from the writes. If the read view breaks, you rebuild it from the source instead of repairing it.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- run on every dashboard load\nSELECT customer_id, SUM(amount) AS total\nFROM orders\nGROUP BY customer_id;",
+        "after": "CREATE MATERIALIZED VIEW customer_totals AS\n  SELECT customer_id, SUM(amount) AS total\n  FROM orders\n  GROUP BY customer_id;\n\n-- rebuilt from the writes, after them or on a schedule\nREFRESH MATERIALIZED VIEW customer_totals;\n\nSELECT total FROM customer_totals WHERE customer_id = 42;"
+      },
+      "pitfall": "Applying it to a simple CRUD screen where a single model works fine, and paying for two models and a sync delay for nothing."
+    },
+    "fr": {
+      "why": "Écrire et lire demandent souvent des formes différentes : l'écriture veut des règles strictes et des données normalisées, la lecture veut des données rapides et prêtes à afficher. CQRS sépare les deux modèles, la lecture étant dérivée des écritures. Si la vue de lecture casse, on la reconstruit depuis la source au lieu de la réparer.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- exécuté à chaque chargement du tableau de bord\nSELECT customer_id, SUM(amount) AS total\nFROM orders\nGROUP BY customer_id;",
+        "after": "CREATE MATERIALIZED VIEW customer_totals AS\n  SELECT customer_id, SUM(amount) AS total\n  FROM orders\n  GROUP BY customer_id;\n\n-- reconstruite depuis les écritures, après elles ou à intervalle fixe\nREFRESH MATERIALIZED VIEW customer_totals;\n\nSELECT total FROM customer_totals WHERE customer_id = 42;"
+      },
+      "pitfall": "L'appliquer à un simple écran CRUD où un seul modèle suffit, et payer deux modèles et un délai de synchronisation pour rien."
+    }
+  },
+  "extension-point": {
+    "en": {
+      "why": "An extension point is the one place designed for adding a new case, so a new format means a new entry rather than edits across the code. It pays off once two real cases exist and a third is likely. Before that, a plain if is simpler and you do not yet know what the shape of the hook should be.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def export(data, fmt):\n    if fmt == \"csv\":\n        return \",\".join(map(str, data))\n    elif fmt == \"json\":\n        return json.dumps(data)\n    raise ValueError(fmt)",
+        "after": "EXPORTERS = {\n    \"csv\": lambda data: \",\".join(map(str, data)),\n    \"json\": json.dumps,\n}   # a new format = one new entry here\n\ndef export(data, fmt):\n    if fmt not in EXPORTERS:\n        raise ValueError(fmt)\n    return EXPORTERS[fmt](data)"
+      },
+      "pitfall": "Building the hook for imagined future cases, which fixes the wrong interface and then constrains the real cases that come."
+    },
+    "fr": {
+      "why": "Un point d'extension est l'endroit unique prévu pour ajouter un cas : un nouveau format devient une nouvelle entrée au lieu de modifications dispersées. Ça rapporte quand deux cas réels existent et qu'un troisième est probable. Avant, un simple if est plus simple, et on ne connaît pas encore la bonne forme du hook.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def export(data, fmt):\n    if fmt == \"csv\":\n        return \",\".join(map(str, data))\n    elif fmt == \"json\":\n        return json.dumps(data)\n    raise ValueError(fmt)",
+        "after": "EXPORTERS = {\n    \"csv\": lambda data: \",\".join(map(str, data)),\n    \"json\": json.dumps,\n}   # un nouveau format = une entrée de plus ici\n\ndef export(data, fmt):\n    if fmt not in EXPORTERS:\n        raise ValueError(fmt)\n    return EXPORTERS[fmt](data)"
+      },
+      "pitfall": "Construire le hook pour des cas futurs imaginés : on fige la mauvaise interface, qui contraint ensuite les vrais cas."
+    }
+  },
+  "global-state": {
+    "en": {
+      "why": "When any function can change a variable, you cannot tell who changed it, tests leak into each other and behaviour depends on call order. Passing the value as a parameter, or giving it one owner that controls every change, makes the data flow visible. It matters most in tests and in anything concurrent.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "counter = 0\n\ndef hit():\n    global counter\n    counter += 1",
+        "after": "class HitCounter:\n    def __init__(self):\n        self._count = 0\n\n    def hit(self):\n        self._count += 1\n        return self._count\n\ndef handle(request, counter: HitCounter):   # the dependency is in the signature\n    return counter.hit()\n\n# each caller or test creates its own: handle(req, HitCounter())"
+      },
+      "pitfall": "Hiding the global behind a singleton or a module-level getter, which keeps every problem of global state under a different name."
+    },
+    "fr": {
+      "why": "Quand n'importe quelle fonction peut changer une variable, on ne sait plus qui l'a modifiée, les tests se contaminent et le comportement dépend de l'ordre des appels. La passer en paramètre, ou lui donner un seul propriétaire qui contrôle chaque changement, rend le flux de données visible. C'est surtout important dans les tests et tout ce qui est concurrent.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "counter = 0\n\ndef hit():\n    global counter\n    counter += 1",
+        "after": "class HitCounter:\n    def __init__(self):\n        self._count = 0\n\n    def hit(self):\n        self._count += 1\n        return self._count\n\ndef handle(request, counter: HitCounter):   # la dépendance est dans la signature\n    return counter.hit()\n\n# chaque appelant ou test crée le sien : handle(req, HitCounter())"
+      },
+      "pitfall": "Cacher la globale derrière un singleton ou un getter de module : tous les problèmes de l'état global restent, sous un autre nom."
+    }
+  },
+  "temporal-coupling": {
+    "en": {
+      "why": "If B only works after A has run, and nothing in the code says so, the next person finds out through a crash far from the cause. Building the objects so the wrong order cannot be written, through a constructor, a type or a single function, moves the error to where the mistake is made. The compiler or the signature then carries the rule instead of a comment.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "client = Client(url)\nclient.connect()          # forgetting this line fails later\nrows = client.query(\"SELECT 1\")",
+        "after": "with Client.connect(url) as client:   # no client exists before it is connected\n    rows = client.query(\"SELECT 1\")"
+      },
+      "pitfall": "Documenting the required order in a comment or README instead of making the code refuse the wrong order."
+    },
+    "fr": {
+      "why": "Si B ne marche qu'après A et que rien dans le code ne le dit, la personne suivante le découvre par un crash loin de la cause. Construire les objets pour que le mauvais ordre soit impossible à écrire, via un constructeur, un type ou une fonction unique, déplace l'erreur là où la faute est commise. La signature porte alors la règle à la place d'un commentaire.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "client = Client(url)\nclient.connect()          # oublier cette ligne casse plus tard\nrows = client.query(\"SELECT 1\")",
+        "after": "with Client.connect(url) as client:   # aucun client n'existe avant d'être connecté\n    rows = client.query(\"SELECT 1\")"
+      },
+      "pitfall": "Documenter l'ordre requis dans un commentaire ou le README, au lieu de faire refuser le mauvais ordre par le code."
+    }
+  },
+  "local-first": {
+    "en": {
+      "why": "An app that waits for the network before doing anything feels slow and breaks in a tunnel or on a bad connection. Local first means the data on the device is the real copy: reads and writes work immediately and offline, and syncing is a background job. The user never waits on a server for a basic action.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "async function addTodo(todo: Todo) {\n  await fetch(\"/api/todos\", { method: \"POST\", body: JSON.stringify(todo) });\n}",
+        "after": "function addTodo(todo: Todo) {\n  const todos = JSON.parse(localStorage.getItem(\"todos\") ?? \"[]\");\n  todos.push(todo);\n  localStorage.setItem(\"todos\", JSON.stringify(todos));\n  syncSoon();   // background push, retried when the network is back\n}"
+      },
+      "pitfall": "Treating sync as an afterthought and ignoring conflicts, so two devices edited offline silently overwrite each other."
+    },
+    "fr": {
+      "why": "Une appli qui attend le réseau avant de faire quoi que ce soit semble lente et casse dans un tunnel ou sur une mauvaise connexion. Local d'abord veut dire que les données de l'appareil sont la vraie copie : lectures et écritures marchent tout de suite et hors ligne, et la synchronisation est un travail de fond. L'utilisateur n'attend jamais un serveur pour une action de base.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "async function addTodo(todo: Todo) {\n  await fetch(\"/api/todos\", { method: \"POST\", body: JSON.stringify(todo) });\n}",
+        "after": "function addTodo(todo: Todo) {\n  const todos = JSON.parse(localStorage.getItem(\"todos\") ?? \"[]\");\n  todos.push(todo);\n  localStorage.setItem(\"todos\", JSON.stringify(todos));\n  syncSoon();   // envoi en fond, réessayé au retour du réseau\n}"
+      },
+      "pitfall": "Traiter la synchronisation en dernier et ignorer les conflits : deux appareils modifiés hors ligne s'écrasent alors silencieusement."
+    }
+  },
+  "12-factors": {
+    "en": {
+      "why": "The twelve-factor rules are a checklist for services that deploy and scale cleanly. The ones to apply first: configuration comes from the environment, logs go to stdout, and processes keep no state of their own. The same build then runs in any environment, and an instance can be killed and replaced at any moment.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "DB = \"postgres://admin:secret@10.0.0.5/app\"\nlog = open(\"/var/log/app.log\", \"a\")\nlog.write(\"started\\n\")",
+        "after": "import os\n\nDB = os.environ[\"DATABASE_URL\"]\nprint(\"started\", flush=True)   # stdout: the platform collects the logs"
+      },
+      "pitfall": "Checking the list once at the start, then slowly adding local files or in-memory state that make the process impossible to restart safely."
+    },
+    "fr": {
+      "why": "Les douze facteurs sont une liste de règles pour des services qui se déploient et passent à l'échelle proprement. À appliquer d'abord : la config vient de l'environnement, les logs vont sur stdout, et les processus ne gardent aucun état en local. Le même build tourne alors dans n'importe quel environnement, et une instance peut être tuée et remplacée à tout moment.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "DB = \"postgres://admin:secret@10.0.0.5/app\"\nlog = open(\"/var/log/app.log\", \"a\")\nlog.write(\"started\\n\")",
+        "after": "import os\n\nDB = os.environ[\"DATABASE_URL\"]\nprint(\"started\", flush=True)   # stdout : la plateforme collecte les logs"
+      },
+      "pitfall": "Vérifier la liste une fois au début, puis ajouter peu à peu des fichiers locaux ou de l'état en mémoire qui empêchent de redémarrer le processus sans risque."
+    }
+  }
+}

@@ -1,0 +1,640 @@
+{
+  "parse-don-t-validate": {
+    "en": {
+      "why": "Raw input (a JSON body, a CLI argument, a file line) is just a string or a dict that could contain anything. If every function re-checks it, some check gets forgotten and bad data slips deep into the code. Parse it once at the boundary into a typed value, and everything downstream can trust the type instead of re-validating.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def register(data: dict):\n    if \"@\" not in data.get(\"email\", \"\"):\n        raise ValueError(\"bad email\")\n    send_welcome(data[\"email\"])\n\ndef send_welcome(email: str):\n    if \"@\" not in email:\n        return\n    ...",
+        "after": "@dataclass(frozen=True)\nclass Email:\n    value: str\n    def __post_init__(self):\n        if \"@\" not in self.value:\n            raise ValueError(\"bad email\")\n\ndef register(data: dict):\n    send_welcome(Email(data[\"email\"]))\n\ndef send_welcome(email: Email):\n    ..."
+      },
+      "pitfall": "Parsing and then still passing the raw dict around, so the typed value exists but nobody uses it."
+    },
+    "fr": {
+      "why": "Une entrée brute (corps JSON, argument de CLI, ligne de fichier) n'est qu'une chaîne ou un dict qui peut contenir n'importe quoi. Si chaque fonction la revérifie, un contrôle finit par être oublié et la donnée invalide s'enfonce dans le code. On la parse une seule fois à la frontière en valeur typée, et tout le reste du code se fie au type au lieu de revalider.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def register(data: dict):\n    if \"@\" not in data.get(\"email\", \"\"):\n        raise ValueError(\"bad email\")\n    send_welcome(data[\"email\"])\n\ndef send_welcome(email: str):\n    if \"@\" not in email:\n        return\n    ...",
+        "after": "@dataclass(frozen=True)\nclass Email:\n    value: str\n    def __post_init__(self):\n        if \"@\" not in self.value:\n            raise ValueError(\"bad email\")\n\ndef register(data: dict):\n    send_welcome(Email(data[\"email\"]))\n\ndef send_welcome(email: Email):\n    ..."
+      },
+      "pitfall": "Parser puis continuer à faire circuler le dict brut : la valeur typée existe mais personne ne s'en sert."
+    }
+  },
+  "make-illegal-states-unrepresentable": {
+    "en": {
+      "why": "Two booleans give four combinations, but only three mean something: a job that is running and done at the same time is a bug waiting to happen. If the type cannot express the impossible state, no code path can create it and no `if` has to defend against it. This matters most for state that is stored or sent between systems.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "@dataclass\nclass Job:\n    is_running: bool\n    is_done: bool",
+        "after": "class Status(Enum):\n    PENDING = \"pending\"\n    RUNNING = \"running\"\n    DONE = \"done\"\n\n@dataclass\nclass Job:\n    status: Status"
+      },
+      "pitfall": "Keeping the booleans and adding a comment saying \"never both true\", which no one enforces."
+    },
+    "fr": {
+      "why": "Deux booléens donnent quatre combinaisons, mais seules trois ont un sens : un job à la fois en cours et terminé est un bug en sursis. Si le type ne sait pas exprimer l'état impossible, aucun chemin de code ne peut le créer et aucun `if` n'a à s'en défendre. C'est surtout utile pour l'état stocké ou échangé entre systèmes.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "@dataclass\nclass Job:\n    is_running: bool\n    is_done: bool",
+        "after": "class Status(Enum):\n    PENDING = \"pending\"\n    RUNNING = \"running\"\n    DONE = \"done\"\n\n@dataclass\nclass Job:\n    status: Status"
+      },
+      "pitfall": "Garder les booléens et ajouter un commentaire \"jamais les deux à true\", que personne ne fait respecter."
+    }
+  },
+  "total-function": {
+    "en": {
+      "why": "A partial function is defined for some inputs and silently does something odd for the rest, often returning `None`. A total function answers for every possible input: either with a result or with an error that names the problem. The failure then appears at the faulty call, not three layers later as a confusing `NoneType` crash.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def label(status):\n    if status == \"ok\":\n        return \"OK\"\n    elif status == \"err\":\n        return \"Error\"",
+        "after": "def label(status):\n    match status:\n        case \"ok\":\n            return \"OK\"\n        case \"err\":\n            return \"Error\"\n        case _:\n            raise ValueError(f\"unknown status: {status!r}\")"
+      },
+      "pitfall": "Making the catch-all `case _` return a default value instead of raising, which hides the unknown case instead of reporting it."
+    },
+    "fr": {
+      "why": "Une fonction partielle n'est définie que pour certaines entrées et fait silencieusement n'importe quoi pour les autres, souvent en renvoyant `None`. Une fonction totale répond pour toute entrée possible : soit un résultat, soit une erreur qui nomme le problème. L'échec apparaît alors à l'appel fautif, pas trois couches plus loin en crash `NoneType` incompréhensible.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def label(status):\n    if status == \"ok\":\n        return \"OK\"\n    elif status == \"err\":\n        return \"Error\"",
+        "after": "def label(status):\n    match status:\n        case \"ok\":\n            return \"OK\"\n        case \"err\":\n            return \"Error\"\n        case _:\n            raise ValueError(f\"unknown status: {status!r}\")"
+      },
+      "pitfall": "Faire renvoyer une valeur par défaut au `case _` fourre-tout au lieu de lever une erreur, ce qui cache le cas inconnu au lieu de le signaler."
+    }
+  },
+  "schema-data-contract": {
+    "en": {
+      "why": "A schema (or a dataclass, JSON Schema, protobuf) is the shape of your data written down in one place that both humans and code can check. Without it, the shape lives in the heads of whoever wrote the producer and the consumer, and drifts. A `version` field in each file lets a future reader know which shape it holds.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "config = json.load(open(\"config.json\", encoding=\"utf-8\"))\ntimeout = config[\"timeout_s\"]",
+        "after": "@dataclass\nclass Config:\n    version: int\n    timeout_s: int\n\ndata = json.load(open(\"config.json\", encoding=\"utf-8\"))\nif data.get(\"version\") != 1:\n    raise ValueError(f\"unsupported config version: {data.get('version')}\")\nconfig = Config(**data)"
+      },
+      "pitfall": "Writing the schema but never validating real files against it, so it becomes documentation that lies."
+    },
+    "fr": {
+      "why": "Un schéma (ou une dataclass, un JSON Schema, du protobuf) est la forme de vos données écrite à un seul endroit, vérifiable par les humains comme par le code. Sans lui, la forme vit dans la tête de ceux qui ont écrit le producteur et le consommateur, et elle dérive. Un champ `version` dans chaque fichier permet à un futur lecteur de savoir quelle forme il a devant lui.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "config = json.load(open(\"config.json\", encoding=\"utf-8\"))\ntimeout = config[\"timeout_s\"]",
+        "after": "@dataclass\nclass Config:\n    version: int\n    timeout_s: int\n\ndata = json.load(open(\"config.json\", encoding=\"utf-8\"))\nif data.get(\"version\") != 1:\n    raise ValueError(f\"unsupported config version: {data.get('version')}\")\nconfig = Config(**data)"
+      },
+      "pitfall": "Écrire le schéma sans jamais valider de vrais fichiers avec, et il devient une documentation qui ment."
+    }
+  },
+  "round-trip": {
+    "en": {
+      "why": "If you write data and read it back, you must get the same value, otherwise something is lost or changed on disk. A round-trip test catches encoding bugs, dropped fields, rounded numbers and reordered data in one assertion. It is cheap, and it covers the exact seam where serializers break.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_save():\n    save(path, data)\n    assert path.exists()",
+        "after": "def test_round_trip(tmp_path):\n    original = {\"name\": \"Zoë\", \"tags\": [\"a\", \"b\"], \"n\": 3}\n    path = tmp_path / \"x.json\"\n    save(path, original)\n    assert load(path) == original"
+      },
+      "pitfall": "Round-tripping only simple ASCII sample data, so accents, empty values and large numbers are never exercised."
+    },
+    "fr": {
+      "why": "Si vous écrivez une donnée puis la relisez, vous devez retrouver la même valeur, sinon quelque chose est perdu ou modifié sur le disque. Un test d'aller-retour attrape en une assertion les bugs d'encodage, les champs perdus, les nombres arrondis et l'ordre modifié. Il coûte peu et couvre pile l'endroit où les sérialiseurs cassent.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_save():\n    save(path, data)\n    assert path.exists()",
+        "after": "def test_round_trip(tmp_path):\n    original = {\"name\": \"Zoë\", \"tags\": [\"a\", \"b\"], \"n\": 3}\n    path = tmp_path / \"x.json\"\n    save(path, original)\n    assert load(path) == original"
+      },
+      "pitfall": "Ne tester l'aller-retour que sur des exemples ASCII simples : accents, valeurs vides et grands nombres ne sont jamais exercés."
+    }
+  },
+  "canonical-form": {
+    "en": {
+      "why": "The same value can be written in several ways: a letter with an accent as one character or as two, upper or lower case, a path with or without a trailing slash. Compared as raw strings, those are different, so lookups miss and duplicates appear. Pick one canonical spelling, convert to it once, and compare only canonical values.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "\"Cafe\\u0301\" == \"caf\\u00e9\"  # False",
+        "after": "def canon_name(s: str) -> str:\n    return unicodedata.normalize(\"NFC\", s).casefold()\n\ndef canon_dir(p: str) -> str:\n    return unicodedata.normalize(\"NFC\", p).rstrip(\"/\") or \"/\"\n\ncanon_name(\"Cafe\\u0301\") == canon_name(\"CAF\\u00c9\")  # True\ncanon_dir(\"docs/\") == canon_dir(\"docs\")  # True"
+      },
+      "pitfall": "Normalizing too far, for example lowercasing something that is case-sensitive like a URL path or a Unix filename."
+    },
+    "fr": {
+      "why": "Une même valeur peut s'écrire de plusieurs façons : une lettre accentuée en un ou deux caractères, majuscules ou minuscules, un chemin avec ou sans `/` final. Comparées en chaînes brutes, ces écritures diffèrent, donc les recherches ratent et des doublons apparaissent. On choisit une écriture canonique, on convertit une fois, et on ne compare que des valeurs canoniques.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "\"Cafe\\u0301\" == \"caf\\u00e9\"  # False",
+        "after": "def canon_name(s: str) -> str:\n    return unicodedata.normalize(\"NFC\", s).casefold()\n\ndef canon_dir(p: str) -> str:\n    return unicodedata.normalize(\"NFC\", p).rstrip(\"/\") or \"/\"\n\ncanon_name(\"Cafe\\u0301\") == canon_name(\"CAF\\u00c9\")  # True\ncanon_dir(\"docs/\") == canon_dir(\"docs\")  # True"
+      },
+      "pitfall": "Normaliser trop loin, par exemple passer en minuscules quelque chose de sensible à la casse comme un chemin d'URL ou un nom de fichier Unix."
+    }
+  },
+  "explicit-encoding": {
+    "en": {
+      "why": "When you do not name an encoding, Python up to 3.14 uses the locale encoding, which is often not UTF-8 on Windows. The same program then writes different bytes on two machines, or crashes on the first accented character. Always say `encoding=\"utf-8\"`, fix the newline, and do not add a BOM, so the bytes are the same everywhere.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with open(\"notes.txt\", \"w\") as f:\n    f.write(text)",
+        "after": "with open(\"notes.txt\", \"w\", encoding=\"utf-8\", newline=\"\\n\") as f:\n    f.write(text)"
+      },
+      "pitfall": "Fixing the write side but leaving `open(path)` without an encoding on the read side."
+    },
+    "fr": {
+      "why": "Quand on ne nomme pas d'encodage, Python jusqu'à 3.14 prend celui de la locale, souvent pas UTF-8 sous Windows. Le même programme écrit alors des octets différents selon la machine, ou plante au premier caractère accentué. On écrit toujours `encoding=\"utf-8\"`, on fixe la fin de ligne, et on n'ajoute pas de BOM : les octets sont les mêmes partout.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with open(\"notes.txt\", \"w\") as f:\n    f.write(text)",
+        "after": "with open(\"notes.txt\", \"w\", encoding=\"utf-8\", newline=\"\\n\") as f:\n    f.write(text)"
+      },
+      "pitfall": "Corriger l'écriture mais laisser `open(path)` sans encodage à la lecture."
+    }
+  },
+  "units-in-the-name": {
+    "en": {
+      "why": "A bare number like `30` or `50` does not say seconds or milliseconds, megabytes or mebibytes. Someone will pass 30000 thinking milliseconds and wait eight hours. Putting the unit in the name (`timeout_s`, `size_mb`, `delay_ms`) makes the mistake visible at every call site.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def wait(timeout=30):\n    ...\n\nMAX_UPLOAD = 50",
+        "after": "def wait(timeout_s=30):\n    ...\n\nMAX_UPLOAD_MB = 50"
+      },
+      "pitfall": "Putting the unit only in a comment or docstring, which the caller of `wait(30)` never reads."
+    },
+    "fr": {
+      "why": "Un nombre nu comme `30` ou `50` ne dit pas s'il s'agit de secondes ou de millisecondes, de Mo ou de Mio. Quelqu'un passera 30000 en pensant millisecondes et attendra huit heures. Mettre l'unité dans le nom (`timeout_s`, `size_mb`, `delay_ms`) rend l'erreur visible à chaque appel.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def wait(timeout=30):\n    ...\n\nMAX_UPLOAD = 50",
+        "after": "def wait(timeout_s=30):\n    ...\n\nMAX_UPLOAD_MB = 50"
+      },
+      "pitfall": "Mettre l'unité seulement dans un commentaire ou une docstring, que l'appelant de `wait(30)` ne lit jamais."
+    }
+  },
+  "magic-numbers": {
+    "en": {
+      "why": "A number dropped into the code with no name forces the reader to guess what it means and where else it appears. A named constant says what it is, lives in one place, and can be changed once. It also makes searching possible: you can grep `MAX_RETRIES`, not `3`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if attempts > 3:\n    raise GiveUp()\ntime.sleep(86400)",
+        "after": "MAX_RETRIES = 3\nONE_DAY_S = 24 * 60 * 60\n\nif attempts > MAX_RETRIES:\n    raise GiveUp()\ntime.sleep(ONE_DAY_S)"
+      },
+      "pitfall": "Naming the constant after its value (`THREE = 3`), which gives a name without giving a meaning."
+    },
+    "fr": {
+      "why": "Un nombre jeté dans le code sans nom oblige le lecteur à deviner ce qu'il signifie et où il réapparaît. Une constante nommée dit ce que c'est, vit à un seul endroit et se change une seule fois. Elle rend aussi la recherche possible : on peut chercher `MAX_RETRIES`, pas `3`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if attempts > 3:\n    raise GiveUp()\ntime.sleep(86400)",
+        "after": "MAX_RETRIES = 3\nONE_DAY_S = 24 * 60 * 60\n\nif attempts > MAX_RETRIES:\n    raise GiveUp()\ntime.sleep(ONE_DAY_S)"
+      },
+      "pitfall": "Nommer la constante d'après sa valeur (`TROIS = 3`), ce qui donne un nom sans donner de sens."
+    }
+  },
+  "integers-for-money": {
+    "en": {
+      "why": "Binary floats cannot represent most decimal fractions exactly, so sums of prices drift by tiny amounts that become visible cents after enough operations. Store money as an integer count of the smallest unit (cents), or use `Decimal` built from strings. The arithmetic is then exact and comparisons with `==` are safe.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "total = 0.1 + 0.2\nprint(total)  # 0.30000000000000004",
+        "after": "total_cents = 10 + 20\nprint(f\"{total_cents // 100}.{total_cents % 100:02d}\")\n\nfrom decimal import Decimal\nDecimal(\"0.10\") + Decimal(\"0.20\") == Decimal(\"0.30\")"
+      },
+      "pitfall": "Building a `Decimal` from a float (`Decimal(0.1)`), which imports the float error instead of removing it."
+    },
+    "fr": {
+      "why": "Les flottants binaires ne représentent pas exactement la plupart des fractions décimales : les sommes de prix dérivent de quantités infimes qui deviennent des centimes visibles après assez d'opérations. On stocke l'argent en nombre entier de la plus petite unité (centimes), ou en `Decimal` construit depuis des chaînes. Le calcul est alors exact et `==` est sûr.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "total = 0.1 + 0.2\nprint(total)  # 0.30000000000000004",
+        "after": "total_cents = 10 + 20\nprint(f\"{total_cents // 100}.{total_cents % 100:02d}\")\n\nfrom decimal import Decimal\nDecimal(\"0.10\") + Decimal(\"0.20\") == Decimal(\"0.30\")"
+      },
+      "pitfall": "Construire un `Decimal` depuis un float (`Decimal(0.1)`), ce qui importe l'erreur du float au lieu de la supprimer."
+    }
+  },
+  "off-by-one-half-open-ranges": {
+    "en": {
+      "why": "Off-by-one errors come from not deciding whether each end of a range is included. The half-open convention `[start, end)` (start included, end excluded) is what Python slices and `range` use: the length is `end - start`, and adjacent ranges join without overlap or gap. Then test the edges: 0, 1, n-1 and n elements.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def chunks(items, size):\n    for i in range(0, len(items) + 1, size):\n        yield items[i:i + size]",
+        "after": "def chunks(items, size):\n    for i in range(0, len(items), size):\n        yield items[i:i + size]\n\nassert list(chunks([], 3)) == []\nassert list(chunks([1], 3)) == [[1]]\nassert list(chunks([1, 2], 3)) == [[1, 2]]\nassert list(chunks([1, 2, 3], 3)) == [[1, 2, 3]]\nassert list(chunks([1, 2, 3, 4], 3)) == [[1, 2, 3], [4]]"
+      },
+      "pitfall": "Testing only a typical size like 10 items, when the bugs live at 0, 1 and exactly n."
+    },
+    "fr": {
+      "why": "Les erreurs de borne viennent du fait de ne pas avoir décidé si chaque extrémité d'un intervalle est incluse. La convention semi-ouverte `[début, fin)` (début inclus, fin exclue) est celle des slices et de `range` en Python : la longueur vaut `fin - début`, et deux intervalles voisins se rejoignent sans recouvrement ni trou. Ensuite on teste les bords : 0, 1, n-1 et n éléments.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def chunks(items, size):\n    for i in range(0, len(items) + 1, size):\n        yield items[i:i + size]",
+        "after": "def chunks(items, size):\n    for i in range(0, len(items), size):\n        yield items[i:i + size]\n\nassert list(chunks([], 3)) == []\nassert list(chunks([1], 3)) == [[1]]\nassert list(chunks([1, 2], 3)) == [[1, 2]]\nassert list(chunks([1, 2, 3], 3)) == [[1, 2, 3]]\nassert list(chunks([1, 2, 3, 4], 3)) == [[1, 2, 3], [4]]"
+      },
+      "pitfall": "Ne tester qu'une taille typique comme 10 éléments, alors que les bugs vivent à 0, 1 et pile n."
+    }
+  },
+  "content-addressed": {
+    "en": {
+      "why": "Naming a file by the hash of its content means two identical files get the same name, so duplicates are stored once for free. It also makes integrity checkable: re-hash the bytes and compare with the name. Git objects and many package caches work this way.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "path = Path(\"blobs\") / upload.filename\npath.write_bytes(data)",
+        "after": "digest = hashlib.sha256(data).hexdigest()\npath = Path(\"blobs\") / digest\nif not path.exists():\n    path.write_bytes(data)"
+      },
+      "pitfall": "Using a weak or truncated hash for the name, so two different files can end up under the same name."
+    },
+    "fr": {
+      "why": "Nommer un fichier d'après le hash de son contenu fait que deux fichiers identiques ont le même nom : les doublons ne sont stockés qu'une fois, sans effort. L'intégrité devient vérifiable : on re-hashe les octets et on compare au nom. Les objets Git et beaucoup de caches de paquets fonctionnent ainsi.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "path = Path(\"blobs\") / upload.filename\npath.write_bytes(data)",
+        "after": "digest = hashlib.sha256(data).hexdigest()\npath = Path(\"blobs\") / digest\nif not path.exists():\n    path.write_bytes(data)"
+      },
+      "pitfall": "Utiliser un hash faible ou tronqué pour le nom, au risque que deux fichiers différents partagent le même nom."
+    }
+  },
+  "null-missing-empty": {
+    "en": {
+      "why": "A missing field (\"I say nothing about it\"), a null (\"clear it\") and an empty string (\"it is set, to nothing\") are three different statements. Folding them into one `if not value` loses information: here the client can never erase a nickname. Decide what each state means in the schema and handle each one separately.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if patch.get(\"nickname\"):\n    user[\"nickname\"] = patch[\"nickname\"]",
+        "after": "if \"nickname\" not in patch:\n    pass\nelif patch[\"nickname\"] is None:\n    user.pop(\"nickname\", None)\nelse:\n    user[\"nickname\"] = patch[\"nickname\"]"
+      },
+      "pitfall": "Using `if not value` or `.get(key) or default`, which also swallows legitimate values like `0`, `\"\"` and `False`."
+    },
+    "fr": {
+      "why": "Un champ absent (\"je ne dis rien\"), un null (\"efface-le\") et une chaîne vide (\"il existe, et il est vide\") sont trois affirmations différentes. Les replier en un seul `if not value` perd de l'information : ici le client ne peut jamais effacer un pseudo. On décide ce que chaque état signifie dans le schéma et on traite chacun à part.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if patch.get(\"nickname\"):\n    user[\"nickname\"] = patch[\"nickname\"]",
+        "after": "if \"nickname\" not in patch:\n    pass\nelif patch[\"nickname\"] is None:\n    user.pop(\"nickname\", None)\nelse:\n    user[\"nickname\"] = patch[\"nickname\"]"
+      },
+      "pitfall": "Utiliser `if not value` ou `.get(clé) or défaut`, qui avale aussi des valeurs légitimes comme `0`, `\"\"` et `False`."
+    }
+  },
+  "tolerant-reader-postel-s-law": {
+    "en": {
+      "why": "Postel's law says: be strict in what you send, tolerant in what you accept. A reader that crashes on an unknown field breaks as soon as a newer writer adds one. Ignore what you do not understand, keep it intact if you rewrite the file, and always emit the exact documented format yourself.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "event = Event(**data)\nsave(asdict(event))",
+        "after": "known = {f.name for f in fields(Event)}\nevent = Event(**{k: v for k, v in data.items() if k in known})\nextras = {k: v for k, v in data.items() if k not in known}\nsave({**asdict(event), **extras})"
+      },
+      "pitfall": "Being tolerant on output too, sending sloppy variants that every consumer now has to accept forever."
+    },
+    "fr": {
+      "why": "La loi de Postel dit : strict dans ce qu'on envoie, tolérant dans ce qu'on accepte. Un lecteur qui plante sur un champ inconnu casse dès qu'un écrivain plus récent en ajoute un. On ignore ce qu'on ne comprend pas, on le conserve intact si on réécrit le fichier, et on émet soi-même toujours le format exact documenté.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "event = Event(**data)\nsave(asdict(event))",
+        "after": "known = {f.name for f in fields(Event)}\nevent = Event(**{k: v for k, v in data.items() if k in known})\nextras = {k: v for k, v in data.items() if k not in known}\nsave({**asdict(event), **extras})"
+      },
+      "pitfall": "Être tolérant aussi à l'émission, en envoyant des variantes approximatives que tous les consommateurs devront accepter pour toujours."
+    }
+  },
+  "checksum": {
+    "en": {
+      "why": "A copy that exits with success can still contain damaged bytes: a flaky disk, faulty RAM, a network share that dropped data it had acknowledged. A checksum is a short fingerprint of the file; compute it at the source, recompute it at the destination, and compare. Equal hashes prove the bytes are identical, with no need to eyeball anything.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp big.tar /mnt/backup/",
+        "after": "sha256sum big.tar > big.tar.sha256\ncp big.tar big.tar.sha256 /mnt/backup/\ncd /mnt/backup && sha256sum -c big.tar.sha256"
+      },
+      "pitfall": "Hashing after the copy on the destination only, which proves nothing about whether the source was the same."
+    },
+    "fr": {
+      "why": "Une copie qui se termine en succès peut quand même contenir des octets abîmés : disque instable, RAM défectueuse, partage réseau qui perd des données qu'il avait acquittées. Une somme de contrôle est l'empreinte courte d'un fichier ; on la calcule à la source, on la recalcule à l'arrivée, et on compare. Des hashes égaux prouvent que les octets sont identiques, sans rien avoir à vérifier à l'œil.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp big.tar /mnt/backup/",
+        "after": "sha256sum big.tar > big.tar.sha256\ncp big.tar big.tar.sha256 /mnt/backup/\ncd /mnt/backup && sha256sum -c big.tar.sha256"
+      },
+      "pitfall": "Ne hasher que la destination après la copie, ce qui ne prouve rien sur le fait que la source était la même."
+    }
+  },
+  "no-silent-truncation": {
+    "en": {
+      "why": "Cutting data that does not fit, without telling anyone, makes the program lie: the caller thinks the whole value was stored. The loss is found weeks later, when the data is already gone. Refuse the input, or truncate and report exactly what overflowed, with the count.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def save_title(title):\n    return title[:100]",
+        "after": "MAX_TITLE = 100\n\ndef save_title(title):\n    if len(title) > MAX_TITLE:\n        raise ValueError(f\"title too long: {len(title)} > {MAX_TITLE}\")\n    return title"
+      },
+      "pitfall": "Checking the length in the code but leaving the database column shorter, so a database without strict mode (old MySQL defaults) still cuts the value with only a warning."
+    },
+    "fr": {
+      "why": "Couper une donnée qui ne rentre pas, sans le dire, fait mentir le programme : l'appelant croit que toute la valeur a été stockée. La perte se découvre des semaines plus tard, quand la donnée n'existe déjà plus. On refuse l'entrée, ou on tronque en signalant exactement ce qui dépasse, avec le compte.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def save_title(title):\n    return title[:100]",
+        "after": "MAX_TITLE = 100\n\ndef save_title(title):\n    if len(title) > MAX_TITLE:\n        raise ValueError(f\"title too long: {len(title)} > {MAX_TITLE}\")\n    return title"
+      },
+      "pitfall": "Vérifier la longueur dans le code mais laisser une colonne plus courte en base : une base sans mode strict (anciens réglages par défaut de MySQL) coupe quand même la valeur avec un simple avertissement."
+    }
+  },
+  "real-parser": {
+    "en": {
+      "why": "HTML, JSON, CSV and shell have nesting, quoting and escaping rules that a regex cannot follow. A regex works on the sample you tried and fails on the first comma inside a quoted CSV field or the first escaped quote in a JSON string. Use the format's own library, and keep regex for flat text like log lines.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "price = re.findall(r'\"price\":\\s*(\\d+)', text)[0]",
+        "after": "price = json.loads(text)[\"items\"][0][\"price\"]"
+      },
+      "pitfall": "Using a regex \"just for this one simple case\" and growing it with each new edge case until it is unreadable."
+    },
+    "fr": {
+      "why": "HTML, JSON, CSV et shell ont des règles d'imbrication, de guillemets et d'échappement qu'une regex ne peut pas suivre. Elle marche sur l'exemple essayé et casse à la première virgule dans un champ CSV entre guillemets ou au premier guillemet échappé dans une chaîne JSON. On prend la bibliothèque du format, et on garde la regex pour le texte plat comme les lignes de log.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "price = re.findall(r'\"price\":\\s*(\\d+)', text)[0]",
+        "after": "price = json.loads(text)[\"items\"][0][\"price\"]"
+      },
+      "pitfall": "Utiliser une regex \"juste pour ce cas simple\" puis la faire grossir à chaque nouveau cas limite jusqu'à ce qu'elle devienne illisible."
+    }
+  },
+  "floats": {
+    "en": {
+      "why": "Floats store binary approximations, so `0.1 + 0.2` is `0.30000000000000004` and `==` says it differs from `0.3`. Two numbers that are mathematically equal can differ in the last bits after a calculation. Compare with a tolerance, using `math.isclose`, and never test floats with `==`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if 0.1 + 0.2 == 0.3:\n    print(\"equal\")",
+        "after": "import math\n\nif math.isclose(0.1 + 0.2, 0.3, rel_tol=1e-9):\n    print(\"equal\")"
+      },
+      "pitfall": "Calling `math.isclose(x, 0.0)` with the default tolerances, which are relative and only match an exact `0.0` unless you also pass `abs_tol`."
+    },
+    "fr": {
+      "why": "Les floats stockent des approximations binaires : `0.1 + 0.2` vaut `0.30000000000000004` et `==` dit qu'il diffère de `0.3`. Deux nombres mathématiquement égaux peuvent différer par les derniers bits après un calcul. On compare avec une tolérance, via `math.isclose`, et on ne teste jamais des floats avec `==`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if 0.1 + 0.2 == 0.3:\n    print(\"equal\")",
+        "after": "import math\n\nif math.isclose(0.1 + 0.2, 0.3, rel_tol=1e-9):\n    print(\"equal\")"
+      },
+      "pitfall": "Appeler `math.isclose(x, 0.0)` avec les tolérances par défaut, qui sont relatives et ne donnent vrai que pour un `0.0` exact sans `abs_tol`."
+    }
+  },
+  "stable-sort-total-order": {
+    "en": {
+      "why": "When two items have the same sort key, their relative order depends on the order they arrived in, which may come from a set, a thread or a database without `ORDER BY`. The result then changes between runs and breaks tests, pagination and diffs. Give the sort a complete key that never ties, such as score, then name, then a unique id.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "ranked = sorted(players, key=lambda p: p[\"score\"], reverse=True)",
+        "after": "ranked = sorted(players, key=lambda p: (-p[\"score\"], p[\"name\"], p[\"id\"]))"
+      },
+      "pitfall": "Relying on a stable sort to break ties, when the input order itself is not guaranteed."
+    },
+    "fr": {
+      "why": "Quand deux éléments ont la même clé de tri, leur ordre relatif dépend de leur ordre d'arrivée, qui peut venir d'un set, d'un thread ou d'une base sans `ORDER BY`. Le résultat change alors d'une exécution à l'autre et casse tests, pagination et diffs. On donne au tri une clé complète qui ne fait jamais d'égalité, par exemple score, puis nom, puis un id unique.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "ranked = sorted(players, key=lambda p: p[\"score\"], reverse=True)",
+        "after": "ranked = sorted(players, key=lambda p: (-p[\"score\"], p[\"name\"], p[\"id\"]))"
+      },
+      "pitfall": "S'appuyer sur la stabilité du tri pour départager les égalités, alors que l'ordre d'entrée n'est lui-même pas garanti."
+    }
+  },
+  "cursor-pagination": {
+    "en": {
+      "why": "With `OFFSET`, the database counts rows from the start each time, so if a row is inserted or deleted between two pages you see one twice or miss one. It also gets slower as the offset grows. A cursor, an opaque token the server hands back, says \"continue after this last row I saw\", so each page starts exactly where the previous one ended.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "SELECT * FROM events\nORDER BY id\nLIMIT 20 OFFSET 40;",
+        "after": "SELECT * FROM events\nWHERE id > :last_id\nORDER BY id\nLIMIT 20;"
+      },
+      "pitfall": "Using a cursor on a column that is not unique or not ordered, so rows with equal values are skipped."
+    },
+    "fr": {
+      "why": "Avec `OFFSET`, la base recompte les lignes depuis le début à chaque fois : si une ligne est insérée ou supprimée entre deux pages, on en voit une deux fois ou on en rate une. Et c'est de plus en plus lent quand l'offset grandit. Un curseur, un jeton opaque renvoyé par le serveur, dit \"continue après la dernière ligne que j'ai vue\", donc chaque page commence exactement où la précédente s'est arrêtée.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "SELECT * FROM events\nORDER BY id\nLIMIT 20 OFFSET 40;",
+        "after": "SELECT * FROM events\nWHERE id > :last_id\nORDER BY id\nLIMIT 20;"
+      },
+      "pitfall": "Mettre un curseur sur une colonne non unique ou non triée, si bien que les lignes à valeur égale sont sautées."
+    }
+  },
+  "json-lines": {
+    "en": {
+      "why": "JSON Lines puts one complete JSON object on each line. Adding a record is just appending a line, with no need to read and rewrite the whole file, and a reader can stream it line by line. If a crash leaves one line half written, you lose that line, not the whole file as with one big JSON array.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "records = json.load(open(\"events.json\", encoding=\"utf-8\"))\nrecords.append(event)\njson.dump(records, open(\"events.json\", \"w\", encoding=\"utf-8\"))",
+        "after": "with open(\"events.jsonl\", \"a\", encoding=\"utf-8\") as f:\n    f.write(json.dumps(event) + \"\\n\")\n\nbad = 0\nwith open(\"events.jsonl\", encoding=\"utf-8\") as f:\n    for line in f:\n        try:\n            handle(json.loads(line))\n        except json.JSONDecodeError:\n            bad += 1"
+      },
+      "pitfall": "Writing pretty-printed JSON across several lines, which breaks the one-object-per-line rule."
+    },
+    "fr": {
+      "why": "JSON Lines met un objet JSON complet par ligne. Ajouter un enregistrement revient à ajouter une ligne, sans lire ni réécrire tout le fichier, et un lecteur peut le parcourir en flux ligne par ligne. Si un crash laisse une ligne à moitié écrite, on perd cette ligne, pas tout le fichier comme avec un gros tableau JSON.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "records = json.load(open(\"events.json\", encoding=\"utf-8\"))\nrecords.append(event)\njson.dump(records, open(\"events.json\", \"w\", encoding=\"utf-8\"))",
+        "after": "with open(\"events.jsonl\", \"a\", encoding=\"utf-8\") as f:\n    f.write(json.dumps(event) + \"\\n\")\n\nbad = 0\nwith open(\"events.jsonl\", encoding=\"utf-8\") as f:\n    for line in f:\n        try:\n            handle(json.loads(line))\n        except json.JSONDecodeError:\n            bad += 1"
+      },
+      "pitfall": "Écrire du JSON indenté sur plusieurs lignes, ce qui casse la règle un objet par ligne."
+    }
+  },
+  "natural-surrogate-key": {
+    "en": {
+      "why": "A natural key is a business value such as an email or a product code; a surrogate key is an identifier generated by the system. Business values change (a user changes email) and every table that referenced the old value breaks. Link tables with a generated id, and keep the business key as a `UNIQUE` constraint so duplicates are still refused.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "CREATE TABLE users (email TEXT PRIMARY KEY, name TEXT);\nCREATE TABLE orders (id INTEGER PRIMARY KEY,\n                     user_email TEXT REFERENCES users(email));",
+        "after": "CREATE TABLE users (id INTEGER PRIMARY KEY,\n                    email TEXT NOT NULL UNIQUE,\n                    name TEXT);\nCREATE TABLE orders (id INTEGER PRIMARY KEY,\n                     user_id INTEGER REFERENCES users(id));"
+      },
+      "pitfall": "Making a value the primary key because it \"never changes\", then watching it change."
+    },
+    "fr": {
+      "why": "Une clé naturelle est une valeur métier comme un email ou un code produit ; une clé technique est un identifiant généré par le système. Les valeurs métier changent (un utilisateur change d'email) et toutes les tables qui référençaient l'ancienne valeur cassent. On lie les tables par un id généré, et on garde la clé métier en contrainte `UNIQUE` pour que les doublons restent refusés.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "CREATE TABLE users (email TEXT PRIMARY KEY, name TEXT);\nCREATE TABLE orders (id INTEGER PRIMARY KEY,\n                     user_email TEXT REFERENCES users(email));",
+        "after": "CREATE TABLE users (id INTEGER PRIMARY KEY,\n                    email TEXT NOT NULL UNIQUE,\n                    name TEXT);\nCREATE TABLE orders (id INTEGER PRIMARY KEY,\n                     user_id INTEGER REFERENCES users(id));"
+      },
+      "pitfall": "Faire d'une valeur la clé primaire parce qu'elle \"ne change jamais\", puis la voir changer."
+    }
+  },
+  "normalized-denormalized": {
+    "en": {
+      "why": "A normalized schema stores each fact once; a denormalized table copies facts so reads are fast, at the cost of two places that can disagree. The copy is fine as long as it is purely derived from the source. Rebuild it from the source whenever needed, and never fix a value in the copy by hand, because the next rebuild erases the fix.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "UPDATE order_summary\nSET customer_name = 'Ana'\nWHERE order_id = 42;",
+        "after": "BEGIN;\nDELETE FROM order_summary;\nINSERT INTO order_summary (order_id, customer_name, total_cents)\nSELECT o.id, c.name, o.total_cents\nFROM orders o JOIN customers c ON c.id = o.customer_id;\nCOMMIT;"
+      },
+      "pitfall": "Fixing a wrong value in the derived table and forgetting to fix the source, so it comes back at the next rebuild."
+    },
+    "fr": {
+      "why": "Un schéma normalisé stocke chaque fait une fois ; une table dénormalisée recopie des faits pour lire vite, au prix de deux endroits qui peuvent diverger. La copie est acceptable tant qu'elle est purement dérivée de la source. On la reconstruit depuis la source quand il faut, et on ne corrige jamais une valeur à la main dans la copie, car la reconstruction suivante efface la correction.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "UPDATE order_summary\nSET customer_name = 'Ana'\nWHERE order_id = 42;",
+        "after": "BEGIN;\nDELETE FROM order_summary;\nINSERT INTO order_summary (order_id, customer_name, total_cents)\nSELECT o.id, c.name, o.total_cents\nFROM orders o JOIN customers c ON c.id = o.customer_id;\nCOMMIT;"
+      },
+      "pitfall": "Corriger une valeur fausse dans la table dérivée et oublier la source : elle revient à la reconstruction suivante."
+    }
+  },
+  "opaque-id": {
+    "en": {
+      "why": "An opaque ID is a label whose inner format is not part of the contract. If code slices it to find a region or compares two ids to know which is older, it depends on a detail the producer may change at any time. Treat the id as a black box, and read meaning from explicit fields such as `region` and `created_at`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "region = order_id[:2]\nis_newer = order_id_a > order_id_b",
+        "after": "order = orders.get(order_id)\nregion = order.region\nis_newer = order_a.created_at > order_b.created_at"
+      },
+      "pitfall": "Deducing an order from ids because it \"always worked so far\" with sequential numbers, until ids become random."
+    },
+    "fr": {
+      "why": "Un identifiant opaque est une étiquette dont le format interne ne fait pas partie du contrat. Si le code le découpe pour trouver une région ou compare deux ids pour savoir lequel est le plus vieux, il dépend d'un détail que le producteur peut changer à tout moment. On traite l'id comme une boîte noire, et on lit le sens dans des champs explicites comme `region` et `created_at`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "region = order_id[:2]\nis_newer = order_id_a > order_id_b",
+        "after": "order = orders.get(order_id)\nregion = order.region\nis_newer = order_a.created_at > order_b.created_at"
+      },
+      "pitfall": "Déduire un ordre à partir des ids parce que \"ça a toujours marché\" avec des numéros séquentiels, jusqu'à ce que les ids deviennent aléatoires."
+    }
+  },
+  "uuid-ulid": {
+    "en": {
+      "why": "An auto-increment counter needs one place that hands out numbers, which breaks when several machines or offline clients create records at the same time. A UUID is random enough that two generators will practically never collide, with no coordinator. If you also want ids that sort by creation time, pick ULID or UUIDv7 instead of UUIDv4.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "new_id = max(existing_ids) + 1",
+        "after": "new_id = str(uuid.uuid4())\n\nordered_id = str(uuid.uuid7())  # Python 3.14+"
+      },
+      "pitfall": "Using random UUIDv4 as a primary key in a large indexed table, which scatters inserts, when a time-ordered id would not."
+    },
+    "fr": {
+      "why": "Un compteur auto-incrémenté demande un point unique qui distribue les numéros, ce qui casse quand plusieurs machines ou clients hors ligne créent des enregistrements en même temps. Un UUID est assez aléatoire pour que deux générateurs n'entrent pratiquement jamais en collision, sans coordinateur. Si on veut aussi des ids triés par date de création, on prend ULID ou UUIDv7 plutôt qu'UUIDv4.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "new_id = max(existing_ids) + 1",
+        "after": "new_id = str(uuid.uuid4())\n\nordered_id = str(uuid.uuid7())  # Python 3.14+"
+      },
+      "pitfall": "Prendre un UUIDv4 aléatoire comme clé primaire d'une grosse table indexée, ce qui éparpille les insertions, alors qu'un id ordonné dans le temps ne le ferait pas."
+    }
+  },
+  "sentinel-value": {
+    "en": {
+      "why": "A sentinel is a normal-looking value like `-1` or `\"\"` that secretly means \"nothing\". Sooner or later something treats it as real data: the `-1` ends up in an average, or the empty string is a legitimate value. Use `None`, an `Optional` type or a dedicated type, so the type checker and the reader both see that the value may be absent.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def age_of(user):\n    return user.get(\"age\", -1)\n\nages = [age_of(u) for u in users]\navg = sum(ages) / len(ages)",
+        "after": "def age_of(user) -> int | None:\n    return user.get(\"age\")\n\nages = [a for u in users if (a := age_of(u)) is not None]\navg = sum(ages) / len(ages) if ages else None"
+      },
+      "pitfall": "Switching `-1` for another magic value like `-999`, which is still a sentinel."
+    },
+    "fr": {
+      "why": "Une sentinelle est une valeur d'apparence normale comme `-1` ou `\"\"` qui veut secrètement dire \"rien\". Tôt ou tard, quelque chose la traite comme une vraie donnée : le `-1` finit dans une moyenne, ou la chaîne vide est une valeur légitime. On utilise `None`, un type `Optional` ou un type dédié, pour que le vérificateur de types et le lecteur voient tous deux que la valeur peut être absente.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def age_of(user):\n    return user.get(\"age\", -1)\n\nages = [age_of(u) for u in users]\navg = sum(ages) / len(ages)",
+        "after": "def age_of(user) -> int | None:\n    return user.get(\"age\")\n\nages = [a for u in users if (a := age_of(u)) is not None]\navg = sum(ages) / len(ages) if ages else None"
+      },
+      "pitfall": "Remplacer `-1` par une autre valeur magique comme `-999`, qui reste une sentinelle."
+    }
+  },
+  "size-limit": {
+    "en": {
+      "why": "Any field or payload without a maximum is a way to fill memory or disk, by accident or on purpose. Decide a limit for each one, check it at the entry before processing, and return a clear error that states the limit. Reading one byte more than the limit is enough to know it was exceeded without loading everything.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "body = stream.read()",
+        "after": "MAX_BODY_BYTES = 1_000_000\n\nbody = stream.read(MAX_BODY_BYTES + 1)\nif len(body) > MAX_BODY_BYTES:\n    raise ValueError(f\"body too large (max {MAX_BODY_BYTES} bytes)\")"
+      },
+      "pitfall": "Checking the declared `Content-Length` only, which a client can lie about, instead of counting bytes actually read."
+    },
+    "fr": {
+      "why": "Tout champ ou corps sans maximum est un moyen de remplir la mémoire ou le disque, par accident ou exprès. On décide une limite pour chacun, on la vérifie à l'entrée avant tout traitement, et on renvoie une erreur claire qui énonce la limite. Lire un octet de plus que la limite suffit pour savoir qu'elle est dépassée sans tout charger.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "body = stream.read()",
+        "after": "MAX_BODY_BYTES = 1_000_000\n\nbody = stream.read(MAX_BODY_BYTES + 1)\nif len(body) > MAX_BODY_BYTES:\n    raise ValueError(f\"body too large (max {MAX_BODY_BYTES} bytes)\")"
+      },
+      "pitfall": "Ne vérifier que le `Content-Length` annoncé, sur lequel un client peut mentir, au lieu de compter les octets réellement lus."
+    }
+  },
+  "bytes-characters": {
+    "en": {
+      "why": "In UTF-8 a character takes between one and four bytes, so `len(bytes)` and `len(text)` differ as soon as there is an accent or an emoji. Cutting bytes in the middle of a sequence leaves invalid bytes that raise `UnicodeDecodeError` as soon as someone decodes them. Count and slice in characters, and if a byte limit is required, drop the incomplete trailing sequence.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "s = \"héllo\"\ns.encode(\"utf-8\")[:2].decode(\"utf-8\")  # UnicodeDecodeError",
+        "after": "s = \"héllo\"\ns[:2]\n\ndef cut_bytes(s: str, n: int) -> str:\n    return s.encode(\"utf-8\")[:n].decode(\"utf-8\", errors=\"ignore\")"
+      },
+      "pitfall": "Assuming characters are what the user sees: an emoji with a skin tone or a letter plus accent can be several code points."
+    },
+    "fr": {
+      "why": "En UTF-8 un caractère prend de un à quatre octets, donc `len(octets)` et `len(texte)` diffèrent dès qu'il y a un accent ou un emoji. Couper des octets au milieu d'une séquence laisse des octets invalides qui lèvent `UnicodeDecodeError` dès qu'on les décode. On compte et on découpe en caractères, et si une limite en octets est imposée, on retire la séquence finale incomplète.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "s = \"héllo\"\ns.encode(\"utf-8\")[:2].decode(\"utf-8\")  # UnicodeDecodeError",
+        "after": "s = \"héllo\"\ns[:2]\n\ndef cut_bytes(s: str, n: int) -> str:\n    return s.encode(\"utf-8\")[:n].decode(\"utf-8\", errors=\"ignore\")"
+      },
+      "pitfall": "Croire qu'un caractère est ce que voit l'utilisateur : un emoji avec teinte de peau ou une lettre plus un accent peuvent faire plusieurs points de code."
+    }
+  },
+  "format-compatibility": {
+    "en": {
+      "why": "Files outlive the code that wrote them: a user opens a file saved by last year's version. If the format changed without a migration, the new code crashes or misreads it. Store a `version`, convert old shapes on read, and keep a real old file in the tests so the promise is checked.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "config = Config(**json.load(open(\"config.json\", encoding=\"utf-8\")))",
+        "after": "def migrate(data):\n    if data.get(\"version\", 1) == 1:\n        data = {**data, \"version\": 2, \"timeout_s\": data[\"timeout\"]}\n        del data[\"timeout\"]\n    if data[\"version\"] != 2:\n        raise ValueError(f\"unsupported version: {data['version']}\")\n    return data\n\nconfig = Config(**migrate(json.load(open(\"config.json\", encoding=\"utf-8\"))))\nassert migrate({\"timeout\": 30}) == {\"version\": 2, \"timeout_s\": 30}"
+      },
+      "pitfall": "Migrating only the files you remember and never testing against a real old sample, so a rarely used older version breaks."
+    },
+    "fr": {
+      "why": "Les fichiers survivent au code qui les a écrits : un utilisateur ouvre un fichier enregistré par la version de l'an dernier. Si le format a changé sans migration, le nouveau code plante ou le lit de travers. On stocke une `version`, on convertit les anciennes formes à la lecture, et on garde un vrai ancien fichier dans les tests pour que la promesse soit vérifiée.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "config = Config(**json.load(open(\"config.json\", encoding=\"utf-8\")))",
+        "after": "def migrate(data):\n    if data.get(\"version\", 1) == 1:\n        data = {**data, \"version\": 2, \"timeout_s\": data[\"timeout\"]}\n        del data[\"timeout\"]\n    if data[\"version\"] != 2:\n        raise ValueError(f\"unsupported version: {data['version']}\")\n    return data\n\nconfig = Config(**migrate(json.load(open(\"config.json\", encoding=\"utf-8\"))))\nassert migrate({\"timeout\": 30}) == {\"version\": 2, \"timeout_s\": 30}"
+      },
+      "pitfall": "Ne migrer que les fichiers dont on se souvient sans jamais tester avec un vrai ancien échantillon : une version ancienne rarement utilisée casse."
+    }
+  }
+}

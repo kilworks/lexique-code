@@ -1,0 +1,530 @@
+{
+  "atomic-commit": {
+    "en": {
+      "why": "A commit that mixes a bug fix, a rename and a new feature cannot be reviewed, reverted or cherry-picked without dragging the rest along. When each commit is one coherent change that builds and passes the tests alone, history becomes a tool instead of a dump. It matters most the day you need to revert one change at 2 a.m.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add -A\ngit commit -m \"various fixes and new export\"",
+        "after": "git add -p src/parse.py tests/test_parse.py\ngit commit -m \"Fix off-by-one in parse_range\"\ngit add src/export.py tests/test_export.py\ngit commit -m \"Add CSV export\""
+      },
+      "pitfall": "Splitting by file instead of by intent, so a commit touches half of a change and breaks the build."
+    },
+    "fr": {
+      "why": "Un commit qui mélange un correctif, un renommage et une feature ne peut ni se relire, ni se revert, ni se cherry-pick sans embarquer le reste. Quand chaque commit est un changement cohérent qui compile et passe les tests seul, l'historique devient un outil et pas une décharge. Ça compte surtout le jour où il faut annuler un seul changement en urgence.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add -A\ngit commit -m \"corrections diverses et export\"",
+        "after": "git add -p src/parse.py tests/test_parse.py\ngit commit -m \"Corrige le décalage d'un dans parse_range\"\ngit add src/export.py tests/test_export.py\ngit commit -m \"Ajoute l'export CSV\""
+      },
+      "pitfall": "Découper par fichier plutôt que par intention : le commit contient la moitié d'un changement et casse le build."
+    }
+  },
+  "bisectable": {
+    "en": {
+      "why": "git bisect finds the commit that introduced a bug by binary search, but only if every commit in the range can be built and tested. A commit that is broken for an unrelated reason makes the search land on the wrong culprit or stop. Keeping every intermediate commit working makes bisect, revert and review reliable.",
+      "example": {
+        "kind": "command",
+        "lang": "text",
+        "before": "$ git log --oneline\nc3 Use client.get in callers\nc2 Fix build broken by c1\nc1 Rename client.fetch to client.get\n# c1 does not compile: bisect run blames c1 for a bug that\n# was introduced in c3",
+        "after": "$ git log --oneline\nc2 Use client.get in callers\nc1 Rename client.fetch to client.get (callers updated)\n$ git bisect start\n$ git bisect bad HEAD\n$ git bisect good v1.2.0\n$ git bisect run npm test"
+      },
+      "pitfall": "Committing a half-done rename on its own and fixing the build in the next commit, which sends bisect to the wrong place."
+    },
+    "fr": {
+      "why": "git bisect trouve par dichotomie le commit qui a introduit un bug, mais seulement si chaque commit de l'intervalle compile et se teste. Un commit cassé pour une autre raison envoie la recherche sur le mauvais coupable ou la bloque. Garder chaque commit intermédiaire fonctionnel rend bisect, revert et relecture fiables.",
+      "example": {
+        "kind": "command",
+        "lang": "text",
+        "before": "$ git log --oneline\nc3 Utilise client.get dans les appelants\nc2 Répare le build cassé par c1\nc1 Renomme client.fetch en client.get\n# c1 ne compile pas : bisect run accuse c1 pour un bug\n# introduit en c3",
+        "after": "$ git log --oneline\nc2 Utilise client.get dans les appelants\nc1 Renomme client.fetch en client.get (appelants mis à jour)\n$ git bisect start\n$ git bisect bad HEAD\n$ git bisect good v1.2.0\n$ git bisect run npm test"
+      },
+      "pitfall": "Commiter un renommage à moitié fait puis réparer le build au commit suivant : bisect désigne le mauvais commit."
+    }
+  },
+  "expand-contract": {
+    "en": {
+      "why": "During a rolling deploy, old and new versions of your code run at the same time against the same data. Renaming a column or changing a format in one step breaks whichever side is not updated yet. Expand / contract spreads the change over several releases so every intermediate state works with both versions.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- one deployment: old code still running breaks\nALTER TABLE users RENAME COLUMN name TO full_name;",
+        "after": "-- release 1 (expand): new column, code writes both\nALTER TABLE users ADD COLUMN full_name text;\n-- once every instance writes both: backfill\nUPDATE users SET full_name = name WHERE full_name IS NULL;\n-- release 2: code reads and writes full_name only\n-- release 3 (contract): nothing uses name anymore\nALTER TABLE users DROP COLUMN name;"
+      },
+      "pitfall": "Doing the three steps in one release because the migration is small, which brings back the exact outage the pattern prevents."
+    },
+    "fr": {
+      "why": "Pendant un déploiement progressif, l'ancienne et la nouvelle version du code tournent en même temps sur les mêmes données. Renommer une colonne ou changer un format d'un coup casse le côté pas encore mis à jour. Expand / contract étale le changement sur plusieurs releases pour que chaque état intermédiaire marche avec les deux versions.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- un seul déploiement : l'ancien code encore en ligne casse\nALTER TABLE users RENAME COLUMN name TO full_name;",
+        "after": "-- release 1 (expand) : nouvelle colonne, le code écrit les deux\nALTER TABLE users ADD COLUMN full_name text;\n-- quand toutes les instances écrivent les deux : backfill\nUPDATE users SET full_name = name WHERE full_name IS NULL;\n-- release 2 : le code lit et écrit full_name seulement\n-- release 3 (contract) : plus rien n'utilise name\nALTER TABLE users DROP COLUMN name;"
+      },
+      "pitfall": "Faire les trois étapes dans une seule release parce que la migration est petite : on retombe sur la panne que le pattern évite."
+    }
+  },
+  "strangler-fig": {
+    "en": {
+      "why": "A full rewrite stays invisible for months, then has to match every behavior of the old system on one release day. The strangler fig grows the new code around the old one: a router sends a few requests to the new path, and the old path shrinks until it can be deleted. Each step is shippable and reversible.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "// rewrite all of billing, ship in one go\napp.use(\"/billing\", newBilling);",
+        "after": "// new path next to the old one, one route at a time\nconst migrated = new Set([\"/invoices\"]); // req.path is relative to /billing\napp.use(\"/billing\", (req, res, next) =>\n  (migrated.has(req.path) ? newBilling : legacyBilling)(req, res, next));"
+      },
+      "pitfall": "Never finishing: the old path is kept forever behind the router, and you now maintain both."
+    },
+    "fr": {
+      "why": "Une réécriture complète reste invisible des mois, puis doit reproduire tous les comportements de l'ancien système le jour de la mise en prod. Le strangler fig fait pousser le nouveau code autour de l'ancien : un routeur envoie quelques requêtes vers le nouveau chemin, et l'ancien rétrécit jusqu'à pouvoir être supprimé. Chaque étape est livrable et réversible.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "// réécrire tout billing, livrer d'un coup\napp.use(\"/billing\", newBilling);",
+        "after": "// nouveau chemin à côté de l'ancien, une route à la fois\nconst migrated = new Set([\"/invoices\"]); // req.path est relatif à /billing\napp.use(\"/billing\", (req, res, next) =>\n  (migrated.has(req.path) ? newBilling : legacyBilling)(req, res, next));"
+      },
+      "pitfall": "Ne jamais finir : l'ancien chemin reste derrière le routeur pour toujours et on maintient les deux."
+    }
+  },
+  "seam": {
+    "en": {
+      "why": "A seam is a place where you can change behavior without editing the code around it: a parameter, an interface, a constructor argument. Code with no seam is welded to its dependencies (network, clock, database), so you can neither test it nor replace the dependency. Creating a seam is often the first safe step before changing legacy code.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def send_report(user):\n    # hits the real network: hard to test\n    requests.post(URL, json={\"user\": user})",
+        "after": "def send_report(user, post=requests.post):\n    post(URL, json={\"user\": user})\n\n# test: a fake replaces the network call\ncalls = []\nsend_report(\"ana\", post=lambda url, json: calls.append(json))\nassert calls == [{\"user\": \"ana\"}]"
+      },
+      "pitfall": "Monkeypatching globals in tests instead of creating a seam, which hides the dependency instead of exposing it."
+    },
+    "fr": {
+      "why": "Un seam est un endroit où l'on peut changer le comportement sans toucher au code autour : un paramètre, une interface, un argument de constructeur. Un code sans seam est soudé à ses dépendances (réseau, horloge, base), donc impossible à tester ou à remplacer. Créer un seam est souvent la première étape sûre avant de modifier du legacy.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def send_report(user):\n    # appelle le vrai réseau : difficile à tester\n    requests.post(URL, json={\"user\": user})",
+        "after": "def send_report(user, post=requests.post):\n    post(URL, json={\"user\": user})\n\n# test : un faux remplace l'appel réseau\ncalls = []\nsend_report(\"ana\", post=lambda url, json: calls.append(json))\nassert calls == [{\"user\": \"ana\"}]"
+      },
+      "pitfall": "Patcher des globales dans les tests au lieu de créer un seam : on cache la dépendance au lieu de l'exposer."
+    }
+  },
+  "deprecate-before-removing": {
+    "en": {
+      "why": "Deleting a function or option breaks everyone who still uses it, with no time to react. Deprecating first keeps it working while a warning tells callers what to use instead and when it goes away. The removal then lands on code that has already been migrated.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# v2.0: old_name() deleted, every caller breaks at once",
+        "after": "import warnings\n\ndef old_name(*a, **kw):\n    warnings.warn(\"old_name() is deprecated, use new_name(); removed in 3.0\",\n                  DeprecationWarning, stacklevel=2)\n    return new_name(*a, **kw)\n# deleted in 3.0, as announced in the changelog"
+      },
+      "pitfall": "Deprecating without naming the replacement or the removal version, so the warning is ignored."
+    },
+    "fr": {
+      "why": "Supprimer une fonction ou une option casse tous ceux qui s'en servent encore, sans délai pour réagir. Déprécier d'abord la garde en état de marche pendant qu'un avertissement indique quoi utiliser à la place et quand elle disparaît. Le retrait tombe ensuite sur du code déjà migré.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# v2.0 : old_name() supprimée, tous les appelants cassent d'un coup",
+        "after": "import warnings\n\ndef old_name(*a, **kw):\n    warnings.warn(\"old_name() est dépréciée, utiliser new_name() ; retrait en 3.0\",\n                  DeprecationWarning, stacklevel=2)\n    return new_name(*a, **kw)\n# supprimée en 3.0, comme annoncé dans le changelog"
+      },
+      "pitfall": "Déprécier sans citer le remplaçant ni la version de retrait : l'avertissement est ignoré."
+    }
+  },
+  "semver": {
+    "en": {
+      "why": "Semantic versioning lets a version number carry a promise: a patch is safe to take, a minor adds things without breaking, a major may break. Consumers can then upgrade automatically within a range and only review majors. The number is only useful if you bump it for what the change really does.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# removed a parameter from a public function\nnpm version patch   # 1.4.2 -> 1.4.3, every ^1.4.2 user gets the break",
+        "after": "# pick ONE, by what the change does:\nnpm version major   # removed a parameter: 1.4.2 -> 2.0.0\nnpm version minor   # added an optional flag: 1.4.2 -> 1.5.0\nnpm version patch   # fixed a bug only: 1.4.2 -> 1.4.3"
+      },
+      "pitfall": "Calling a breaking change a minor because it feels small, which breaks everyone who trusted the range."
+    },
+    "fr": {
+      "why": "Le versionnage sémantique fait porter une promesse au numéro : un patch se prend sans risque, un mineur ajoute sans casser, un majeur peut casser. Les consommateurs mettent à jour automatiquement dans une plage et ne relisent que les majeurs. Le numéro n'a de valeur que s'il reflète ce que le changement fait vraiment.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# paramètre retiré d'une fonction publique\nnpm version patch   # 1.4.2 -> 1.4.3, tous les ^1.4.2 reçoivent la rupture",
+        "after": "# en choisir UNE selon ce que fait le changement :\nnpm version major   # paramètre retiré : 1.4.2 -> 2.0.0\nnpm version minor   # option facultative ajoutée : 1.4.2 -> 1.5.0\nnpm version patch   # simple correctif : 1.4.2 -> 1.4.3"
+      },
+      "pitfall": "Classer une rupture en mineur parce qu'elle paraît petite : on casse tous ceux qui se fiaient à la plage."
+    }
+  },
+  "reproducible-build": {
+    "en": {
+      "why": "If the same commit produces a different binary next week, a bug can appear without any code change and a rollback may not restore the old behavior. Pinning versions and using the lockfile makes the build a function of the source. npm ci installs exactly what package-lock.json says, where npm install may drift.",
+      "example": {
+        "kind": "code",
+        "lang": "dockerfile",
+        "before": "FROM node:latest\nCOPY . .\nRUN npm install",
+        "after": "FROM node:22.11.0-alpine\nCOPY package.json package-lock.json ./\nRUN npm ci\nCOPY . ."
+      },
+      "pitfall": "Pinning the app dependencies but leaving the base image or the toolchain on a floating tag like latest."
+    },
+    "fr": {
+      "why": "Si le même commit donne un binaire différent la semaine suivante, un bug peut apparaître sans changement de code et un rollback ne restaure pas forcément l'ancien comportement. Épingler les versions et s'appuyer sur le lockfile fait du build une fonction de la source. npm ci installe exactement ce que dit package-lock.json, alors que npm install peut dériver.",
+      "example": {
+        "kind": "code",
+        "lang": "dockerfile",
+        "before": "FROM node:latest\nCOPY . .\nRUN npm install",
+        "after": "FROM node:22.11.0-alpine\nCOPY package.json package-lock.json ./\nRUN npm ci\nCOPY . ."
+      },
+      "pitfall": "Épingler les dépendances de l'appli mais laisser l'image de base ou la toolchain sur un tag flottant comme latest."
+    }
+  },
+  "drift": {
+    "en": {
+      "why": "Drift is when what runs in production no longer matches what is committed: a hotfix edited by hand, a deploy that half-failed, a config changed on the server. Debugging the repository's code while the server runs something else wastes hours. A hash comparison answers in seconds whether the two are the same.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"same size, same date, looks identical\"\nls -l main.py\nssh prod ls -l /srv/app/main.py",
+        "after": "git show HEAD:main.py | sha256sum\nssh prod sha256sum /srv/app/main.py\n# different hash = the deployed file is not the committed one"
+      },
+      "pitfall": "Comparing by size or modification date, which can match while the content differs."
+    },
+    "fr": {
+      "why": "La dérive, c'est quand ce qui tourne en prod ne correspond plus à ce qui est commité : hotfix fait à la main, déploiement à moitié raté, config modifiée sur le serveur. Déboguer le code du dépôt alors que le serveur exécute autre chose fait perdre des heures. Une comparaison de hash dit en quelques secondes si les deux sont identiques.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"même taille, même date, ça a l'air identique\"\nls -l main.py\nssh prod ls -l /srv/app/main.py",
+        "after": "git show HEAD:main.py | sha256sum\nssh prod sha256sum /srv/app/main.py\n# hash différent = le fichier déployé n'est pas celui du commit"
+      },
+      "pitfall": "Comparer par taille ou date de modification : elles peuvent coïncider alors que le contenu diffère."
+    }
+  },
+  "separate-refactor": {
+    "en": {
+      "why": "When a commit changes both the structure and the behavior, a reviewer cannot tell which line is a pure move and which one changes the result. A refactor commit with no effect can be skimmed and trusted by the tests, and the behavior commit then shows a small, readable diff. A bug is also far easier to locate.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit -m \"Rename helper and fix rounding\"",
+        "after": "git commit -m \"Extract round_price helper (no behavior change)\"\ngit commit -m \"Round prices half-up instead of truncating\""
+      },
+      "pitfall": "Labeling a commit a refactor while it quietly changes behavior, so reviewers skim it and the change slips through unreviewed."
+    },
+    "fr": {
+      "why": "Quand un commit change à la fois la structure et le comportement, le relecteur ne sait pas quelle ligne est un simple déplacement et laquelle change le résultat. Un commit de refactor sans effet se survole et se vérifie par les tests, et le commit de comportement montre alors un petit diff lisible. Localiser un bug devient aussi bien plus simple.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit -m \"Renomme le helper et corrige l'arrondi\"",
+        "after": "git commit -m \"Extrait le helper round_price (sans changement de comportement)\"\ngit commit -m \"Arrondit les prix au plus proche au lieu de tronquer\""
+      },
+      "pitfall": "Étiqueter refactor un commit qui change discrètement le comportement : le relecteur le survole et le changement passe sans revue."
+    }
+  },
+  "small-pr": {
+    "en": {
+      "why": "Reviewers skim a 40-file diff and approve it, so real bugs slip through. A diff that can be read in one sitting gets a real review, merges quickly and conflicts less. Cutting along deliverable steps keeps each PR useful and revertable on its own.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Open one PR with the whole export feature.",
+        "after": "Split this branch into PRs by deliverable step, each mergeable and\ntested on its own: 1) export table and migration, 2) endpoint behind\na flag, 3) UI button. Aim for under 300 changed lines each."
+      },
+      "pitfall": "Splitting by file or by layer so no single PR works alone and none can be reverted separately."
+    },
+    "fr": {
+      "why": "Un diff de 40 fichiers se survole et s'approuve, donc les vrais bugs passent. Un diff qui se relit en une fois reçoit une vraie revue, fusionne vite et entre moins en conflit. Découper selon les étapes livrables garde chaque PR utile et annulable seule.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ouvre une seule PR avec toute la fonctionnalité d'export.",
+        "after": "Découpe cette branche en PR par étape livrable, chacune fusionnable\net testée seule : 1) table d'export et migration, 2) endpoint derrière\nun flag, 3) bouton dans l'UI. Vise moins de 300 lignes modifiées chacune."
+      },
+      "pitfall": "Découper par fichier ou par couche : aucune PR ne marche seule et aucune ne peut être revert séparément."
+    }
+  },
+  "commit-message-why": {
+    "en": {
+      "why": "The diff already shows what changed line by line. What it cannot show is why you did it, what you ruled out and what could go wrong, and that is what someone needs in a year when running git blame. A short imperative title plus a body on reason and risk makes history readable.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit -m \"Change timeout to 30\"",
+        "after": "git commit -m \"Raise upload timeout to 30s\" \\\n  -m \"Large exports from the EU region were cut at 10s. Risk: a stuck client now holds a worker three times longer.\""
+      },
+      "pitfall": "Writing a message that paraphrases the diff (\"change X to Y\") and leaves out the reason."
+    },
+    "fr": {
+      "why": "Le diff montre déjà ce qui change, ligne par ligne. Ce qu'il ne montre pas, c'est pourquoi on l'a fait, ce qu'on a écarté et ce qui peut mal tourner, et c'est ce dont on a besoin dans un an devant git blame. Un titre court à l'impératif et un corps sur la raison et le risque rendent l'historique lisible.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit -m \"Change timeout à 30\"",
+        "after": "git commit -m \"Passe le timeout d'upload à 30 s\" \\\n  -m \"Les gros exports de la région EU étaient coupés à 10 s. Risque : un client bloqué garde un worker trois fois plus longtemps.\""
+      },
+      "pitfall": "Écrire un message qui paraphrase le diff (\"change X en Y\") sans la raison."
+    }
+  },
+  "revert-first": {
+    "en": {
+      "why": "During an incident, every minute of understanding is a minute of downtime. If the last change is the likely cause, undoing it restores service in seconds and gives you time to investigate without pressure. A hotfix written under stress often adds a second incident.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# prod is down: read logs for an hour, then hotfix live\nssh prod tail -f /var/log/app.log",
+        "after": "git revert --no-edit abc1234   # the commit deployed just before the incident\ngit push                        # deploy, service is back\n# then diagnose calmly, on a branch"
+      },
+      "pitfall": "Forgetting that a merge commit needs git revert -m 1, and that reverting code does not undo a migration already applied to the data."
+    },
+    "fr": {
+      "why": "Pendant un incident, chaque minute passée à comprendre est une minute de panne. Si le dernier changement est la cause probable, l'annuler rétablit le service en quelques secondes et laisse le temps d'enquêter sans pression. Un hotfix écrit dans l'urgence provoque souvent un deuxième incident.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# prod est tombée : une heure de logs, puis hotfix en direct\nssh prod tail -f /var/log/app.log",
+        "after": "git revert --no-edit abc1234   # le commit déployé juste avant l'incident\ngit push                        # déploiement, le service revient\n# puis diagnostic à froid, sur une branche"
+      },
+      "pitfall": "Oublier qu'un commit de merge demande git revert -m 1, et que revert le code n'annule pas une migration déjà appliquée aux données."
+    }
+  },
+  "named-debt": {
+    "en": {
+      "why": "Sometimes the right call is a quick shortcut. The debt only becomes a problem when nobody remembers it exists, what its limit is or when to pay it back. Writing it down where the code lives, with its limit and the trigger to lift it, turns a hidden trap into a planned decision.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cache = {}  # TODO fix later",
+        "after": "# shortcut: in-memory cache, lost on restart and not shared between\n# workers; move to Redis when we run more than one process.\ncache = {}"
+      },
+      "pitfall": "Writing a bare TODO with no limit and no trigger, which nobody ever acts on."
+    },
+    "fr": {
+      "why": "Parfois le bon choix est un raccourci rapide. La dette ne devient un problème que lorsque personne ne se souvient qu'elle existe, de sa limite ni du moment de la rembourser. L'écrire là où vit le code, avec sa limite et le déclencheur pour la lever, transforme un piège caché en décision planifiée.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cache = {}  # TODO corriger plus tard",
+        "after": "# shortcut: cache en mémoire, perdu au redémarrage et non partagé entre\n# workers ; passer à Redis dès qu'on lance plus d'un processus.\ncache = {}"
+      },
+      "pitfall": "Écrire un TODO nu, sans limite ni déclencheur : personne n'y donne jamais suite."
+    }
+  },
+  "minimal-public-surface": {
+    "en": {
+      "why": "Everything you export or document becomes a promise: someone will import it, and changing it later costs a deprecation cycle or a major version. Keeping the public surface small leaves you free to rewrite the internals. Adding an export later is cheap, removing one is not.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "export function parse(s: string) { /* ... */ }\nexport function trimQuotes(s: string) { /* ... */ }\nexport const DEFAULTS = { /* ... */ };",
+        "after": "export function parse(s: string) { /* ... */ }\nfunction trimQuotes(s: string) { /* ... */ }   // internal, free to change\nconst DEFAULTS = { /* ... */ };"
+      },
+      "pitfall": "Exporting a helper \"just in case\" or for a test, and then having to support it for years."
+    },
+    "fr": {
+      "why": "Tout ce que tu exportes ou documentes devient une promesse : quelqu'un va l'importer, et le changer plus tard coûte un cycle de dépréciation ou une version majeure. Une surface publique réduite te laisse libre de réécrire l'intérieur. Ajouter un export plus tard est bon marché, en retirer un ne l'est pas.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "export function parse(s: string) { /* ... */ }\nexport function trimQuotes(s: string) { /* ... */ }\nexport const DEFAULTS = { /* ... */ };",
+        "after": "export function parse(s: string) { /* ... */ }\nfunction trimQuotes(s: string) { /* ... */ }   // interne, libre de changer\nconst DEFAULTS = { /* ... */ };"
+      },
+      "pitfall": "Exporter un helper \"au cas où\" ou pour un test, puis devoir le supporter pendant des années."
+    }
+  },
+  "hyrum-s-law": {
+    "en": {
+      "why": "With enough users, every observable behavior of your system gets relied on by someone: the order of keys, the wording of an error, a timing. Whether it is documented does not matter. So a change that is \"only internal\" can break a caller you never knew about, and it is worth looking before changing a format.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# reword the error message, nobody could depend on it\nsed -i 's/not found/missing/' src/errors.py",
+        "after": "# someone may match on the text: look for callers first\ngit grep -n \"not found\"\n# also check other repos, scripts and dashboards before changing it"
+      },
+      "pitfall": "Assuming an undocumented behavior is free to change because the documentation never promised it."
+    },
+    "fr": {
+      "why": "Avec assez d'utilisateurs, tout comportement observable de ton système finit par servir à quelqu'un : l'ordre des clés, le texte d'une erreur, un délai. Qu'il soit documenté ou non ne change rien. Un changement \"purement interne\" peut donc casser un appelant que tu ne connaissais pas, et mieux vaut chercher avant de changer un format.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# on reformule le message d'erreur, personne ne peut en dépendre\nsed -i 's/not found/missing/' src/errors.py",
+        "after": "# quelqu'un matche peut-être le texte : chercher les appelants d'abord\ngit grep -n \"not found\"\n# vérifier aussi les autres dépôts, scripts et tableaux de bord"
+      },
+      "pitfall": "Croire qu'un comportement non documenté est libre de changer parce que la doc ne l'a jamais promis."
+    }
+  },
+  "ci-gate": {
+    "en": {
+      "why": "A gate only protects if it blocks. As soon as one person skips lint or tests \"just this once\", red builds become normal and the next breakage goes unnoticed. Making lint, tests and build mandatory, and never bypassed, keeps the main branch always deployable.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit --no-verify -m \"wip, tests fail but I will fix later\"\ngit push --no-verify",
+        "after": "npm run lint && npm test && npm run build\ngit commit -m \"Fix pagination off-by-one\"\ngit push\n# CI runs the same three on the PR and blocks the merge if one is red"
+      },
+      "pitfall": "Bypassing the gate with --no-verify or by marking a flaky test as skipped instead of fixing it."
+    },
+    "fr": {
+      "why": "Une porte ne protège que si elle bloque. Dès que quelqu'un saute lint ou tests \"juste cette fois\", les builds rouges deviennent normaux et la casse suivante passe inaperçue. Rendre lint, tests et build obligatoires et jamais contournés garde la branche principale toujours déployable.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit --no-verify -m \"wip, les tests échouent, je corrige plus tard\"\ngit push --no-verify",
+        "after": "npm run lint && npm test && npm run build\ngit commit -m \"Corrige le décalage de pagination\"\ngit push\n# la CI relance les trois sur la PR et bloque la fusion si l'un est rouge"
+      },
+      "pitfall": "Contourner la porte avec --no-verify, ou marquer un test instable comme ignoré au lieu de le réparer."
+    }
+  },
+  "changelog": {
+    "en": {
+      "why": "Users do not read commit logs, they want to know what changes for them when they upgrade. A changelog gives one line per visible change, grouped by version, so they can decide whether to upgrade and what to test. It also forces you to notice breaking changes at release time.",
+      "example": {
+        "kind": "code",
+        "lang": "markdown",
+        "before": "fix stuff\nwip\nmerge branch 'dev'\nupdate deps",
+        "after": "## 1.5.0 (2026-11-17)\n### Added\n- CSV export from the reports page.\n### Changed\n- Upload timeout raised from 10 s to 30 s.\n### Fixed\n- Pagination skipped the last item."
+      },
+      "pitfall": "Pasting the raw git log, which lists internal work (\"wip\", \"merge\") instead of user-visible changes."
+    },
+    "fr": {
+      "why": "Les utilisateurs ne lisent pas les logs de commits, ils veulent savoir ce qui change pour eux en mettant à jour. Un changelog donne une ligne par changement visible, groupée par version, pour décider s'ils mettent à jour et quoi tester. Il force aussi à repérer les ruptures au moment de la release.",
+      "example": {
+        "kind": "code",
+        "lang": "markdown",
+        "before": "fix stuff\nwip\nmerge branch 'dev'\nupdate deps",
+        "after": "## 1.5.0 (2026-11-17)\n### Ajouté\n- Export CSV depuis la page des rapports.\n### Modifié\n- Délai d'upload porté de 10 s à 30 s.\n### Corrigé\n- La pagination sautait le dernier élément."
+      },
+      "pitfall": "Coller le git log brut, qui liste le travail interne (\"wip\", \"merge\") au lieu des changements visibles."
+    }
+  },
+  "vendoring": {
+    "en": {
+      "why": "Vendoring puts a copy of a dependency inside your repository. It protects you when the source can vanish, be unpublished or change under you, and when you need a build that works offline. The price is a bigger repo and the duty to update the copy yourself.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# the build needs the module proxy or a warm cache:\n# if a module disappears upstream, a fresh build fails\ngo build ./...",
+        "after": "go mod vendor          # copies dependencies into vendor/\ngit add vendor go.mod go.sum\ngo build -mod=vendor ./...   # builds offline, from the copy\n# version stays pinned in go.mod"
+      },
+      "pitfall": "Copying the code without recording its version and origin, so nobody knows how to update or audit it."
+    },
+    "fr": {
+      "why": "Le vendoring met une copie d'une dépendance dans ton dépôt. Il te protège quand la source peut disparaître, être dépubliée ou changer sous tes pieds, et quand il faut un build qui marche hors ligne. Le prix : un dépôt plus gros et le devoir de mettre la copie à jour toi-même.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# le build dépend du proxy de modules ou du cache :\n# si un module disparaît en amont, un build neuf échoue\ngo build ./...",
+        "after": "go mod vendor          # copie les dépendances dans vendor/\ngit add vendor go.mod go.sum\ngo build -mod=vendor ./...   # build hors ligne, depuis la copie\n# la version reste épinglée dans go.mod"
+      },
+      "pitfall": "Copier le code sans noter sa version ni son origine : personne ne sait comment le mettre à jour ni l'auditer."
+    }
+  },
+  "code-review": {
+    "en": {
+      "why": "The author sees what they meant to write, a reviewer sees what is actually there. A second look catches bugs, missed edge cases and over-complicated code before they reach main, and spreads knowledge of the codebase. It only works if the review targets substance, not taste.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Review this PR.",
+        "after": "Review this diff for bugs, forgotten cases (empty input, concurrent\ncalls, the network call failing) and anything that could be simpler.\nSkip style, the linter handles it. Cite file and line for each point."
+      },
+      "pitfall": "Spending the review on style and naming that a linter could check, and missing the logic error."
+    },
+    "fr": {
+      "why": "L'auteur voit ce qu'il voulait écrire, le relecteur voit ce qui est réellement là. Un second regard attrape bugs, cas limites oubliés et code trop compliqué avant qu'ils n'arrivent sur main, et diffuse la connaissance du code. Ça ne marche que si la revue vise le fond, pas le goût.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fais la review de cette PR.",
+        "after": "Relis ce diff pour trouver les bugs, les cas oubliés (entrée vide,\nappels concurrents, échec de l'appel réseau) et ce qui pourrait être\nplus simple. Ignore le style, le linter s'en charge. Cite fichier et ligne."
+      },
+      "pitfall": "Passer la revue sur le style et les noms qu'un linter vérifie, et rater l'erreur de logique."
+    }
+  },
+  "deletion-addition": {
+    "en": {
+      "why": "Every line of code is something to read, test and maintain. A change often makes older code useless: a flag fully rolled out, a helper with no callers, a branch that cannot happen anymore. Deleting it keeps the codebase smaller than the feature, and a smaller codebase has fewer bugs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# the migration to new_parse is finished, the flag stays \"just in case\"\nif USE_NEW_PARSER:\n    return new_parse(s)\nreturn old_parse(s)",
+        "after": "# flag fully rolled out: old_parse, the flag and its tests are deleted\nreturn new_parse(s)"
+      },
+      "pitfall": "Leaving the old path \"just in case\" after the migration, until nobody dares remove it."
+    },
+    "fr": {
+      "why": "Chaque ligne de code est à lire, tester et maintenir. Un changement rend souvent du code plus ancien inutile : un flag généralisé, un helper sans appelant, une branche devenue impossible. Le supprimer garde le code plus petit que la fonctionnalité, et un code plus petit contient moins de bugs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# la migration vers new_parse est finie, le flag reste \"au cas où\"\nif USE_NEW_PARSER:\n    return new_parse(s)\nreturn old_parse(s)",
+        "after": "# flag généralisé : old_parse, le flag et ses tests sont supprimés\nreturn new_parse(s)"
+      },
+      "pitfall": "Laisser l'ancien chemin \"au cas où\" après la migration, jusqu'à ce que plus personne n'ose le retirer."
+    }
+  },
+  "isolated-update": {
+    "en": {
+      "why": "If a version bump is mixed with code changes and something breaks, you cannot tell whether the dependency or your code is guilty. One bump per commit, with tests run, makes the cause obvious and the revert trivial. Passing tests are not enough: exercise the feature that uses the library for real.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npm update\n# plus three code changes, one commit \"updates\"",
+        "after": "npm install lodash@4.17.21\nnpm test\n# then run the feature that uses lodash for real\ngit add package.json package-lock.json\ngit commit -m \"Bump lodash to 4.17.21\""
+      },
+      "pitfall": "Running a global update of everything at once, so a single regression hides among thirty bumps."
+    },
+    "fr": {
+      "why": "Si une montée de version est mélangée à du code et que quelque chose casse, impossible de savoir si c'est la dépendance ou ton code. Une montée par commit, tests lancés, rend la cause évidente et le revert trivial. Des tests verts ne suffisent pas : fais tourner pour de vrai la fonctionnalité qui utilise la bibliothèque.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npm update\n# plus trois changements de code, un commit \"mises à jour\"",
+        "after": "npm install lodash@4.17.21\nnpm test\n# puis faire tourner pour de vrai la fonctionnalité qui utilise lodash\ngit add package.json package-lock.json\ngit commit -m \"Monte lodash en 4.17.21\""
+      },
+      "pitfall": "Tout mettre à jour d'un coup : une seule régression se cache parmi trente montées."
+    }
+  },
+  "docs-in-the-same-commit": {
+    "en": {
+      "why": "Docs written \"later\" are never written, and a README that describes behavior that no longer exists is worse than none. Updating the doc in the same commit as the behavior keeps them in step, and reverting the commit reverts both. A reviewer also sees the intended behavior next to the code.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add src/cli.py\ngit commit -m \"Add --json output\"\n# README still describes the old output",
+        "after": "git add src/cli.py README.md\ngit commit -m \"Add --json output and document it in the README\""
+      },
+      "pitfall": "Promising to update the docs in a follow-up PR that never comes."
+    },
+    "fr": {
+      "why": "La doc écrite \"plus tard\" ne l'est jamais, et un README qui décrit un comportement disparu est pire que pas de README. La mettre à jour dans le même commit que le comportement garde les deux alignés, et revert le commit revert les deux. Le relecteur voit aussi le comportement voulu à côté du code.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add src/cli.py\ngit commit -m \"Ajoute la sortie --json\"\n# le README décrit encore l'ancienne sortie",
+        "after": "git add src/cli.py README.md\ngit commit -m \"Ajoute la sortie --json et la documente dans le README\""
+      },
+      "pitfall": "Promettre de mettre la doc à jour dans une PR suivante qui ne vient jamais."
+    }
+  },
+  "migration-tested-on-a-copy": {
+    "en": {
+      "why": "A migration that fails halfway on production data can leave it corrupted, and some changes cannot be undone. Running it first on a clone shows errors, timing and surprises in the data without risk. Comparing counts before and after catches lost or duplicated rows that no error message reports.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "psql prod_db -f migrate_orders.sql   # first run, directly on prod",
+        "after": "createdb copy_db\npg_dump prod_db | psql -d copy_db\npsql -d copy_db -c \"SELECT count(*) FROM orders\"      # before\npsql -d copy_db -f migrate_orders.sql\npsql -d copy_db -c \"SELECT count(*) FROM orders\"      # after, must match"
+      },
+      "pitfall": "Testing on a tiny dev database whose data is too clean to reveal the real edge cases."
+    },
+    "fr": {
+      "why": "Une migration qui échoue en route sur les données de prod peut les laisser corrompues, et certains changements sont irréversibles. La jouer d'abord sur un clone montre erreurs, durée et surprises dans les données sans risque. Comparer les comptes avant et après attrape les lignes perdues ou dupliquées qu'aucune erreur ne signale.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "psql prod_db -f migrate_orders.sql   # premier essai, directement en prod",
+        "after": "createdb copy_db\npg_dump prod_db | psql -d copy_db\npsql -d copy_db -c \"SELECT count(*) FROM orders\"      # avant\npsql -d copy_db -f migrate_orders.sql\npsql -d copy_db -c \"SELECT count(*) FROM orders\"      # après, doit correspondre"
+      },
+      "pitfall": "Tester sur une petite base de dev aux données trop propres pour révéler les vrais cas limites."
+    }
+  }
+}

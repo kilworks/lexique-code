@@ -1,0 +1,332 @@
+{
+  "bottom-line-first-bluf": {
+    "en": {
+      "why": "A reader scans the first line and decides whether to read on. If the answer is buried after the story of how you got there, they miss it or have to dig. Lead with the verdict, back it with proof, and keep detail for those who want it.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Report on the migration. I started by reading the schema, then wrote a copy script, hit two timeouts on orders, retried, and eventually compared the row counts.",
+        "after": "Migration done: 41/41 tables copied, row counts match.\nProof: SELECT count(*) on source and target, same numbers (output below).\nDetail, only if needed: 2 timeouts on orders, fixed by retry."
+      },
+      "pitfall": "Writing a first line like \"Here is a summary of what I did\" that carries no verdict."
+    },
+    "fr": {
+      "why": "Un lecteur survole la première ligne et décide s'il continue. Si la réponse est enfouie après le récit du chemin parcouru, il la rate ou doit la chercher. Mets le verdict en tête, appuie-le d'une preuve, et garde le détail pour ceux qui le veulent.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Rapport sur la migration. J'ai d'abord lu le schéma, puis écrit un script de copie, eu deux timeouts sur orders, relancé, et fini par comparer les comptes de lignes.",
+        "after": "Migration terminée : 41/41 tables copiées, comptes de lignes identiques.\nPreuve : SELECT count(*) sur la source et la cible, mêmes chiffres (sortie ci-dessous).\nDétail, si besoin : 2 timeouts sur orders, résolus par relance."
+      },
+      "pitfall": "Ouvrir sur \"Voici un résumé de ce que j'ai fait\", une ligne qui ne porte aucun verdict."
+    }
+  },
+  "facts-assumptions-judgments": {
+    "en": {
+      "why": "A report that blends what was observed, what was guessed and what was concluded makes every sentence look equally solid. The reader cannot tell which parts to trust or to check first. Three labels make the weak spots visible.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "The deploy failed because the config is wrong, so we should roll back.",
+        "after": "FACTS: deploy exited with code 1; log line 212 says \"missing DB_URL\".\nASSUMPTIONS: DB_URL was set in the old environment (not checked).\nJUDGMENT: roll back, since the fix needs a secret I cannot read."
+      },
+      "pitfall": "Putting a guess under FACTS because it sounds obvious."
+    },
+    "fr": {
+      "why": "Un rapport qui mélange ce qui a été observé, ce qui a été supposé et ce qui a été conclu donne à chaque phrase la même solidité apparente. Le lecteur ne sait pas quoi croire ni quoi vérifier en premier. Trois étiquettes rendent les points faibles visibles.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Le déploiement a échoué parce que la config est mauvaise, donc il faut revenir en arrière.",
+        "after": "FAITS : le déploiement sort en code 1 ; la ligne 212 du log dit \"missing DB_URL\".\nHYPOTHÈSES : DB_URL était définie dans l'ancien environnement (non vérifié).\nJUGEMENT : revenir à la version précédente, car le correctif demande un secret que je ne peux pas lire."
+      },
+      "pitfall": "Ranger une supposition sous FAITS parce qu'elle semble évidente."
+    }
+  },
+  "confidence-level": {
+    "en": {
+      "why": "Two claims can sound identical while one was tested and the other inferred from a name. Stating how sure you are lets the reader decide how much to rely on it. Naming what would settle it turns doubt into a next step.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "The slow query comes from the missing index on orders.user_id.",
+        "after": "Likely: the slow query comes from the missing index on orders.user_id.\nWhat would settle it: run EXPLAIN on the query and look for a sequential scan on orders."
+      },
+      "pitfall": "Saying \"I think\" everywhere, which hides the one claim that really is uncertain."
+    },
+    "fr": {
+      "why": "Deux affirmations peuvent sonner pareil alors que l'une a été testée et l'autre déduite d'un nom. Dire à quel point tu es sûr permet au lecteur de doser sa confiance. Nommer ce qui trancherait transforme le doute en prochaine étape.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "La requête lente vient de l'index manquant sur orders.user_id.",
+        "after": "Probable : la requête lente vient de l'index manquant sur orders.user_id.\nCe qui trancherait : lancer EXPLAIN sur la requête et chercher un sequential scan sur orders."
+      },
+      "pitfall": "Mettre \"je pense\" partout, ce qui noie la seule affirmation vraiment incertaine."
+    }
+  },
+  "derived-numbers": {
+    "en": {
+      "why": "A count typed from memory or estimated by eye is often off, and nobody can check it. A number produced by a command can be rerun and trusted. Citing the command lets the reader reproduce it.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# report: \"about 40 TODOs left in src\"",
+        "after": "grep -rn 'TODO' src | wc -l\n# report: \"38 TODO lines in src (grep -rn 'TODO' src | wc -l)\""
+      },
+      "pitfall": "Running the command but then rounding or retyping the result into the report."
+    },
+    "fr": {
+      "why": "Un compte tapé de tête ou estimé à l'œil est souvent faux, et personne ne peut le vérifier. Un chiffre sorti d'une commande peut être relancé et cru. Citer la commande permet au lecteur de le reproduire.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# rapport : \"une quarantaine de TODO restants dans src\"",
+        "after": "grep -rn 'TODO' src | wc -l\n# rapport : \"38 lignes TODO dans src (grep -rn 'TODO' src | wc -l)\""
+      },
+      "pitfall": "Lancer la commande puis arrondir ou retaper le résultat dans le rapport."
+    }
+  },
+  "processed-total-ratio": {
+    "en": {
+      "why": "\"Done\" says nothing when a task covers many items. A ratio shows at a glance how much is finished, and naming the remainder shows nothing was silently dropped. It is how \"all\" and \"every\" requests get checked.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "I renamed the files and everything is updated.",
+        "after": "Processed 12/15 files.\nNot processed: legacy/a.py (read-only), legacy/b.py (read-only), docs/c.md (name collision with docs/C.md)."
+      },
+      "pitfall": "Reporting 12/15 without saying which 3 are missing and why."
+    },
+    "fr": {
+      "why": "\"Fait\" ne dit rien quand une tâche couvre beaucoup d'éléments. Un ratio montre d'un coup d'œil l'avancement, et nommer le reste prouve que rien n'a été oublié en silence. C'est ce qui permet de contrôler les demandes en \"tout\" ou \"toutes\".",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "J'ai renommé les fichiers, tout est à jour.",
+        "after": "12/15 fichiers traités.\nNon traités : legacy/a.py (lecture seule), legacy/b.py (lecture seule), docs/c.md (collision de nom avec docs/C.md)."
+      },
+      "pitfall": "Annoncer 12/15 sans dire quels sont les 3 manquants ni pourquoi."
+    }
+  },
+  "gaps": {
+    "en": {
+      "why": "Every task leaves something undone or unchecked, and the reader assumes the best if you stay quiet. A gaps list makes that part visible so it can be decided on instead of discovered later in production. A silent gap reads as a hidden defect.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "The API change is complete and tested.",
+        "after": "The API change is complete. Unit tests pass.\nGaps: not tested against the real payment sandbox; the mobile client was not checked; the OpenAPI file was not regenerated."
+      },
+      "pitfall": "Listing only the gaps that sound minor and leaving out the one that matters."
+    },
+    "fr": {
+      "why": "Toute tâche laisse quelque chose de non fait ou de non vérifié, et le lecteur suppose le meilleur si tu te tais. Une liste d'écarts rend cette partie visible pour qu'on tranche dessus au lieu de la découvrir plus tard en production. Un écart passé sous silence ressemble à un défaut caché.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Le changement d'API est terminé et testé.",
+        "after": "Le changement d'API est terminé. Les tests unitaires passent.\nÉcarts : non testé sur la vraie sandbox de paiement ; client mobile non vérifié ; fichier OpenAPI non régénéré."
+      },
+      "pitfall": "Ne lister que les écarts qui semblent mineurs et omettre celui qui compte."
+    }
+  },
+  "locatable-deliverable": {
+    "en": {
+      "why": "\"It's done\" gives the reader nothing to open. An absolute path points straight at the artifact, with no guessing about the working directory or which copy is meant. It also makes the claim checkable.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "I generated the report, it's done.",
+        "after": "Report written: C:\\work\\out\\report.csv (1 file)\nScript used: C:\\work\\make_report.py"
+      },
+      "pitfall": "Giving a relative path like out/report.csv that depends on where the command ran."
+    },
+    "fr": {
+      "why": "\"C'est fait\" ne donne rien à ouvrir au lecteur. Un chemin absolu mène droit à l'artefact, sans deviner le dossier courant ni quelle copie est visée. Cela rend aussi l'affirmation vérifiable.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "J'ai généré le rapport, c'est fait.",
+        "after": "Rapport écrit : C:\\work\\out\\report.csv (1 fichier)\nScript utilisé : C:\\work\\make_report.py"
+      },
+      "pitfall": "Donner un chemin relatif comme out/report.csv qui dépend de l'endroit où la commande a tourné."
+    }
+  },
+  "one-click-check": {
+    "en": {
+      "why": "Saying it works asks the reader to trust you. Handing over the exact command or URL lets them see it work in seconds. It matters most when you could not observe the behavior yourself.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# report: \"the health endpoint works now\"",
+        "after": "curl -s -o /dev/null -w \"%{http_code}\\n\" https://example.com/health\n# expected output: 200"
+      },
+      "pitfall": "Giving a vague check like \"try the endpoint\" or a command that needs setup the reader lacks."
+    },
+    "fr": {
+      "why": "Dire que ça marche demande au lecteur de te croire. Donner la commande ou l'URL exacte lui permet de le voir marcher en quelques secondes. C'est surtout utile quand tu n'as pas pu observer le comportement toi-même.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# rapport : \"l'endpoint de santé marche maintenant\"",
+        "after": "curl -s -o /dev/null -w \"%{http_code}\\n\" https://example.com/health\n# sortie attendue : 200"
+      },
+      "pitfall": "Donner un check vague comme \"essaie l'endpoint\" ou une commande qui exige une config que le lecteur n'a pas."
+    }
+  },
+  "next-action": {
+    "en": {
+      "why": "A report that ends with several options or open questions leaves the reader to work out what is blocking. One named action, placed last, is what they actually do next. It keeps the handoff clear and avoids a round of back and forth.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Let me know what you think, we could also change the schema or wait for the vendor, up to you.",
+        "after": "Next action for you: approve the schema change in PR #42."
+      },
+      "pitfall": "Ending with a menu of options instead of one named action."
+    },
+    "fr": {
+      "why": "Un rapport qui finit sur plusieurs options ou questions ouvertes laisse au lecteur le soin de trouver ce qui bloque. Une seule action nommée, placée en dernier, est ce qu'il fait vraiment ensuite. Le passage de relais reste net et on évite un aller-retour.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Dis-moi ce que tu en penses, on pourrait aussi changer le schéma ou attendre le fournisseur, à toi de voir.",
+        "after": "Prochain geste pour toi : approuver le changement de schéma dans la PR #42."
+      },
+      "pitfall": "Finir sur un menu d'options au lieu d'une seule action nommée."
+    }
+  },
+  "one-page-map": {
+    "en": {
+      "why": "When a person is lost in a big task, more detail makes it worse. One screen in plain words, with a single request, gives them a place to stand. You keep the sorting and ranking work so they only have to act.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Here are 40 findings grouped in 9 categories with severity scores, links and a long methodology section. Tell me which ones to fix.",
+        "after": "Where we are: 3 things need attention, 37 are fine.\n1. Backup did not run last night\n2. Certificate expires in 6 days\n3. Login page is slow\nAlready ranked by urgency. One thing for you: reply \"go\" and I fix them in this order."
+      },
+      "pitfall": "Cutting the page down to fit by dropping the items that need action."
+    },
+    "fr": {
+      "why": "Quand quelqu'un est perdu dans une grosse tâche, plus de détail aggrave les choses. Un écran en mots simples, avec une seule demande, lui donne un point d'appui. Le tri et le classement restent à ta charge, il n'a plus qu'à agir.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Voici 40 constats rangés en 9 catégories avec scores de sévérité, liens et une longue section méthodo. Dis-moi lesquels corriger.",
+        "after": "Où on en est : 3 points demandent de l'attention, 37 sont bons.\n1. La sauvegarde n'a pas tourné cette nuit\n2. Le certificat expire dans 6 jours\n3. La page de connexion est lente\nDéjà classés par urgence. Un seul geste pour toi : réponds \"go\" et je les corrige dans cet ordre."
+      },
+      "pitfall": "Faire tenir la page en retirant justement les points qui demandent une action."
+    }
+  },
+  "plain-language": {
+    "en": {
+      "why": "Jargon and acronyms make a report unreadable for anyone outside the context, including you in six months. Common words work for everyone, and one definition at first use costs a few words. If a term is truly needed, define it once and then reuse it.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "The cron job is not idempotent, so a retry inserts dupes and the DLQ fills up.",
+        "after": "The nightly job is not safe to run twice: a second run adds the same rows again, and the list of failed messages (the \"dead letter queue\") keeps growing."
+      },
+      "pitfall": "Defining a term once and then switching to a synonym, so the reader thinks it is a new thing."
+    },
+    "fr": {
+      "why": "Le jargon et les sigles rendent un rapport illisible pour quiconque est hors contexte, toi dans six mois compris. Les mots courants marchent pour tout le monde, et une définition à la première occurrence coûte quelques mots. Si un terme est vraiment nécessaire, définis-le une fois puis réutilise-le.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Le cron n'est pas idempotent, donc un retry insère des doublons et la DLQ se remplit.",
+        "after": "La tâche de nuit n'est pas sûre à relancer : une deuxième exécution ajoute les mêmes lignes une seconde fois, et la liste des messages en échec (la \"dead letter queue\") ne cesse de grossir."
+      },
+      "pitfall": "Définir un terme puis passer à un synonyme, ce qui fait croire à une nouvelle notion."
+    }
+  },
+  "before-after": {
+    "en": {
+      "why": "A description of a change is read, compared in the head, and often misread. Two columns or a diff put the old and new state side by side, so the reader sees the change directly. It works for config, output, layouts and numbers alike.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "I raised the request timeout and lowered the retry count.",
+        "after": "| setting  | before | after |\n|----------|--------|-------|\n| timeout  | 5 s    | 30 s  |\n| retries  | 5      | 2     |"
+      },
+      "pitfall": "Showing only the after, so the reader cannot tell what actually moved."
+    },
+    "fr": {
+      "why": "La description d'un changement se lit, se compare de tête, et se comprend souvent de travers. Deux colonnes ou un diff placent l'ancien et le nouvel état côte à côte, le lecteur voit le changement directement. Ça marche pour une config, une sortie, une mise en page ou des chiffres.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "J'ai augmenté le timeout des requêtes et baissé le nombre de retries.",
+        "after": "| réglage  | avant | après |\n|----------|-------|-------|\n| timeout  | 5 s   | 30 s  |\n| retries  | 5     | 2     |"
+      },
+      "pitfall": "Ne montrer que l'après, le lecteur ne voit pas ce qui a vraiment bougé."
+    }
+  },
+  "concrete-example": {
+    "en": {
+      "why": "An abstract description lets each reader imagine a different thing. One real input and its exact output pins the behavior down and exposes edge cases. A reader can check it by running it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# normalize() cleans up names.",
+        "after": "# normalize(\"  Eric   DUPONT \") -> \"eric dupont\"\ndef normalize(name):\n    return \" \".join(name.lower().split())"
+      },
+      "pitfall": "Picking an easy input that hides the edge case the reader worries about."
+    },
+    "fr": {
+      "why": "Une description abstraite laisse chaque lecteur imaginer autre chose. Une entrée réelle et sa sortie exacte fixent le comportement et font ressortir les cas limites. Le lecteur peut le vérifier en le lançant.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# normalize() nettoie les noms.",
+        "after": "# normalize(\"  Eric   DUPONT \") -> \"eric dupont\"\ndef normalize(name):\n    return \" \".join(name.lower().split())"
+      },
+      "pitfall": "Choisir une entrée facile qui cache le cas limite qui inquiète le lecteur."
+    }
+  },
+  "diff-only": {
+    "en": {
+      "why": "Pasting a whole file back makes the reader hunt for the three lines that changed. A diff shows just those lines, so review is fast and nothing else gets touched by accident. It also keeps long outputs short.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fix the off-by-one in paginate(). Reply with the full updated file.",
+        "after": "Fix the off-by-one in paginate(). Reply with a unified diff only, no full file.\n\nExpected reply:\n@@ -14 +14 @@\n-    end = start + page_size + 1\n+    end = start + page_size"
+      },
+      "pitfall": "Asking for a diff, then accepting a reply that quietly rewrites other lines too."
+    },
+    "fr": {
+      "why": "Recoller un fichier entier oblige le lecteur à chercher les trois lignes qui ont changé. Un diff montre juste ces lignes, la relecture est rapide et rien d'autre n'est touché par erreur. Les sorties longues restent courtes.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Corrige l'erreur off-by-one dans paginate(). Réponds avec le fichier complet mis à jour.",
+        "after": "Corrige l'erreur off-by-one dans paginate(). Réponds avec un diff unifié seulement, pas le fichier entier.\n\nRéponse attendue :\n@@ -14 +14 @@\n-    end = start + page_size + 1\n+    end = start + page_size"
+      },
+      "pitfall": "Demander un diff puis accepter une réponse qui réécrit aussi d'autres lignes sans le dire."
+    }
+  },
+  "table": {
+    "en": {
+      "why": "Comparing options in paragraphs forces the reader to hold values in memory and line them up. A table with one row per option and one column per criterion makes the comparison direct. Prose is kept for the recommendation, not for the data.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "SQLite is simple and needs no server but handles few writers, Postgres scales better but needs hosting, and MySQL is much like Postgres.",
+        "after": "| option   | server needed | concurrent writes | ops cost |\n|----------|---------------|-------------------|----------|\n| SQLite   | no            | low               | none     |\n| Postgres | yes           | high              | medium   |\n| MySQL    | yes           | high              | medium   |"
+      },
+      "pitfall": "Mixing criteria and verdicts in the cells, so the columns no longer compare like with like."
+    },
+    "fr": {
+      "why": "Comparer des options en paragraphes oblige le lecteur à garder les valeurs en tête et à les aligner. Un tableau avec une ligne par option et une colonne par critère rend la comparaison directe. La prose reste pour la recommandation, pas pour les données.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "SQLite est simple et sans serveur mais gère peu d'écritures, Postgres passe mieux à l'échelle mais demande un hébergement, et MySQL ressemble à Postgres.",
+        "after": "| option   | serveur requis | écritures concurrentes | coût d'exploitation |\n|----------|----------------|------------------------|---------------------|\n| SQLite   | non            | faibles                | nul                 |\n| Postgres | oui            | élevées                | moyen               |\n| MySQL    | oui            | élevées                | moyen               |"
+      },
+      "pitfall": "Mélanger critères et verdicts dans les cellules, les colonnes ne comparent plus la même chose."
+    }
+  }
+}

@@ -1,0 +1,772 @@
+{
+  "semantics": {
+    "en": {
+      "why": "A name is the first documentation a reader sees. When it says what the thing is in business terms, nobody has to open the body to guess what `data2` or `ok` mean. The same goes for exit codes and log lines: they should state the cause, not just that something happened.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def f(data2, ok):\n    r = data2 * 0.2\n    if ok:\n        return r\n    return 0",
+        "after": "VAT_RATE = 0.2\n\ndef vat_amount(price_excl_tax, is_taxable):\n    if not is_taxable:\n        return 0\n    return price_excl_tax * VAT_RATE"
+      },
+      "pitfall": "Renaming to a longer name is not enough: `process_data` or `handle_result` are still empty, the name must carry the business meaning."
+    },
+    "fr": {
+      "why": "Un nom est la première documentation que lit quelqu'un. S'il dit ce qu'est la chose en termes métier, personne n'a besoin d'ouvrir le corps de la fonction pour deviner ce que veulent dire `data2` ou `ok`. Pareil pour les codes de sortie et les logs : ils doivent dire la cause, pas seulement qu'un truc s'est passé.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def f(data2, ok):\n    r = data2 * 0.2\n    if ok:\n        return r\n    return 0",
+        "after": "VAT_RATE = 0.2\n\ndef vat_amount(price_excl_tax, is_taxable):\n    if not is_taxable:\n        return 0\n    return price_excl_tax * VAT_RATE"
+      },
+      "pitfall": "Allonger le nom ne suffit pas : `process_data` ou `handle_result` restent vides, le nom doit porter le sens métier."
+    }
+  },
+  "explicit-implicit": {
+    "en": {
+      "why": "Implicit behaviour works until someone else (or you in six months) reads a call and cannot tell what it does. Named parameters and values you must pass on purpose move the decision to the call site, where it can be read and reviewed. Magic defaults are a classic source of bugs that nobody sees in review.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def fetch(url, timeout=0):  # 0 secretly means \"wait forever\"\n    ...\n\nfetch(u, 0)",
+        "after": "def fetch(url, *, timeout_s):  # required, no hidden default\n    ...\n\nfetch(u, timeout_s=None)  # None = wait forever, said at the call site"
+      },
+      "pitfall": "A default is not always implicit: a sensible, documented default like `encoding=\"utf-8\"` is fine, the problem is a default that changes behaviour in a way the caller cannot see."
+    },
+    "fr": {
+      "why": "Un comportement implicite marche jusqu'au jour où quelqu'un (ou toi dans six mois) lit un appel et ne sait pas ce qu'il fait. Les paramètres nommés et les valeurs à passer exprès remettent la décision à l'endroit de l'appel, où elle se lit et se relit en review. Les défauts magiques sont une source classique de bugs que personne ne voit en review.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def fetch(url, timeout=0):  # 0 veut dire \"attendre sans limite\", en secret\n    ...\n\nfetch(u, 0)",
+        "after": "def fetch(url, *, timeout_s):  # obligatoire, pas de défaut caché\n    ...\n\nfetch(u, timeout_s=None)  # None = attendre sans limite, dit à l'appel"
+      },
+      "pitfall": "Un défaut n'est pas toujours implicite : un défaut sensé et documenté comme `encoding=\"utf-8\"` est correct, le problème est un défaut qui change le comportement sans que l'appelant le voie."
+    }
+  },
+  "least-surprise": {
+    "en": {
+      "why": "A caller trusts the name: `get_user` reads, so it should not write. When a function does something its name does not announce, bugs appear far away, in a cache, a report, a retry that now writes twice. Either make the name tell the whole truth or split the function.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def get_user(user_id):\n    user = db.find(user_id)\n    user.last_seen = now()\n    db.save(user)\n    return user",
+        "after": "def get_user(user_id):\n    return db.find(user_id)\n\ndef touch_last_seen(user_id):\n    user = db.find(user_id)\n    user.last_seen = now()\n    db.save(user)"
+      },
+      "pitfall": "Documenting the surprise in a docstring does not fix it: the caller rarely reads the docstring, the name has to be honest."
+    },
+    "fr": {
+      "why": "L'appelant fait confiance au nom : `get_user` lit, donc il ne doit pas écrire. Quand une fonction fait quelque chose que son nom n'annonce pas, les bugs apparaissent loin de là, dans un cache, un rapport, un retry qui écrit maintenant deux fois. Soit le nom dit toute la vérité, soit on scinde la fonction en deux.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def get_user(user_id):\n    user = db.find(user_id)\n    user.last_seen = now()\n    db.save(user)\n    return user",
+        "after": "def get_user(user_id):\n    return db.find(user_id)\n\ndef touch_last_seen(user_id):\n    user = db.find(user_id)\n    user.last_seen = now()\n    db.save(user)"
+      },
+      "pitfall": "Documenter la surprise dans une docstring ne la corrige pas : l'appelant lit rarement la docstring, c'est le nom qui doit être honnête."
+    }
+  },
+  "pure-function-side-effect": {
+    "en": {
+      "why": "A pure function returns the same output for the same input and touches nothing else, so you test it with a plain `assert`. A side effect is anything that reaches outside: disk, network, database, print, global variable. Keeping them in separate functions makes the logic testable and the effects easy to find.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def checkout(cart):\n    total = 0\n    for item in cart:\n        total += item.price * item.qty\n    db.save_order(cart, total)\n    print(\"order saved\", total)",
+        "after": "def total(cart):\n    return sum(item.price * item.qty for item in cart)\n\ndef checkout(cart):\n    amount = total(cart)\n    db.save_order(cart, amount)\n    print(\"order saved\", amount)"
+      },
+      "pitfall": "Reading the clock, a random number or an environment variable inside a function makes it impure even though it writes nothing."
+    },
+    "fr": {
+      "why": "Une fonction pure renvoie la même sortie pour la même entrée et ne touche à rien d'autre, donc on la teste avec un simple `assert`. Un effet de bord est tout ce qui sort de la fonction : disque, réseau, base, print, variable globale. Les mettre dans des fonctions séparées rend la logique testable et les effets faciles à repérer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def checkout(cart):\n    total = 0\n    for item in cart:\n        total += item.price * item.qty\n    db.save_order(cart, total)\n    print(\"order saved\", total)",
+        "after": "def total(cart):\n    return sum(item.price * item.qty for item in cart)\n\ndef checkout(cart):\n    amount = total(cart)\n    db.save_order(cart, amount)\n    print(\"order saved\", amount)"
+      },
+      "pitfall": "Lire l'horloge, un nombre aléatoire ou une variable d'environnement dans une fonction la rend impure même si elle n'écrit rien."
+    }
+  },
+  "functional-core-imperative-shell": {
+    "en": {
+      "why": "Put the decisions in pure functions at the center and keep reading files, calling APIs and writing output in a thin outer layer. The core then runs on plain values, so tests need no mock, no temp file and no network. The shell stays so small that there is almost nothing left to test in it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def report(path):\n    rows = json.load(open(path))\n    errors = [r for r in rows if r[\"level\"] == \"error\"]\n    open(\"out.txt\", \"w\").write(f\"{len(errors)} errors\")",
+        "after": "def summarize(rows):\n    errors = [r for r in rows if r[\"level\"] == \"error\"]\n    return f\"{len(errors)} errors\"\n\ndef report(path):  # the shell: only I/O\n    with open(path) as f:\n        rows = json.load(f)\n    with open(\"out.txt\", \"w\") as f:\n        f.write(summarize(rows))\n\nassert summarize([{\"level\": \"error\"}, {\"level\": \"info\"}]) == \"1 errors\""
+      },
+      "pitfall": "The core stops being a core if it quietly receives a client, a path or a connection: pass it data, not handles."
+    },
+    "fr": {
+      "why": "On met les décisions dans des fonctions pures au centre, et la lecture de fichiers, les appels d'API et l'écriture en sortie dans une couche fine à l'extérieur. Le noyau travaille alors sur des valeurs simples, donc les tests n'ont besoin ni de mock, ni de fichier temporaire, ni de réseau. La coque est si petite qu'il ne reste presque rien à y tester.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def report(path):\n    rows = json.load(open(path))\n    errors = [r for r in rows if r[\"level\"] == \"error\"]\n    open(\"out.txt\", \"w\").write(f\"{len(errors)} errors\")",
+        "after": "def summarize(rows):\n    errors = [r for r in rows if r[\"level\"] == \"error\"]\n    return f\"{len(errors)} errors\"\n\ndef report(path):  # la coque : seulement de l'I/O\n    with open(path) as f:\n        rows = json.load(f)\n    with open(\"out.txt\", \"w\") as f:\n        f.write(summarize(rows))\n\nassert summarize([{\"level\": \"error\"}, {\"level\": \"info\"}]) == \"1 errors\""
+      },
+      "pitfall": "Le noyau n'en est plus un s'il reçoit discrètement un client, un chemin ou une connexion : on lui passe des données, pas des handles."
+    }
+  },
+  "immutable": {
+    "en": {
+      "why": "When data is never modified after it is built, nobody can change it behind your back: no surprise from another function, a callback or a second thread. You create a new value for each change, and the old one stays valid for comparison, undo or debugging. This removes a whole family of shared-state bugs.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "function addTag(post: Post, tag: string): Post {\n  post.tags.push(tag);\n  return post;\n}",
+        "after": "function addTag(post: Readonly<Post>, tag: string): Post {\n  return { ...post, tags: [...post.tags, tag] };\n}"
+      },
+      "pitfall": "A spread or `copy()` is shallow: nested objects and arrays are still shared, so the copy is only immutable one level deep."
+    },
+    "fr": {
+      "why": "Quand une donnée n'est jamais modifiée après sa création, personne ne peut la changer dans ton dos : pas de surprise venant d'une autre fonction, d'un callback ou d'un second thread. On crée une nouvelle valeur à chaque changement, et l'ancienne reste valide pour comparer, annuler ou déboguer. Ça supprime toute une famille de bugs d'état partagé.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "function addTag(post: Post, tag: string): Post {\n  post.tags.push(tag);\n  return post;\n}",
+        "after": "function addTag(post: Readonly<Post>, tag: string): Post {\n  return { ...post, tags: [...post.tags, tag] };\n}"
+      },
+      "pitfall": "Le spread ou `copy()` est superficiel : les objets et tableaux imbriqués restent partagés, la copie n'est donc immuable que sur un niveau."
+    }
+  },
+  "single-source-of-truth": {
+    "en": {
+      "why": "If the same fact is written in two places, they will eventually disagree, and nobody knows which one is right. Pick one owner for each piece of data (a file, a table, a config) and make everything else read from it. Generated copies are fine as long as they are regenerated, never edited.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# pyproject.toml says 1.4.2, and so does this line\n__version__ = \"1.4.2\"",
+        "after": "from importlib.metadata import version\n\n__version__ = version(\"mypkg\")  # read from the installed package metadata"
+      },
+      "pitfall": "A copy that a script regenerates is fine, a copy that a human retypes \"just this once\" is the one that drifts."
+    },
+    "fr": {
+      "why": "Si le même fait est écrit à deux endroits, ils finiront par diverger, et personne ne sait lequel a raison. On choisit un propriétaire pour chaque donnée (un fichier, une table, une config) et tout le reste la lit. Les copies générées sont acceptables tant qu'elles sont régénérées, jamais éditées.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# pyproject.toml dit 1.4.2, cette ligne aussi\n__version__ = \"1.4.2\"",
+        "after": "from importlib.metadata import version\n\n__version__ = version(\"mypkg\")  # lu dans les métadonnées du paquet installé"
+      },
+      "pitfall": "Une copie qu'un script régénère est correcte, c'est celle qu'un humain recopie \"juste cette fois\" qui dérive."
+    }
+  },
+  "cohesion-coupling": {
+    "en": {
+      "why": "Cohesion means the things inside a module belong together and change for the same reason. Coupling is how many other modules you must touch when this one changes. You want high cohesion and low coupling, so a change stays in one place and a reader opens one file.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "utils.py\n    parse_date()\n    send_email()\n    hash_password()\n    resize_image()",
+        "after": "dates.py       parse_date()\nmailer.py      send_email()\npasswords.py   hash_password()\nimages.py      resize_image()"
+      },
+      "pitfall": "A `utils` or `helpers` file is the classic sign of no cohesion: it groups things by \"I had nowhere to put them\", not by reason to change."
+    },
+    "fr": {
+      "why": "La cohésion, c'est que ce qui est dans un module va ensemble et change pour la même raison. Le couplage, c'est le nombre d'autres modules à toucher quand celui-ci change. On vise une forte cohésion et un faible couplage : un changement reste à un seul endroit et le lecteur n'ouvre qu'un fichier.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "utils.py\n    parse_date()\n    send_email()\n    hash_password()\n    resize_image()",
+        "after": "dates.py       parse_date()\nmailer.py      send_email()\npasswords.py   hash_password()\nimages.py      resize_image()"
+      },
+      "pitfall": "Un fichier `utils` ou `helpers` est le signe classique d'une cohésion nulle : il range par \"je ne savais pas où les mettre\", pas par raison de changer."
+    }
+  },
+  "orthogonal": {
+    "en": {
+      "why": "Orthogonal options are independent: you can combine any value of one with any value of another and each keeps its own effect. When a setting secretly changes another, users get combinations nobody tested. Independent options also keep the test matrix small and the docs short.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def run(fast=False):\n    verify = True\n    if fast:\n        verify = False  # undocumented side effect\n    ...",
+        "after": "def run(*, fast=False, verify=True):\n    ...  # each option does exactly one thing"
+      },
+      "pitfall": "If two options must never be used together or one only matters when the other is on, they are not orthogonal: merge them or reject the bad combination with an error."
+    },
+    "fr": {
+      "why": "Des options orthogonales sont indépendantes : on peut combiner n'importe quelle valeur de l'une avec n'importe quelle valeur de l'autre et chacune garde son propre effet. Quand un réglage en change un autre en secret, les utilisateurs tombent sur des combinaisons que personne n'a testées. Des options indépendantes gardent aussi la matrice de tests petite et la doc courte.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def run(fast=False):\n    verify = True\n    if fast:\n        verify = False  # effet de bord non documenté\n    ...",
+        "after": "def run(*, fast=False, verify=True):\n    ...  # chaque option fait exactement une chose"
+      },
+      "pitfall": "Si deux options ne doivent jamais être utilisées ensemble, ou si l'une n'a de sens que quand l'autre est active, elles ne sont pas orthogonales : on les fusionne ou on rejette la mauvaise combinaison avec une erreur."
+    }
+  },
+  "composable": {
+    "en": {
+      "why": "Small pieces with one input and one output can be chained in ways their author never planned. Unix tools are the model: each does one thing, reads text, writes text. A big tool that does everything must be rewritten for every new need, a composable one is just recombined.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./report.sh   # reads app.log, counts errors by module, writes report.txt",
+        "after": "grep ERROR app.log | cut -d' ' -f4 | sort | uniq -c | sort -rn | head"
+      },
+      "pitfall": "Pieces only compose if they share a format: a function that returns a formatted string instead of data forces the next step to parse it back."
+    },
+    "fr": {
+      "why": "De petites pièces avec une entrée et une sortie se chaînent de manières que leur auteur n'avait pas prévues. Les outils Unix sont le modèle : chacun fait une chose, lit du texte, écrit du texte. Un gros outil qui fait tout doit être réécrit à chaque nouveau besoin, un outil composable se recombine simplement.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./report.sh   # lit app.log, compte les erreurs par module, écrit report.txt",
+        "after": "grep ERROR app.log | cut -d' ' -f4 | sort | uniq -c | sort -rn | head"
+      },
+      "pitfall": "Les pièces ne se composent que si elles partagent un format : une fonction qui renvoie une chaîne mise en forme au lieu de données oblige l'étape suivante à la reparser."
+    }
+  },
+  "early-return": {
+    "en": {
+      "why": "Checking the bad cases first and leaving right away keeps the main path at the left margin. The reader handles each edge case once, at the top, and then reads the real logic without carrying three open conditions in their head. Less indentation means fewer places to misplace an `else`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def discount(user, cart):\n    if user:\n        if user.active:\n            if cart.items:\n                return cart.total * 0.9\n    return 0",
+        "after": "def discount(user, cart):\n    if not user or not user.active:\n        return 0\n    if not cart.items:\n        return 0\n    return cart.total * 0.9"
+      },
+      "pitfall": "Early return is not a license for ten exits in a long function: if you need that many guards, the function does too much."
+    },
+    "fr": {
+      "why": "Vérifier les mauvais cas d'abord et sortir tout de suite garde le chemin principal collé à la marge gauche. Le lecteur règle chaque cas limite une fois, en haut, puis lit la vraie logique sans garder trois conditions ouvertes en tête. Moins d'indentation, c'est moins d'endroits où mal placer un `else`.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def discount(user, cart):\n    if user:\n        if user.active:\n            if cart.items:\n                return cart.total * 0.9\n    return 0",
+        "after": "def discount(user, cart):\n    if not user or not user.active:\n        return 0\n    if not cart.items:\n        return 0\n    return cart.total * 0.9"
+      },
+      "pitfall": "L'early return ne justifie pas dix sorties dans une longue fonction : si tu as besoin d'autant de gardes, la fonction en fait trop."
+    }
+  },
+  "yagni": {
+    "en": {
+      "why": "Code written for a need that does not exist yet costs time now and is usually wrong when the need arrives. It still has to be read, tested and kept working. Write what today's requirement asks, and add the option the day someone really needs it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "class Exporter:\n    registry = {}\n\n    def register(self, fmt, fn):\n        self.registry[fmt] = fn\n\n    def export(self, rows, fmt=\"csv\"):\n        return self.registry[fmt](rows)",
+        "after": "def export_csv(rows):\n    return \"\\n\".join(\",\".join(map(str, r)) for r in rows)"
+      },
+      "pitfall": "YAGNI is not \"never prepare\": it targets speculative features, not cheap good habits like clear names or a test."
+    },
+    "fr": {
+      "why": "Du code écrit pour un besoin qui n'existe pas encore coûte du temps maintenant, et il est souvent faux quand le besoin arrive. Il faut quand même le lire, le tester et le maintenir. On écrit ce que demande l'exigence d'aujourd'hui, et on ajoute l'option le jour où quelqu'un en a vraiment besoin.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "class Exporter:\n    registry = {}\n\n    def register(self, fmt, fn):\n        self.registry[fmt] = fn\n\n    def export(self, rows, fmt=\"csv\"):\n        return self.registry[fmt](rows)",
+        "after": "def export_csv(rows):\n    return \"\\n\".join(\",\".join(map(str, r)) for r in rows)"
+      },
+      "pitfall": "YAGNI ne veut pas dire \"ne jamais anticiper\" : il vise les fonctionnalités spéculatives, pas les bonnes habitudes peu coûteuses comme des noms clairs ou un test."
+    }
+  },
+  "rule-of-three": {
+    "en": {
+      "why": "One copy is normal, two copies are a coincidence you can tolerate, the third one proves the pattern is real. Factoring out too early locks in an abstraction built from one or two examples, which often does not fit the next case. Waiting for the third lets the true shape show up.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "a = raw_a.strip().lower()\nb = raw_b.strip().lower()\nc = raw_c.strip().lower()",
+        "after": "def normalize(s):\n    return s.strip().lower()\n\na, b, c = normalize(raw_a), normalize(raw_b), normalize(raw_c)"
+      },
+      "pitfall": "Three similar-looking copies are not always the same thing: if they change for different reasons, merging them creates coupling, not reuse."
+    },
+    "fr": {
+      "why": "Une copie est normale, deux copies sont une coïncidence tolérable, la troisième prouve que le motif existe. Factoriser trop tôt fige une abstraction construite sur un ou deux exemples, qui ne colle souvent pas au cas suivant. Attendre la troisième laisse apparaître la vraie forme.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "a = raw_a.strip().lower()\nb = raw_b.strip().lower()\nc = raw_c.strip().lower()",
+        "after": "def normalize(s):\n    return s.strip().lower()\n\na, b, c = normalize(raw_a), normalize(raw_b), normalize(raw_c)"
+      },
+      "pitfall": "Trois copies qui se ressemblent ne sont pas toujours la même chose : si elles changent pour des raisons différentes, les fusionner crée du couplage, pas de la réutilisation."
+    }
+  },
+  "chesterton-s-fence": {
+    "en": {
+      "why": "Before removing a line, a check or a workaround that looks pointless, find out why it was added. Old code often guards against a bug or a constraint nobody remembers. Git history is the fastest way to ask the author.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"this sleep looks useless\"\nsed -i '/time.sleep(2)/d' client.py",
+        "after": "git blame -L 42,42 client.py\ngit log -S\"time.sleep(2)\" -- client.py\n# read the commit message, then decide"
+      },
+      "pitfall": "If history gives no answer, \"I cannot see the reason\" is not a reason to delete: add a test or a log first and observe."
+    },
+    "fr": {
+      "why": "Avant de retirer une ligne, une vérification ou un contournement qui semble inutile, on cherche pourquoi il a été ajouté. Le vieux code protège souvent contre un bug ou une contrainte dont plus personne ne se souvient. L'historique git est le moyen le plus rapide d'interroger l'auteur.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"ce sleep a l'air inutile\"\nsed -i '/time.sleep(2)/d' client.py",
+        "after": "git blame -L 42,42 client.py\ngit log -S\"time.sleep(2)\" -- client.py\n# lire le message du commit, puis décider"
+      },
+      "pitfall": "Si l'historique ne répond pas, \"je ne vois pas la raison\" n'est pas une raison de supprimer : on ajoute d'abord un test ou un log et on observe."
+    }
+  },
+  "command-query-cqs": {
+    "en": {
+      "why": "Command-query separation says a function either changes state (command) or returns information (query), never both. Callers can then call a query as often as they like, in a log line or an assert, with no consequence. Hidden mutations in getters cause bugs that depend on how many times something was called.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def set_quantity(self, item_id, qty):\n    self.items[item_id] = qty\n    return sum(self.items.values())  # a command that also answers",
+        "after": "def set_quantity(self, item_id, qty):\n    self.items[item_id] = qty\n\ndef total_quantity(self):\n    return sum(self.items.values())"
+      },
+      "pitfall": "Some operations are legitimately both, like `stack.pop()` or an atomic `compare_and_swap`: split only when it does not create a race between the two calls."
+    },
+    "fr": {
+      "why": "La séparation commande-requête dit qu'une fonction soit change l'état (commande), soit renvoie une information (requête), jamais les deux. On peut alors appeler une requête autant de fois qu'on veut, dans un log ou un assert, sans conséquence. Les mutations cachées dans un getter causent des bugs qui dépendent du nombre d'appels.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def set_quantity(self, item_id, qty):\n    self.items[item_id] = qty\n    return sum(self.items.values())  # une commande qui répond aussi",
+        "after": "def set_quantity(self, item_id, qty):\n    self.items[item_id] = qty\n\ndef total_quantity(self):\n    return sum(self.items.values())"
+      },
+      "pitfall": "Certaines opérations sont légitimement les deux, comme `stack.pop()` ou un `compare_and_swap` atomique : on ne sépare que si ça ne crée pas de course entre les deux appels."
+    }
+  },
+  "law-of-demeter": {
+    "en": {
+      "why": "A chain like `a.b.c.d` ties your code to the internal structure of three other objects, so any of them changing breaks you. Ask the nearest object for what you need and let it find the answer. The structure behind it can then change without touching the callers.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const city = order.customer.address.city;",
+        "after": "const city = order.shippingCity();\n\n// inside Order\nshippingCity() {\n  return this.customer.shippingCity();\n}"
+      },
+      "pitfall": "Fluent builders and data access like `config.get(\"a\").get(\"b\")` are not violations: the rule is about reaching through objects with behaviour, not through plain data."
+    },
+    "fr": {
+      "why": "Une chaîne comme `a.b.c.d` lie ton code à la structure interne de trois autres objets, donc si l'un d'eux change, ça casse chez toi. On demande à l'objet le plus proche ce dont on a besoin et on le laisse trouver la réponse. La structure derrière peut alors changer sans toucher aux appelants.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const city = order.customer.address.city;",
+        "after": "const city = order.shippingCity();\n\n// dans Order\nshippingCity() {\n  return this.customer.shippingCity();\n}"
+      },
+      "pitfall": "Les builders fluides et l'accès à des données comme `config.get(\"a\").get(\"b\")` ne sont pas des violations : la règle vise le fait de traverser des objets à comportement, pas de simples données."
+    }
+  },
+  "dependency-inversion": {
+    "en": {
+      "why": "When a function reaches for the clock, the network or the disk itself, it is stuck with the real one and hard to test. Pass the dependency in as a parameter and the core only knows the shape it needs, not the detail. Tests give it a fixed time or a fake client, production gives it the real one.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def is_expired(token):\n    return time.time() > token.expires_at",
+        "after": "def is_expired(token, now):\n    return now > token.expires_at\n\nassert is_expired(Token(expires_at=100), now=101)"
+      },
+      "pitfall": "Do not invert everything: a dependency that never varies and is never faked (a string helper) gains nothing from being injected."
+    },
+    "fr": {
+      "why": "Quand une fonction va chercher elle-même l'horloge, le réseau ou le disque, elle est collée au vrai et difficile à tester. Si on passe la dépendance en paramètre, le cœur ne connaît que la forme dont il a besoin, pas le détail. Les tests lui donnent une heure fixe ou un faux client, la production lui donne le vrai.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def is_expired(token):\n    return time.time() > token.expires_at",
+        "after": "def is_expired(token, now):\n    return now > token.expires_at\n\nassert is_expired(Token(expires_at=100), now=101)"
+      },
+      "pitfall": "Il ne faut pas tout inverser : une dépendance qui ne varie jamais et qu'on ne simule jamais (un helper de chaînes) ne gagne rien à être injectée."
+    }
+  },
+  "state-machine": {
+    "en": {
+      "why": "A state machine names every state an object can be in and lists which moves between them are allowed. Impossible situations (a delivered order that is then cancelled) become errors instead of silent corruption. The table also doubles as documentation you can read at a glance.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def ship(order):\n    if order.state != \"cancelled\":\n        order.state = \"shipped\"",
+        "after": "ALLOWED = {\n    \"pending\": {\"paid\", \"cancelled\"},\n    \"paid\": {\"shipped\", \"refunded\"},\n    \"shipped\": {\"delivered\"},\n}\n\ndef move(order, new):\n    if new not in ALLOWED.get(order.state, set()):\n        raise ValueError(f\"illegal transition {order.state} -> {new}\")\n    order.state = new"
+      },
+      "pitfall": "A pile of boolean flags (`is_paid`, `is_shipped`, `is_cancelled`) is a state machine in disguise with 2^n states, most of them invalid."
+    },
+    "fr": {
+      "why": "Une machine à états nomme chaque état dans lequel un objet peut se trouver et liste les passages autorisés entre eux. Les situations impossibles (une commande livrée puis annulée) deviennent des erreurs au lieu d'une corruption silencieuse. La table sert aussi de documentation lisible d'un coup d'œil.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def ship(order):\n    if order.state != \"cancelled\":\n        order.state = \"shipped\"",
+        "after": "ALLOWED = {\n    \"pending\": {\"paid\", \"cancelled\"},\n    \"paid\": {\"shipped\", \"refunded\"},\n    \"shipped\": {\"delivered\"},\n}\n\ndef move(order, new):\n    if new not in ALLOWED.get(order.state, set()):\n        raise ValueError(f\"illegal transition {order.state} -> {new}\")\n    order.state = new"
+      },
+      "pitfall": "Un tas de booléens (`is_paid`, `is_shipped`, `is_cancelled`) est une machine à états déguisée avec 2^n états, dont la plupart sont invalides."
+    }
+  },
+  "decision-table": {
+    "en": {
+      "why": "A long `if/elif` chain mixes the rules with the code that applies them. As a table, each case is one line of data: easy to read, to extend and to test row by row. You can even load the table from a file without touching the logic.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def message(code):\n    if code == 200:\n        return \"ok\"\n    elif code == 404:\n        return \"not found\"\n    elif code == 429:\n        return \"slow down\"\n    elif code == 500:\n        return \"server error\"\n    return \"unknown\"",
+        "after": "MESSAGES = {200: \"ok\", 404: \"not found\", 429: \"slow down\", 500: \"server error\"}\n\ndef message(code):\n    return MESSAGES.get(code, \"unknown\")"
+      },
+      "pitfall": "When a case needs real logic and not just a value, the table gets awkward: keep it for lookups, not for multi-step behaviour."
+    },
+    "fr": {
+      "why": "Une longue chaîne `if/elif` mélange les règles et le code qui les applique. En table, chaque cas est une ligne de données : facile à lire, à étendre et à tester ligne par ligne. On peut même charger la table depuis un fichier sans toucher à la logique.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def message(code):\n    if code == 200:\n        return \"ok\"\n    elif code == 404:\n        return \"not found\"\n    elif code == 429:\n        return \"slow down\"\n    elif code == 500:\n        return \"server error\"\n    return \"unknown\"",
+        "after": "MESSAGES = {200: \"ok\", 404: \"not found\", 429: \"slow down\", 500: \"server error\"}\n\ndef message(code):\n    return MESSAGES.get(code, \"unknown\")"
+      },
+      "pitfall": "Quand un cas demande une vraie logique et pas juste une valeur, la table devient lourde : on la garde pour les correspondances, pas pour les comportements en plusieurs étapes."
+    }
+  },
+  "locality": {
+    "en": {
+      "why": "Locality means you can understand a piece of code by reading it where it sits, without jumping through five files. Layers of indirection are worth it only when they buy something real, like a second implementation. Otherwise they just make the reader hold more in their head.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# routes.py\ndef create_order(req):\n    return OrderServiceFactory().create().process(req)  # 4 files to follow",
+        "after": "# routes.py\ndef create_order(req):\n    items = parse_items(req)\n    total = sum(i.price * i.qty for i in items)\n    return db.insert_order(items, total)  # everything is visible here"
+      },
+      "pitfall": "Locality does not mean one giant file: when something is reused in three places, extract it, but do it because of the reuse, not on principle."
+    },
+    "fr": {
+      "why": "La localité, c'est pouvoir comprendre un morceau de code en le lisant là où il se trouve, sans sauter à travers cinq fichiers. Les couches d'indirection ne valent le coup que si elles achètent quelque chose de réel, comme une deuxième implémentation. Sinon elles obligent juste le lecteur à garder plus de choses en tête.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# routes.py\ndef create_order(req):\n    return OrderServiceFactory().create().process(req)  # 4 fichiers à suivre",
+        "after": "# routes.py\ndef create_order(req):\n    items = parse_items(req)\n    total = sum(i.price * i.qty for i in items)\n    return db.insert_order(items, total)  # tout est visible ici"
+      },
+      "pitfall": "La localité ne veut pas dire un fichier géant : quand un truc est réutilisé à trois endroits, on l'extrait, mais à cause de la réutilisation, pas par principe."
+    }
+  },
+  "comment-why": {
+    "en": {
+      "why": "The code already says what it does, a comment that repeats it just goes stale. What the code cannot say is why: the constraint, the bug it works around, the reason a more obvious version does not work. That one line is what saves the next person an hour.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "page = i + 1  # add 1 to i",
+        "after": "# the API numbers pages from 1, our loop starts at 0\npage = i + 1"
+      },
+      "pitfall": "A comment that explains a confusing block is often a hint to rewrite the block with better names, not to add more comments."
+    },
+    "fr": {
+      "why": "Le code dit déjà ce qu'il fait, un commentaire qui le répète finit juste périmé. Ce que le code ne peut pas dire, c'est pourquoi : la contrainte, le bug contourné, la raison pour laquelle la version plus évidente ne marche pas. Cette seule ligne fait gagner une heure à la personne suivante.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "page = i + 1  # ajoute 1 à i",
+        "after": "# l'API numérote les pages à partir de 1, notre boucle part de 0\npage = i + 1"
+      },
+      "pitfall": "Un commentaire qui explique un bloc confus est souvent le signe qu'il faut réécrire le bloc avec de meilleurs noms, pas ajouter des commentaires."
+    }
+  },
+  "actionable-error": {
+    "en": {
+      "why": "An error message is read at the worst moment, often by someone who did not write the code. A good one says what is wrong, where (file, key, line) and what to do about it. The reader then fixes it in a minute instead of searching the source.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "raise ValueError(\"invalid config\")",
+        "after": "raise ValueError(\n    f\"config.yaml: key 'port' is {port!r}, expected an integer \"\n    f\"between 1 and 65535. Fix the value in config.yaml.\"\n)"
+      },
+      "pitfall": "Never put secrets or full user data in the message to be helpful: show the faulty key and a safe summary of the value, not a token or a password."
+    },
+    "fr": {
+      "why": "Un message d'erreur est lu au pire moment, souvent par quelqu'un qui n'a pas écrit le code. Un bon message dit ce qui ne va pas, où (fichier, clé, ligne) et quoi faire. Le lecteur corrige alors en une minute au lieu de fouiller le source.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "raise ValueError(\"invalid config\")",
+        "after": "raise ValueError(\n    f\"config.yaml : la clé 'port' vaut {port!r}, attendu un entier \"\n    f\"entre 1 et 65535. Corriger la valeur dans config.yaml.\"\n)"
+      },
+      "pitfall": "Même pour aider, on ne met jamais de secrets ni de données utilisateur complètes dans le message : on montre la clé fautive et un résumé sûr de la valeur, pas un token ni un mot de passe."
+    }
+  },
+  "never-swallow-an-error": {
+    "en": {
+      "why": "An empty `except` turns a failure into silence: the program carries on with missing data and breaks later, somewhere unrelated. Catch only the exact error you know how to handle, then log it, retry, or use a stated fallback. Anything else should go up, so that someone sees it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "try:\n    cfg = load_config(path)\nexcept:\n    pass",
+        "after": "try:\n    cfg = load_config(path)\nexcept FileNotFoundError:\n    log.warning(\"config %s missing, using defaults\", path)\n    cfg = DEFAULT_CONFIG"
+      },
+      "pitfall": "A bare `except:` also catches `KeyboardInterrupt` and `SystemExit`, so even the Ctrl+C of the person running the script gets swallowed."
+    },
+    "fr": {
+      "why": "Un `except` vide transforme une panne en silence : le programme continue avec des données manquantes et casse plus tard, ailleurs, sans rapport apparent. On attrape seulement l'erreur exacte qu'on sait traiter, puis on journalise, on réessaie ou on prend un repli déclaré. Tout le reste doit remonter pour que quelqu'un le voie.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "try:\n    cfg = load_config(path)\nexcept:\n    pass",
+        "after": "try:\n    cfg = load_config(path)\nexcept FileNotFoundError:\n    log.warning(\"config %s absente, valeurs par défaut\", path)\n    cfg = DEFAULT_CONFIG"
+      },
+      "pitfall": "Un `except:` nu attrape aussi `KeyboardInterrupt` et `SystemExit`, donc même le Ctrl+C de la personne qui lance le script est avalé."
+    }
+  },
+  "positive-boolean": {
+    "en": {
+      "why": "A name with a negation inside forces the reader to untangle `not not_disabled` in their head, and double negatives are where logic bugs hide. A positive name reads like a sentence inside an `if`. Flip the meaning of the flag once, at its definition, instead of everywhere it is read.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if not user.not_disabled:\n    deny()",
+        "after": "if not user.enabled:\n    deny()"
+      },
+      "pitfall": "When you flip a flag, flip its stored data and defaults too, otherwise old records now mean the opposite."
+    },
+    "fr": {
+      "why": "Un nom qui contient une négation oblige le lecteur à démêler `not not_disabled` de tête, et les doubles négations sont l'endroit où les bugs de logique se cachent. Un nom positif se lit comme une phrase dans un `if`. On inverse le sens du drapeau une fois, à sa définition, plutôt qu'à chaque lecture.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if not user.not_disabled:\n    deny()",
+        "after": "if not user.enabled:\n    deny()"
+      },
+      "pitfall": "Quand on inverse un drapeau, il faut aussi inverser les données stockées et les valeurs par défaut, sinon les anciens enregistrements veulent dire l'inverse."
+    }
+  },
+  "dead-code": {
+    "en": {
+      "why": "Code that is never called still gets read, tested by hand and maintained, and it makes people wonder if it matters. Version control already keeps the old version, so a commented-out block adds nothing. Deleting it makes the live code easier to see.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def export(rows):\n    # old version\n    # return legacy_export(rows)\n    return csv_export(rows)\n\ndef legacy_export(rows):  # nobody calls this\n    ...",
+        "after": "def export(rows):\n    return csv_export(rows)"
+      },
+      "pitfall": "Before deleting, search for dynamic callers (reflection, config files, string-based imports): a function with no visible caller is not always unused."
+    },
+    "fr": {
+      "why": "Du code qui n'est jamais appelé est quand même lu, testé à la main et maintenu, et il fait se demander s'il compte. Le contrôle de version garde déjà l'ancienne version, donc un bloc commenté n'apporte rien. En le supprimant, le code vivant se voit mieux.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def export(rows):\n    # ancienne version\n    # return legacy_export(rows)\n    return csv_export(rows)\n\ndef legacy_export(rows):  # personne ne l'appelle\n    ...",
+        "after": "def export(rows):\n    return csv_export(rows)"
+      },
+      "pitfall": "Avant de supprimer, il faut chercher les appelants dynamiques (réflexion, fichiers de config, imports par chaîne) : une fonction sans appelant visible n'est pas toujours inutilisée."
+    }
+  },
+  "convention-configuration": {
+    "en": {
+      "why": "A sensible default that works without any setting means most users configure nothing. Following the repo's existing convention (folder names, file layout, naming) removes decisions for everyone. Each option you expose is something to document, test and keep compatible forever.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def build(src, out=\"dist\", ext=\".js\", encoding=\"utf-8\", sep=\"\\n\", minify=False, clean=True):\n    ...",
+        "after": "def build(src):\n    # output always goes to dist/, like every other tool in this repo\n    ..."
+      },
+      "pitfall": "Convention is not a ban on options: when two real users need different behaviour, add the option, but not before."
+    },
+    "fr": {
+      "why": "Un défaut sensé qui marche sans aucun réglage fait que la plupart des utilisateurs ne configurent rien. Suivre la convention déjà présente dans le dépôt (noms de dossiers, structure, nommage) retire des décisions pour tout le monde. Chaque option exposée est à documenter, à tester et à garder compatible pour toujours.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def build(src, out=\"dist\", ext=\".js\", encoding=\"utf-8\", sep=\"\\n\", minify=False, clean=True):\n    ...",
+        "after": "def build(src):\n    # la sortie va toujours dans dist/, comme tous les autres outils du dépôt\n    ..."
+      },
+      "pitfall": "La convention n'interdit pas les options : quand deux vrais utilisateurs ont besoin d'un comportement différent, on ajoute l'option, mais pas avant."
+    }
+  },
+  "strict-typing": {
+    "en": {
+      "why": "A strict type checker reads your code before it runs and rejects the mismatches that would otherwise crash in production. It only works if you do not switch it off: `any` and `type: ignore` tell the tool to stop looking. Turn on strict mode (`\"strict\": true` in tsconfig, `--strict` in mypy) from the start.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const id: any = JSON.parse(body).id;\nid.toFixed(2);  // crashes at runtime if id is a string",
+        "after": "const data: unknown = JSON.parse(body);\nif (typeof data === \"object\" && data !== null && \"id\" in data && typeof data.id === \"number\") {\n  data.id.toFixed(2);\n}"
+      },
+      "pitfall": "An escape hatch is fine if the reason is written next to it; an unexplained `any` is a bug waiting for its input."
+    },
+    "fr": {
+      "why": "Un vérificateur de types strict lit ton code avant l'exécution et rejette les incohérences qui planteraient sinon en production. Il ne marche que si on ne le désactive pas : `any` et `type: ignore` lui disent d'arrêter de regarder. On active le mode strict (`\"strict\": true` dans tsconfig, `--strict` dans mypy) dès le départ.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const id: any = JSON.parse(body).id;\nid.toFixed(2);  // plante à l'exécution si id est une chaîne",
+        "after": "const data: unknown = JSON.parse(body);\nif (typeof data === \"object\" && data !== null && \"id\" in data && typeof data.id === \"number\") {\n  data.id.toFixed(2);\n}"
+      },
+      "pitfall": "Une échappatoire est acceptable si la raison est écrite à côté ; un `any` sans explication est un bug qui attend sa donnée."
+    }
+  },
+  "explicit-optional": {
+    "en": {
+      "why": "When a value can be missing, the type should say it (`User | undefined`, `Optional[User]`), so the checker forces every caller to deal with it. The missing case is handled right where the value appears, with a clear error or a default. Otherwise a `None` travels through three functions and explodes far from its cause.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "function findUser(id: string): User {\n  return users.get(id) as User;  // lies: may be undefined\n}\n\nfindUser(\"x\").name;",
+        "after": "function findUser(id: string): User | undefined {\n  return users.get(id);\n}\n\nconst user = findUser(\"x\");\nif (!user) throw new Error(\"user x not found\");\nuser.name;"
+      },
+      "pitfall": "Returning `null` and typing it as non-null is worse than no types: the checker trusts the lie."
+    },
+    "fr": {
+      "why": "Quand une valeur peut manquer, le type doit le dire (`User | undefined`, `Optional[User]`), pour que le vérificateur force chaque appelant à gérer le cas. Le cas absent est traité là où la valeur apparaît, avec une erreur claire ou une valeur par défaut. Sinon un `None` traverse trois fonctions et explose loin de sa cause.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "function findUser(id: string): User {\n  return users.get(id) as User;  // ment : peut être undefined\n}\n\nfindUser(\"x\").name;",
+        "after": "function findUser(id: string): User | undefined {\n  return users.get(id);\n}\n\nconst user = findUser(\"x\");\nif (!user) throw new Error(\"user x not found\");\nuser.name;"
+      },
+      "pitfall": "Renvoyer `null` tout en le typant non nul est pire que pas de types : le vérificateur croit le mensonge."
+    }
+  },
+  "guaranteed-release": {
+    "en": {
+      "why": "Files, locks, connections and temp directories must be given back even when an exception happens halfway. Language constructs do it for you: `with` in Python, `finally` in Java or JS, `defer` in Go. Without them, a leak shows up only under load, as \"too many open files\" at 3 a.m.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "f = open(\"data.txt\")\ntext = f.read()  # an error here leaves the file open\nf.close()",
+        "after": "with open(\"data.txt\") as f:\n    text = f.read()"
+      },
+      "pitfall": "Writing `close()` at the end of the function is not a guarantee: any `return` or exception before it skips it."
+    },
+    "fr": {
+      "why": "Les fichiers, verrous, connexions et dossiers temporaires doivent être rendus même si une exception survient en route. Les constructions du langage le font pour toi : `with` en Python, `finally` en Java ou JS, `defer` en Go. Sans elles, la fuite n'apparaît que sous charge, sous forme de \"too many open files\" à 3 h du matin.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "f = open(\"data.txt\")\ntext = f.read()  # une erreur ici laisse le fichier ouvert\nf.close()",
+        "after": "with open(\"data.txt\") as f:\n    text = f.read()"
+      },
+      "pitfall": "Écrire `close()` à la fin de la fonction n'est pas une garantie : un `return` ou une exception avant elle la saute."
+    }
+  },
+  "assertion-validation": {
+    "en": {
+      "why": "An assertion checks something that must be true if the code is correct: when it fails, there is a bug in our own code. Validation checks outside input (user, file, network) and raises a clear error because failure there is normal. Mixing them up gives either crashes for ordinary bad input or silent bugs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def set_age(self, age):\n    assert age > 0  # stripped with python -O, and the user sees a bare AssertionError\n    self.age = age",
+        "after": "def set_age(self, age):\n    if age <= 0:\n        raise ValueError(f\"age must be > 0, got {age}\")\n    self.age = age\n\ndef _split(items):\n    assert len(items) % 2 == 0  # caller bug, cannot happen from user input\n    return items[::2], items[1::2]"
+      },
+      "pitfall": "Python removes `assert` lines when run with `-O`, so never use it to validate input or enforce security."
+    },
+    "fr": {
+      "why": "Une assertion vérifie quelque chose qui doit être vrai si le code est correct : quand elle échoue, il y a un bug dans notre propre code. La validation contrôle une entrée extérieure (utilisateur, fichier, réseau) et lève une erreur claire parce que l'échec y est normal. Les confondre donne soit des plantages sur une entrée simplement fausse, soit des bugs silencieux.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def set_age(self, age):\n    assert age > 0  # supprimé avec python -O, et l'utilisateur voit un AssertionError brut\n    self.age = age",
+        "after": "def set_age(self, age):\n    if age <= 0:\n        raise ValueError(f\"age doit être > 0, reçu {age}\")\n    self.age = age\n\ndef _split(items):\n    assert len(items) % 2 == 0  # bug de l'appelant, impossible depuis une entrée utilisateur\n    return items[::2], items[1::2]"
+      },
+      "pitfall": "Python supprime les lignes `assert` avec l'option `-O`, donc on ne s'en sert jamais pour valider une entrée ni pour la sécurité."
+    }
+  },
+  "readable-clever": {
+    "en": {
+      "why": "Code is read many more times than it is written, often by you after you forgot everything. A clever one-liner saves a few keystrokes once and costs a minute of decoding every time. Pick the version a tired colleague understands on first read.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "ids = list(map(lambda u: u[\"id\"],\n               filter(lambda u: u.get(\"active\") and not u.get(\"banned\"), users)))",
+        "after": "ids = [u[\"id\"] for u in users if u.get(\"active\") and not u.get(\"banned\")]"
+      },
+      "pitfall": "Readable is not the same as long: a clear comprehension beats a five-line loop, so cut what hides the idea, not what shows it."
+    },
+    "fr": {
+      "why": "Le code est lu bien plus souvent qu'il n'est écrit, souvent par toi après avoir tout oublié. Un one-liner malin économise quelques frappes une fois et coûte une minute de décodage à chaque lecture. On prend la version qu'un collègue fatigué comprend à la première lecture.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "ids = list(map(lambda u: u[\"id\"],\n               filter(lambda u: u.get(\"active\") and not u.get(\"banned\"), users)))",
+        "after": "ids = [u[\"id\"] for u in users if u.get(\"active\") and not u.get(\"banned\")]"
+      },
+      "pitfall": "Lisible ne veut pas dire long : une compréhension claire vaut mieux qu'une boucle de cinq lignes, on coupe donc ce qui cache l'idée, pas ce qui la montre."
+    }
+  },
+  "one-level-of-abstraction": {
+    "en": {
+      "why": "When a function mixes the plan (validate, compute, save) with the mechanics (loops, SQL), the reader has to switch between two levels of thought at every line. Keep the top function as a short list of steps and put each mechanic in a named function. You can then read the plan in ten seconds and dive into one detail only if needed.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def process_order(order):\n    if not order.items:\n        raise ValueError(\"empty\")\n    total = 0\n    for i in order.items:\n        total += i.price * i.qty\n    conn = sqlite3.connect(\"shop.db\")\n    conn.execute(\"INSERT INTO orders VALUES (?, ?)\", (order.id, total))\n    conn.commit()",
+        "after": "def process_order(order):\n    check_not_empty(order)\n    total = compute_total(order)\n    save_order(order.id, total)"
+      },
+      "pitfall": "Extracting a function that only renames one line adds a level without adding clarity: each extracted function should hide real detail."
+    },
+    "fr": {
+      "why": "Quand une fonction mélange le plan (valider, calculer, enregistrer) et la mécanique (boucles, SQL), le lecteur doit changer de niveau de réflexion à chaque ligne. La fonction du haut reste une courte liste d'étapes et chaque mécanique va dans une fonction nommée. On lit le plan en dix secondes et on ne plonge dans un détail que si besoin.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def process_order(order):\n    if not order.items:\n        raise ValueError(\"empty\")\n    total = 0\n    for i in order.items:\n        total += i.price * i.qty\n    conn = sqlite3.connect(\"shop.db\")\n    conn.execute(\"INSERT INTO orders VALUES (?, ?)\", (order.id, total))\n    conn.commit()",
+        "after": "def process_order(order):\n    check_not_empty(order)\n    total = compute_total(order)\n    save_order(order.id, total)"
+      },
+      "pitfall": "Extraire une fonction qui ne fait que renommer une ligne ajoute un niveau sans ajouter de clarté : chaque fonction extraite doit cacher un vrai détail."
+    }
+  },
+  "auto-formatter": {
+    "en": {
+      "why": "A formatter rewrites the code to one fixed style, so style is never a topic in reviews. Diffs get smaller because nobody reflows lines by hand. Run it on save, in a pre-commit hook and in CI, so the rule applies to everyone without anyone having to remember it.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# review comment: \"please fix the indentation and the quotes\"\ngit commit -m \"fix style\"",
+        "after": "ruff format .            # Python\nnpx prettier --write .   # JS, TS, CSS, JSON\nruff format --check .    # in CI: fails if anything is unformatted"
+      },
+      "pitfall": "Adopting a formatter on an existing repo in the same commit as a feature hides the real change: format everything in its own commit first."
+    },
+    "fr": {
+      "why": "Un formateur réécrit le code dans un style fixe, donc le style n'est plus jamais un sujet en review. Les diffs deviennent plus petits parce que personne ne réaligne les lignes à la main. On le lance à la sauvegarde, dans un hook pre-commit et en CI, pour que la règle s'applique à tous sans que personne ait à y penser.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# commentaire de review : \"corrige l'indentation et les guillemets\"\ngit commit -m \"fix style\"",
+        "after": "ruff format .            # Python\nnpx prettier --write .   # JS, TS, CSS, JSON\nruff format --check .    # en CI : échoue si quelque chose n'est pas formaté"
+      },
+      "pitfall": "Adopter un formateur sur un dépôt existant dans le même commit qu'une fonctionnalité cache le vrai changement : on formate tout dans un commit à part d'abord."
+    }
+  },
+  "mutable-default": {
+    "en": {
+      "why": "In Python a default value is built once, when the function is defined, not at each call. With a list, dict or set, every call that omits the argument shares and modifies the same object. Use `None` as the default and create the fresh object inside the function.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nadd_tag(\"a\")  # [\"a\"]\nadd_tag(\"b\")  # [\"a\", \"b\"], the same list again",
+        "after": "def add_tag(tag, tags=None):\n    if tags is None:\n        tags = []\n    tags.append(tag)\n    return tags\n\nadd_tag(\"a\")  # [\"a\"]\nadd_tag(\"b\")  # [\"b\"]"
+      },
+      "pitfall": "The trap applies to any mutable default (`{}`, `set()`, a dataclass instance); use `field(default_factory=list)` in dataclasses."
+    },
+    "fr": {
+      "why": "En Python, une valeur par défaut est construite une seule fois, à la définition de la fonction, pas à chaque appel. Avec une liste, un dict ou un set, tous les appels qui omettent l'argument partagent et modifient le même objet. On met `None` par défaut et on crée l'objet neuf dans la fonction.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n\nadd_tag(\"a\")  # [\"a\"]\nadd_tag(\"b\")  # [\"a\", \"b\"], la même liste encore",
+        "after": "def add_tag(tag, tags=None):\n    if tags is None:\n        tags = []\n    tags.append(tag)\n    return tags\n\nadd_tag(\"a\")  # [\"a\"]\nadd_tag(\"b\")  # [\"b\"]"
+      },
+      "pitfall": "Le piège vaut pour tout défaut mutable (`{}`, `set()`, une instance de dataclass) ; dans les dataclasses, on utilise `field(default_factory=list)`."
+    }
+  },
+  "local-consistency": {
+    "en": {
+      "why": "In an existing file, the best style is the one already there: same names, same idioms, same amount of comments. New code that looks like the old is invisible in the diff and easy to review, while a \"better\" style in one corner makes the file feel like several authors. This matters even more when you ask an agent to write code: tell it what to imitate.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Add a function to parse the limits section of the config.",
+        "after": "Add parse_limits() in config.py, right after parse_paths(). Copy its conventions:\nparse_* naming, raise ConfigError on bad input, same comment density, same imports.\nDo not reformat or rename anything else in the file."
+      },
+      "pitfall": "Consistency with the file does not justify copying a real bug or a bad pattern: match the style, not the mistakes."
+    },
+    "fr": {
+      "why": "Dans un fichier existant, le meilleur style est celui qui s'y trouve déjà : mêmes noms, mêmes idiomes, même quantité de commentaires. Du nouveau code qui ressemble à l'ancien passe inaperçu dans le diff et se relit facilement, alors qu'un style \"meilleur\" dans un coin donne l'impression de plusieurs auteurs. C'est encore plus vrai quand on demande du code à un agent : dis-lui quoi imiter.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ajoute une fonction pour parser la section limits de la config.",
+        "after": "Ajoute parse_limits() dans config.py, juste après parse_paths(). Reprends ses conventions :\nnommage parse_*, lever ConfigError sur entrée invalide, même densité de commentaires, mêmes imports.\nNe reformate ni ne renomme rien d'autre dans le fichier."
+      },
+      "pitfall": "La cohérence avec le fichier ne justifie pas de copier un vrai bug ou un mauvais motif : on s'aligne sur le style, pas sur les erreurs."
+    }
+  }
+}

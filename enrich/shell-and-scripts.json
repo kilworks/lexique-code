@@ -1,0 +1,574 @@
+{
+ "strict-mode": {
+  "en": {
+   "why": "By default a shell script keeps going after a failed command, so one typo can run the rest of the script on a broken state. `set -e` stops on a failing command, `-u` turns an unset variable into an error, and `pipefail` makes a pipe fail if any stage fails. In the example, an unset BUILD_DIR would have become `rm -rf /*`; with `-u` the script dies first.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "#!/usr/bin/env bash\ncd /srv/app\nrm -rf $BUILD_DIR/*",
+    "after": "#!/usr/bin/env bash\nset -euo pipefail\ncd /srv/app\nrm -rf \"$BUILD_DIR\"/*"
+   },
+   "pitfall": "`set -e` is silent inside `if`, `&&`, `||` and `while` conditions, and `local x=$(cmd)` hides the failure of `cmd`, so strict mode reduces surprises but does not replace explicit checks."
+  },
+  "fr": {
+   "why": "Par défaut un script shell continue après une commande en échec : une faute de frappe peut lancer la suite sur un état cassé. `set -e` s'arrête sur une commande qui échoue, `-u` transforme une variable non définie en erreur, `pipefail` fait échouer un pipe si une de ses étapes échoue. Dans l'exemple, un BUILD_DIR non défini deviendrait `rm -rf /*` ; avec `-u` le script meurt avant.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "#!/usr/bin/env bash\ncd /srv/app\nrm -rf $BUILD_DIR/*",
+    "after": "#!/usr/bin/env bash\nset -euo pipefail\ncd /srv/app\nrm -rf \"$BUILD_DIR\"/*"
+   },
+   "pitfall": "`set -e` ne se déclenche pas dans les conditions de `if`, `&&`, `||` et `while`, et `local x=$(cmd)` cache l'échec de `cmd` : le mode strict réduit les surprises mais ne remplace pas les vérifications explicites."
+  }
+ },
+ "quote-everything": {
+  "en": {
+   "why": "An unquoted expansion is split on spaces and tabs and then expanded as a glob, so one file name can become two arguments or a whole directory listing. Quoting makes the value one argument, always. Do it by reflex, including for `$(...)` and `\"$@\"`.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "f=\"my report.txt\"\nrm $f",
+    "after": "f=\"my report.txt\"\nrm \"$f\""
+   },
+   "pitfall": "People quote the obvious places and forget tests like `[ $x = y ]` (breaks when x is empty or has a space) and the result of `$(...)`, which is split too."
+  },
+  "fr": {
+   "why": "Une expansion non citée est coupée sur les espaces puis traitée comme un glob : un seul nom de fichier peut devenir deux arguments, ou toute une liste de fichiers. Avec les guillemets, la valeur reste un seul argument, toujours. À faire par réflexe, y compris pour `$(...)` et `\"$@\"`.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "f=\"my report.txt\"\nrm $f",
+    "after": "f=\"my report.txt\"\nrm \"$f\""
+   },
+   "pitfall": "On cite les endroits évidents et on oublie les tests comme `[ $x = y ]` (casse si x est vide ou contient un espace) et le résultat de `$(...)`, lui aussi coupé."
+  }
+ },
+ "hyphen-minus-hyphen-minus": {
+  "en": {
+   "why": "Most commands treat any argument starting with `-` as an option, even if it came from a variable or a file listing. `--` tells the command that options are over and everything after is a name. It matters whenever a name comes from outside: user input, `find`, a download.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "f=\"-n\"          # a file really named -n\nrm \"$f\"         # rm: invalid option",
+    "after": "f=\"-n\"\nrm -- \"$f\"      # removes the file named -n"
+   },
+   "pitfall": "It must sit after the options and before the names, and not every tool honors it (`echo` and `test` do not); prefixing the path with `./` is the fallback."
+  },
+  "fr": {
+   "why": "La plupart des commandes prennent tout argument qui commence par `-` pour une option, même s'il vient d'une variable ou d'une liste de fichiers. `--` dit que les options sont finies et que le reste est un nom. Ça compte dès qu'un nom vient de l'extérieur : saisie, `find`, téléchargement.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "f=\"-n\"          # fichier réellement nommé -n\nrm \"$f\"         # rm: invalid option",
+    "after": "f=\"-n\"\nrm -- \"$f\"      # supprime le fichier nommé -n"
+   },
+   "pitfall": "Il doit être placé après les options et avant les noms, et tous les outils ne le respectent pas (`echo` et `test` non) ; le préfixe `./` sert de secours."
+  }
+ },
+ "mktemp-trap": {
+  "en": {
+   "why": "A fixed name like `/tmp/work` collides with a parallel run and can be hijacked, and the cleanup line is skipped as soon as the script fails halfway. `mktemp` gives a unique name, `trap ... EXIT` runs the cleanup however the script ends (normal exit, `exit 1`, `set -e`, Ctrl-C).",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "t=/tmp/work\nmkdir \"$t\"\nbuild_in \"$t\"\nrm -rf \"$t\"        # never runs if the script dies first",
+    "after": "t=$(mktemp -d)\ntrap 'rm -rf \"$t\"' EXIT\nbuild_in \"$t\""
+   },
+   "pitfall": "`trap ... EXIT` does not run on SIGKILL, and a second `trap` on EXIT replaces the first instead of adding to it; set it right after `mktemp`, before any work."
+  },
+  "fr": {
+   "why": "Un nom fixe comme `/tmp/work` entre en collision avec un run parallèle et peut être détourné, et la ligne de nettoyage saute dès que le script plante à mi-chemin. `mktemp` donne un nom unique, `trap ... EXIT` lance le nettoyage quelle que soit la sortie (fin normale, `exit 1`, `set -e`, Ctrl-C).",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "t=/tmp/work\nmkdir \"$t\"\nbuild_in \"$t\"\nrm -rf \"$t\"        # never runs if the script dies first",
+    "after": "t=$(mktemp -d)\ntrap 'rm -rf \"$t\"' EXIT\nbuild_in \"$t\""
+   },
+   "pitfall": "`trap ... EXIT` ne tourne pas sur un SIGKILL, et un second `trap` sur EXIT remplace le premier au lieu de s'ajouter ; le poser juste après `mktemp`, avant tout travail."
+  }
+ },
+ "stdout-data-stderr-diagnostics": {
+  "en": {
+   "why": "Stdout is for the result a caller will capture or pipe; stderr is for progress, warnings and errors. If both go to stdout, `n=$(./count.sh)` captures the chatter with the number, and `./count.sh | sort` sorts the log lines too. Keeping them apart makes the script a clean link in a pipeline.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "echo \"scanning $dir...\"\ncount=$(find \"$dir\" -type f | wc -l)\necho \"$count\"",
+    "after": "echo \"scanning $dir...\" >&2\ncount=$(find \"$dir\" -type f | wc -l)\nprintf '%s\\n' \"$count\""
+   },
+   "pitfall": "Putting a log line with plain `echo` inside a function whose output is captured by `$(...)` silently corrupts the returned value."
+  },
+  "fr": {
+   "why": "Stdout sert au résultat que l'appelant capture ou pipe ; stderr sert à la progression, aux avertissements et aux erreurs. Si tout va sur stdout, `n=$(./count.sh)` capture le bavardage avec le nombre, et `./count.sh | sort` trie aussi les lignes de log. En les séparant, le script devient un maillon propre d'un pipeline.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "echo \"scanning $dir...\"\ncount=$(find \"$dir\" -type f | wc -l)\necho \"$count\"",
+    "after": "echo \"scanning $dir...\" >&2\ncount=$(find \"$dir\" -type f | wc -l)\nprintf '%s\\n' \"$count\""
+   },
+   "pitfall": "Mettre un log avec `echo` simple dans une fonction dont la sortie est capturée par `$(...)` corrompt la valeur retournée sans rien dire."
+  }
+ },
+ "exit-codes": {
+  "en": {
+   "why": "Callers (cron, CI, `&&`, `if`) decide what to do from the exit status, not from the text you print. Convention: 0 success, 1 general error, 2 bad usage; any other code is fine if you document it in the script header. A script that prints an error and still exits 0 makes every caller believe it worked.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cp \"$1\" /backup/ || echo \"copy failed\"\necho \"done\"\n# exits 0 even when cp failed",
+    "after": "[ $# -eq 1 ] || { echo \"usage: $0 FILE\" >&2; exit 2; }\ncp -- \"$1\" /backup/ || { echo \"copy failed\" >&2; exit 1; }\necho \"done\""
+   },
+   "pitfall": "A script's status is the status of its last command, so a trailing `echo` or cleanup line quietly turns a failure into 0; and codes above 255 wrap around."
+  },
+  "fr": {
+   "why": "Les appelants (cron, CI, `&&`, `if`) décident d'après le code de sortie, pas d'après le texte affiché. Convention : 0 succès, 1 erreur générale, 2 mauvais usage ; les autres codes sont permis s'ils sont documentés en tête du script. Un script qui affiche une erreur et sort quand même en 0 fait croire à tous ses appelants que ça a marché.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cp \"$1\" /backup/ || echo \"copy failed\"\necho \"done\"\n# exits 0 even when cp failed",
+    "after": "[ $# -eq 1 ] || { echo \"usage: $0 FILE\" >&2; exit 2; }\ncp -- \"$1\" /backup/ || { echo \"copy failed\" >&2; exit 1; }\necho \"done\""
+   },
+   "pitfall": "Le code d'un script est celui de sa dernière commande : un `echo` ou un nettoyage en fin de script transforme un échec en 0 sans bruit ; et les codes au-delà de 255 rebouclent (modulo 256)."
+  }
+ },
+ "absolute-paths": {
+  "en": {
+   "why": "cron and systemd start your command with a minimal environment: the working directory is not the one you were in, and under cron PATH is often just `/usr/bin:/bin`. A relative script name or a bare `python3` works in your terminal and fails there. Full paths remove the dependency on the environment.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "0 3 * * * python3 backup.py >> backup.log",
+    "after": "0 3 * * * /usr/bin/python3 /home/kil/backup/backup.py >> /home/kil/backup/backup.log 2>&1"
+   },
+   "pitfall": "Fixing only the first command is not enough: the script itself often calls other tools by short name or writes to relative files, so set `PATH` at its top and use absolute paths inside too."
+  },
+  "fr": {
+   "why": "cron et systemd lancent la commande avec un environnement minimal : le répertoire courant n'est pas celui d'où tu testes, et sous cron le PATH se limite souvent à `/usr/bin:/bin`. Un nom de script relatif ou un `python3` nu marche dans ton terminal et échoue là. Les chemins complets suppriment la dépendance à l'environnement.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "0 3 * * * python3 backup.py >> backup.log",
+    "after": "0 3 * * * /usr/bin/python3 /home/kil/backup/backup.py >> /home/kil/backup/backup.log 2>&1"
+   },
+   "pitfall": "Corriger seulement la première commande ne suffit pas : le script appelle souvent d'autres outils par leur nom court ou écrit dans des fichiers relatifs, donc fixer `PATH` en tête et utiliser des chemins absolus dedans aussi."
+  }
+ },
+ "exec": {
+  "en": {
+   "why": "In a wrapper script, the shell stays alive as the parent of the real program. A SIGTERM from `docker stop` then hits the shell, which does not forward it: the server never shuts down cleanly and gets SIGKILL after the timeout, or is left orphaned. `exec` replaces the shell with the program, same PID, so signals and exit status go straight to it.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "#!/bin/sh\n. /etc/myapp/env\n/usr/bin/myserver --port 8080",
+    "after": "#!/bin/sh\n. /etc/myapp/env\nexec /usr/bin/myserver --port 8080"
+   },
+   "pitfall": "Nothing after `exec` ever runs (no cleanup, no trap), so anything that must happen has to come before it."
+  },
+  "fr": {
+   "why": "Dans un script d'enrobage, le shell reste vivant comme parent du vrai programme. Un SIGTERM de `docker stop` frappe alors le shell, qui ne le transmet pas : le serveur ne s'arrête jamais proprement et prend un SIGKILL après le délai, ou reste orphelin. `exec` remplace le shell par le programme, même PID, donc signaux et code de sortie vont droit dessus.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "#!/bin/sh\n. /etc/myapp/env\n/usr/bin/myserver --port 8080",
+    "after": "#!/bin/sh\n. /etc/myapp/env\nexec /usr/bin/myserver --port 8080"
+   },
+   "pitfall": "Rien après `exec` ne s'exécute jamais (ni nettoyage, ni trap) : tout ce qui doit avoir lieu passe avant."
+  }
+ },
+ "shellcheck": {
+  "en": {
+   "why": "shellcheck reads a script without running it and reports the classic traps: missing quotes (SC2086), bashisms under `#!/bin/sh`, unused or unset variables, useless `cat`. It catches in a second what you would otherwise find on the production machine. Run it before every delivery and fix the findings.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "scp deploy.sh prod:/opt/",
+    "after": "shellcheck deploy.sh && scp deploy.sh prod:/opt/"
+   },
+   "pitfall": "Silencing a warning with `# shellcheck disable=...` just to get a clean run hides the bug; disable only after you understood why the code is actually safe."
+  },
+  "fr": {
+   "why": "shellcheck lit un script sans l'exécuter et signale les pièges classiques : guillemets manquants (SC2086), bashismes sous `#!/bin/sh`, variables inutilisées ou non définies, `cat` inutile. Il attrape en une seconde ce qu'on trouverait sinon sur la machine de prod. Le passer avant chaque livraison et corriger ses remarques.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "scp deploy.sh prod:/opt/",
+    "after": "shellcheck deploy.sh && scp deploy.sh prod:/opt/"
+   },
+   "pitfall": "Faire taire un avertissement avec `# shellcheck disable=...` juste pour avoir un run propre cache le bug ; ne désactiver qu'après avoir compris pourquoi le code est réellement sûr."
+  }
+ },
+ "posix-sh-vs-bash": {
+  "en": {
+   "why": "The shebang decides which shell runs the script, and that shell is not always bash: busybox `ash` and dash (`/bin/sh` on Debian and Ubuntu) lack arrays and often `[[ ]]`. Code that runs on your laptop (where `sh` may be bash) then fails on the router or in the minimal container. Write for the shell the target really has: `[ ]`, `\"$@\"` as the list, no arrays.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "#!/bin/sh\nfiles=(a.txt b.txt)\nif [[ -f ${files[0]} ]]; then echo ok; fi",
+    "after": "#!/bin/sh\nset -- a.txt b.txt\nif [ -f \"$1\" ]; then echo ok; fi"
+   },
+   "pitfall": "Checking only on your dev machine hides it; test with the target's shell (`busybox sh script.sh`) or run `shellcheck -s sh`."
+  },
+  "fr": {
+   "why": "Le shebang décide quel shell exécute le script, et ce n'est pas toujours bash : `ash` de busybox et dash (le `/bin/sh` de Debian et Ubuntu) n'ont pas de tableaux et souvent pas de `[[ ]]`. Un code qui marche sur ton portable (où `sh` est peut-être bash) plante alors sur le routeur ou dans le conteneur minimal. Écrire pour le shell que la cible a vraiment : `[ ]`, `\"$@\"` comme liste, pas de tableaux.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "#!/bin/sh\nfiles=(a.txt b.txt)\nif [[ -f ${files[0]} ]]; then echo ok; fi",
+    "after": "#!/bin/sh\nset -- a.txt b.txt\nif [ -f \"$1\" ]; then echo ok; fi"
+   },
+   "pitfall": "Ne tester que sur sa machine de dev le cache ; tester avec le shell de la cible (`busybox sh script.sh`) ou lancer `shellcheck -s sh`."
+  }
+ },
+ "while-ifs-read-r": {
+  "en": {
+   "why": "Plain `read` strips leading and trailing blanks (it uses `IFS`) and treats a backslash as an escape, so lines come out altered. `IFS=` keeps the spaces and `-r` keeps the backslashes, so each line arrives exactly as in the file. This is the standard way to loop over lines.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "while read line; do\n  echo $line\ndone < names.txt",
+    "after": "while IFS= read -r line; do\n  printf '%s\\n' \"$line\"\ndone < names.txt"
+   },
+   "pitfall": "A last line without a trailing newline is skipped by the loop; add `|| [ -n \"$line\" ]` to the `while` condition if the input may lack it."
+  },
+  "fr": {
+   "why": "Un `read` simple retire les blancs de début et de fin (il utilise `IFS`) et traite l'antislash comme un échappement : les lignes ressortent modifiées. `IFS=` garde les espaces et `-r` garde les antislashs, donc chaque ligne arrive exactement comme dans le fichier. C'est la façon standard de boucler sur des lignes.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "while read line; do\n  echo $line\ndone < names.txt",
+    "after": "while IFS= read -r line; do\n  printf '%s\\n' \"$line\"\ndone < names.txt"
+   },
+   "pitfall": "Une dernière ligne sans retour à la ligne final est sautée par la boucle ; ajouter `|| [ -n \"$line\" ]` à la condition du `while` si l'entrée peut en manquer."
+  }
+ },
+ "print0-0": {
+  "en": {
+   "why": "A newline-separated list cannot represent every file name: a name with a space becomes two, one with a newline becomes two lines. A null byte cannot appear in a path, so it is a safe separator. `-print0` on the producer and `-0` on the consumer pass any name through intact.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "find . -name '*.log' | xargs rm",
+    "after": "find . -name '*.log' -print0 | xargs -0 rm --"
+   },
+   "pitfall": "Both ends must agree: `-print0` into a plain `xargs`, or `-0` after a producer that prints newlines, breaks or mangles everything (the same goes for `sort -z` and `read -d ''`)."
+  },
+  "fr": {
+   "why": "Une liste séparée par des retours à la ligne ne peut pas représenter tous les noms de fichiers : un nom avec espace en devient deux, un nom avec retour à la ligne devient deux lignes. L'octet nul ne peut pas apparaître dans un chemin, c'est donc un séparateur sûr. `-print0` côté producteur et `-0` côté consommateur laissent passer n'importe quel nom intact.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "find . -name '*.log' | xargs rm",
+    "after": "find . -name '*.log' -print0 | xargs -0 rm --"
+   },
+   "pitfall": "Les deux bouts doivent s'accorder : `-print0` vers un `xargs` simple, ou `-0` après un producteur qui sort des retours à la ligne, casse tout (idem pour `sort -z` et `read -d ''`)."
+  }
+ },
+ "quoted-heredoc": {
+  "en": {
+   "why": "An unquoted heredoc delimiter makes the shell expand `$vars`, `$(...)`, backticks and backslashes in the body right now. When the body is itself a script or config, `$1` becomes an empty string and the file is silently wrong. With `<<'EOF'` the text is written byte for byte.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cat > greet.sh <<EOF\n#!/bin/sh\necho \"hello $1, today is $(date)\"\nEOF",
+    "after": "cat > greet.sh <<'EOF'\n#!/bin/sh\necho \"hello $1, today is $(date)\"\nEOF"
+   },
+   "pitfall": "Quoting the delimiter also blocks the substitution you did want; to inject a single value, write the file in two parts or use `sed` or `printf` for that line."
+  },
+  "fr": {
+   "why": "Un délimiteur de heredoc non cité fait que le shell développe `$vars`, `$(...)`, backticks et antislashs du corps tout de suite. Quand le corps est lui-même un script ou une config, `$1` devient une chaîne vide et le fichier est faux sans rien dire. Avec `<<'EOF'` le texte est écrit octet pour octet.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cat > greet.sh <<EOF\n#!/bin/sh\necho \"hello $1, today is $(date)\"\nEOF",
+    "after": "cat > greet.sh <<'EOF'\n#!/bin/sh\necho \"hello $1, today is $(date)\"\nEOF"
+   },
+   "pitfall": "Citer le délimiteur bloque aussi la substitution qu'on voulait ; pour injecter une seule valeur, écrire le fichier en deux parties ou passer par `sed` ou `printf` pour cette ligne."
+  }
+ },
+ "command-v": {
+  "en": {
+   "why": "A script that discovers a missing tool halfway has already done part of its work. Checking all dependencies at the top fails immediately and the message names the missing one. `command -v` is the POSIX way; it prints the path (or name) and exits non-zero when the tool is not found.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "jq '.items[]' data.json\n# fails mid-run: jq: command not found",
+    "after": "for tool in jq curl; do\n  command -v \"$tool\" >/dev/null 2>&1 || { echo \"missing tool: $tool\" >&2; exit 1; }\ndone\njq '.items[]' data.json"
+   },
+   "pitfall": "Do not use `which`: it is not standard and its exit status differs between systems. Note that `command -v` also succeeds for aliases, functions and builtins, so it tells you the name resolves, not that a binary file exists."
+  },
+  "fr": {
+   "why": "Un script qui découvre un outil manquant à mi-chemin a déjà fait une partie de son travail. Vérifier toutes les dépendances en tête échoue tout de suite et le message nomme l'absent. `command -v` est la méthode POSIX : il affiche le chemin (ou le nom) et sort en non-zéro si l'outil est introuvable.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "jq '.items[]' data.json\n# fails mid-run: jq: command not found",
+    "after": "for tool in jq curl; do\n  command -v \"$tool\" >/dev/null 2>&1 || { echo \"missing tool: $tool\" >&2; exit 1; }\ndone\njq '.items[]' data.json"
+   },
+   "pitfall": "Ne pas utiliser `which` : il n'est pas standard et son code de sortie varie selon les systèmes. À noter que `command -v` réussit aussi pour les alias, fonctions et builtins : il dit que le nom se résout, pas qu'un binaire existe."
+  }
+ },
+ "printf-echo": {
+  "en": {
+   "why": "`echo` has no portable behavior: with data like `-n`, `-e` or a backslash, bash, dash, busybox and zsh each do something different. `printf` with an explicit format has one defined behavior everywhere. Use `printf '%s\\n' \"$x\"` whenever the value is data rather than a fixed message.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "x=\"-n\"\necho \"$x\"          # prints nothing, or behaves differently per shell\necho \"a\\tb\"        # tab or literal \\t depending on the shell",
+    "after": "x=\"-n\"\nprintf '%s\\n' \"$x\"      # -n, always\nprintf '%s\\n' 'a\\tb'    # a\\tb, literal"
+   },
+   "pitfall": "Never pass the data itself as the format (`printf \"$x\"`): a `%` or a backslash in it is then interpreted; the data goes as an argument to `%s`."
+  },
+  "fr": {
+   "why": "`echo` n'a pas de comportement portable : avec une donnée comme `-n`, `-e` ou un antislash, bash, dash, busybox et zsh font chacun autre chose. `printf` avec un format explicite a un seul comportement défini partout. Utiliser `printf '%s\\n' \"$x\"` dès que la valeur est une donnée et pas un message fixe.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "x=\"-n\"\necho \"$x\"          # prints nothing, or behaves differently per shell\necho \"a\\tb\"        # tab or literal \\t depending on the shell",
+    "after": "x=\"-n\"\nprintf '%s\\n' \"$x\"      # -n, always\nprintf '%s\\n' 'a\\tb'    # a\\tb, literal"
+   },
+   "pitfall": "Ne jamais passer la donnée elle-même comme format (`printf \"$x\"`) : un `%` ou un antislash dedans serait interprété ; la donnée va en argument de `%s`."
+  }
+ },
+ "dollar-sign-left-parenthesis-full-stop-full-stop-full-stop-right-parenthesis": {
+  "en": {
+   "why": "`$(...)` and backticks both capture a command's output, but backticks cannot nest without escaping and are easy to confuse with quotes. `$(...)` nests freely, reads left to right, and the quotes inside it are independent of the ones outside.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "base=`basename \\`pwd\\``",
+    "after": "base=$(basename \"$(pwd)\")"
+   },
+   "pitfall": "The result of an unquoted `$(...)` is still subject to word splitting and globbing: write `\"$(...)\"`; and it strips trailing newlines."
+  },
+  "fr": {
+   "why": "`$(...)` et les backticks capturent tous deux la sortie d'une commande, mais les backticks ne s'imbriquent qu'avec des échappements et se confondent avec des guillemets. `$(...)` s'imbrique librement, se lit de gauche à droite, et les guillemets à l'intérieur sont indépendants de ceux de l'extérieur.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "base=`basename \\`pwd\\``",
+    "after": "base=$(basename \"$(pwd)\")"
+   },
+   "pitfall": "Le résultat de `$(...)` non cité est encore coupé et soumis au glob : écrire `\"$(...)\"` ; et il supprime les retours à la ligne finaux."
+  }
+ },
+ "local": {
+  "en": {
+   "why": "In shell every variable is global by default, so a helper that uses `i` or `tmp` silently overwrites the caller's variable of the same name. `local` limits it to the function and its callees. The bug shows up far from its cause, which makes it expensive to find.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "fill() { i=0; while [ \"$i\" -lt 3 ]; do i=$((i+1)); done; }\nfor i in a b c; do\n  fill\n  echo \"$i\"      # prints 3 three times\ndone",
+    "after": "fill() { local i=0; while [ \"$i\" -lt 3 ]; do i=$((i+1)); done; }\nfor i in a b c; do\n  fill\n  echo \"$i\"      # prints a, b, c\ndone"
+   },
+   "pitfall": "`local` is not strictly POSIX (it works in bash, dash and busybox ash), and `local x=$(cmd)` masks the exit status of `cmd`; declare first, then assign on the next line."
+  },
+  "fr": {
+   "why": "En shell toute variable est globale par défaut : une fonction utilitaire qui emploie `i` ou `tmp` écrase en silence la variable du même nom de l'appelant. `local` la limite à la fonction et à ses appelées. Le bug apparaît loin de sa cause, donc il coûte cher à trouver.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "fill() { i=0; while [ \"$i\" -lt 3 ]; do i=$((i+1)); done; }\nfor i in a b c; do\n  fill\n  echo \"$i\"      # prints 3 three times\ndone",
+    "after": "fill() { local i=0; while [ \"$i\" -lt 3 ]; do i=$((i+1)); done; }\nfor i in a b c; do\n  fill\n  echo \"$i\"      # prints a, b, c\ndone"
+   },
+   "pitfall": "`local` n'est pas strictement POSIX (il marche dans bash, dash et ash de busybox), et `local x=$(cmd)` masque le code de sortie de `cmd` ; déclarer d'abord, affecter à la ligne suivante."
+  }
+ },
+ "pipe-subshell": {
+  "en": {
+   "why": "Each stage of a pipe runs in its own subshell in bash and POSIX sh, and a subshell's variables vanish when it ends. A counter or flag updated in a `while` that reads from a pipe is therefore back to its old value afterwards. Feed the loop with `< file` (or a here-string, or process substitution in bash), or have the loop print its result on stdout.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "count=0\ncat names.txt | while read -r l; do count=$((count+1)); done\necho \"$count\"        # 0",
+    "after": "count=0\nwhile read -r l; do count=$((count+1)); done < names.txt\necho \"$count\"        # real number of lines"
+   },
+   "pitfall": "The same loss hits `cmd | read x`, and zsh and ksh behave differently (the last stage stays in the main shell), so a test on another shell can hide the bug."
+  },
+  "fr": {
+   "why": "Chaque étape d'un pipe tourne dans son propre sous-shell en bash et en sh POSIX, et les variables d'un sous-shell disparaissent à sa fin. Un compteur ou un drapeau modifié dans un `while` qui lit un pipe retrouve donc son ancienne valeur après la boucle. Nourrir la boucle avec `< fichier` (ou une here-string, ou la substitution de processus en bash), ou faire afficher le résultat par la boucle sur stdout.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "count=0\ncat names.txt | while read -r l; do count=$((count+1)); done\necho \"$count\"        # 0",
+    "after": "count=0\nwhile read -r l; do count=$((count+1)); done < names.txt\necho \"$count\"        # real number of lines"
+   },
+   "pitfall": "La même perte frappe `cmd | read x`, et zsh et ksh se comportent autrement (la dernière étape reste dans le shell principal) : un test sur un autre shell peut cacher le bug."
+  }
+ },
+ "lf-line-endings": {
+  "en": {
+   "why": "Windows editors and `git` with `core.autocrlf` can leave a script with CRLF endings. On Unix the `\\r` becomes part of every line, including the shebang (`#!/bin/sh\\r` is looked up as an interpreter that does not exist) and the last argument of each command. Write in LF and run `file` on any script before copying it to a Unix machine.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "$ ./run.sh\n/bin/sh^M: bad interpreter: No such file or directory",
+    "after": "$ file run.sh\nrun.sh: ASCII text, with CRLF line terminators\n$ sed -i 's/\\r$//' run.sh\n$ file run.sh\nrun.sh: ASCII text"
+   },
+   "pitfall": "The CRLF often comes back by itself at the next checkout; fix it at the source with `* text=auto` and `*.sh text eol=lf` in `.gitattributes`, not only once with `sed`."
+  },
+  "fr": {
+   "why": "Les éditeurs Windows et `git` avec `core.autocrlf` peuvent laisser un script en CRLF. Sous Unix le `\\r` fait partie de chaque ligne, shebang compris (`#!/bin/sh\\r` cherche un interpréteur qui n'existe pas) et dernier argument de chaque commande. Écrire en LF et passer `file` sur tout script avant de le copier vers une machine Unix.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "$ ./run.sh\n/bin/sh^M: bad interpreter: No such file or directory",
+    "after": "$ file run.sh\nrun.sh: ASCII text, with CRLF line terminators\n$ sed -i 's/\\r$//' run.sh\n$ file run.sh\nrun.sh: ASCII text"
+   },
+   "pitfall": "Le CRLF revient souvent tout seul au checkout suivant ; corriger à la source avec `*.sh text eol=lf` dans `.gitattributes`, pas seulement une fois avec `sed`."
+  }
+ },
+ "set-x": {
+  "en": {
+   "why": "`set -x` prints each command, after expansion, to stderr before running it. It shows exactly what the shell will execute, which is often enough to see the wrong variable or the wrong quoting, without sprinkling `echo` lines. `set +x` turns it off.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "echo \"DEBUG: host=$host\"\ndeploy \"$host\"\necho \"DEBUG: deploy returned\"\ncurl -H \"Authorization: Bearer $TOKEN\" \"$url\"",
+    "after": "set -x\ndeploy \"$host\"\nset +x\ncurl -H \"Authorization: Bearer $TOKEN\" \"$url\""
+   },
+   "pitfall": "The trace includes expanded values, so a token or password passed as an argument ends up in the CI log; switch tracing off (`set +x`) around any line that handles a secret."
+  },
+  "fr": {
+   "why": "`set -x` affiche chaque commande, après expansion, sur stderr avant de l'exécuter. On voit exactement ce que le shell va lancer, ce qui suffit souvent à repérer la mauvaise variable ou le mauvais quoting, sans semer des `echo`. `set +x` le coupe.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "echo \"DEBUG: host=$host\"\ndeploy \"$host\"\necho \"DEBUG: deploy returned\"\ncurl -H \"Authorization: Bearer $TOKEN\" \"$url\"",
+    "after": "set -x\ndeploy \"$host\"\nset +x\ncurl -H \"Authorization: Bearer $TOKEN\" \"$url\""
+   },
+   "pitfall": "La trace contient les valeurs développées : un token ou un mot de passe passé en argument finit dans le log de la CI ; couper le traçage (`set +x`) autour de toute ligne qui manipule un secret."
+  }
+ },
+ "filter-then-install": {
+  "en": {
+   "why": "In a pipe both ends start together, so if the filter fails or outputs nothing, the installer still runs and installs an empty crontab (or an empty config). Writing the filter result to a file first lets you check it before touching the live target. Installation is the last step, and only if the check passed.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "sed 's/old/new/' crontab.txt | crontab -",
+    "after": "tmp=$(mktemp)\nsed 's/old/new/' crontab.txt > \"$tmp\"\n[ -s \"$tmp\" ] || { echo \"filter produced nothing\" >&2; exit 1; }\ncrontab \"$tmp\"\nrm -f \"$tmp\""
+   },
+   "pitfall": "`pipefail` does not save you: the installer has already consumed the empty input when the failure is reported. And `-s` only rules out empty; a wrongly filtered but non-empty file passes, so also compare it with the old version when it matters."
+  },
+  "fr": {
+   "why": "Dans un pipe les deux bouts démarrent ensemble : si le filtre échoue ou ne sort rien, l'installeur tourne quand même et installe une crontab vide (ou une config vide). Écrire d'abord le résultat du filtre dans un fichier permet de le vérifier avant de toucher à la cible en production. L'installation est la dernière étape, et seulement si le contrôle passe.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "sed 's/old/new/' crontab.txt | crontab -",
+    "after": "tmp=$(mktemp)\nsed 's/old/new/' crontab.txt > \"$tmp\"\n[ -s \"$tmp\" ] || { echo \"filter produced nothing\" >&2; exit 1; }\ncrontab \"$tmp\"\nrm -f \"$tmp\""
+   },
+   "pitfall": "`pipefail` ne sauve pas : l'installeur a déjà consommé l'entrée vide quand l'échec est signalé. Et `-s` n'écarte que le vide ; un fichier mal filtré mais non vide passe, donc comparer aussi avec l'ancienne version quand ça compte."
+  }
+ },
+ "remote-quoting": {
+  "en": {
+   "why": "`ssh host \"cmd\"` sends a string that your local shell expands first, then the remote shell parses again, so quotes and `$` need escaping at two levels and one slip changes the command. Sending a script as a file (stdin, `scp`) or encoded in base64 means the text arrives unchanged, with no nested quoting.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "ssh host \"grep '$pattern' /var/log/app.log | awk '{print \\$1}'\"",
+    "after": "ssh host 'sh -s' < check.sh"
+   },
+   "pitfall": "Arguments are also joined into one string and re-parsed remotely, so a value with a space or a quote must be passed encoded (base64) or inside the file as well."
+  },
+  "fr": {
+   "why": "`ssh host \"cmd\"` envoie une chaîne que ton shell local développe d'abord, puis que le shell distant reparse : guillemets et `$` doivent être échappés à deux niveaux et un faux pas change la commande. Envoyer un script en fichier (stdin, `scp`) ou encodé en base64 fait arriver le texte intact, sans guillemets imbriqués.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "ssh host \"grep '$pattern' /var/log/app.log | awk '{print \\$1}'\"",
+    "after": "ssh host 'sh -s' < check.sh"
+   },
+   "pitfall": "Les arguments sont aussi recollés en une seule chaîne et reparsés à distance : une valeur avec espace ou guillemet doit être passée encodée (base64) ou écrite dans le fichier aussi."
+  }
+ },
+ "argv-as-array": {
+  "en": {
+   "why": "Building a command as one string and running it with `eval` or an unquoted expansion makes the shell re-parse it: spaces split values and a hostile value can inject commands. An array (bash) or the positional parameters (`set --`, `\"$@\"`) keeps each argument as one separate item all the way to the program.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cmd=\"rsync -a $src $dst\"\neval \"$cmd\"        # breaks on spaces, runs injected code",
+    "after": "args=(-a \"$src\" \"$dst\")\nrsync \"${args[@]}\"\n# POSIX sh: set -- -a \"$src\" \"$dst\"; rsync \"$@\""
+   },
+   "pitfall": "Arrays are bash only; in `sh` use `\"$@\"`. And `\"${args[*]}\"` joins everything back into a single string, so use `@` with the quotes."
+  },
+  "fr": {
+   "why": "Construire une commande en une seule chaîne puis la lancer avec `eval` ou une expansion non citée fait reparser le tout par le shell : les espaces coupent les valeurs et une valeur hostile peut injecter des commandes. Un tableau (bash) ou les paramètres positionnels (`set --`, `\"$@\"`) gardent chaque argument comme un élément séparé jusqu'au programme.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cmd=\"rsync -a $src $dst\"\neval \"$cmd\"        # breaks on spaces, runs injected code",
+    "after": "args=(-a \"$src\" \"$dst\")\nrsync \"${args[@]}\"\n# POSIX sh: set -- -a \"$src\" \"$dst\"; rsync \"$@\""
+   },
+   "pitfall": "Les tableaux sont propres à bash ; en `sh` utiliser `\"$@\"`. Et `\"${args[*]}\"` recolle tout en une seule chaîne : utiliser `@` avec les guillemets."
+  }
+ },
+ "checked-cd": {
+  "en": {
+   "why": "When `cd` fails (missing directory, no permission) the script continues in the current directory, and the next commands act on the wrong place; with `rm` or `mv` that is destructive. Stop at once with `|| exit 1`, or avoid `cd` and give absolute paths to each command.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cd /var/app/build\nrm -rf ./*          # runs in the old directory if cd failed",
+    "after": "cd /var/app/build || exit 1\nrm -rf ./*"
+   },
+   "pitfall": "An unquoted empty variable turns `cd $dir` into plain `cd`, which succeeds and lands in `$HOME`, so the exit status looks fine; quote it and check the variable is not empty."
+  },
+  "fr": {
+   "why": "Quand `cd` échoue (dossier absent, pas de droit), le script continue dans le répertoire courant et les commandes suivantes agissent au mauvais endroit ; avec `rm` ou `mv` c'est destructeur. S'arrêter tout de suite avec `|| exit 1`, ou éviter `cd` et donner des chemins absolus à chaque commande.",
+   "example": {
+    "kind": "code",
+    "lang": "bash",
+    "before": "cd /var/app/build\nrm -rf ./*          # runs in the old directory if cd failed",
+    "after": "cd /var/app/build || exit 1\nrm -rf ./*"
+   },
+   "pitfall": "Une variable vide non citée transforme `cd $dir` en simple `cd`, qui réussit et atterrit dans `$HOME` : le code de sortie a l'air bon ; la citer et vérifier qu'elle n'est pas vide."
+  }
+ },
+ "switch-to-a-real-language": {
+  "en": {
+   "why": "Shell is excellent for gluing programs together and poor at data: no real structures, quoting everywhere, error handling by convention. When a script needs arrays of records, JSON or other parsing, or real error handling, a language like Python does it in readable lines with a proper parser. The signal is the first nested structure, not only the line count.",
+   "example": {
+    "kind": "code",
+    "lang": "text",
+    "before": "# bash: pull names out of JSON with regexes\ngrep '\"name\"' data.json | sed 's/.*: \"\\(.*\\)\".*/\\1/'",
+    "after": "# python\nimport json\nwith open(\"data.json\") as f:\n    for user in json.load(f)[\"users\"]:\n        print(user[\"name\"])"
+   },
+   "pitfall": "People rewrite too late, after the script has grown to hundreds of lines of nested quotes; and regexes on JSON break on the first change of formatting, where a parser does not."
+  },
+  "fr": {
+   "why": "Le shell est excellent pour coller des programmes et mauvais pour les données : pas de vraies structures, du quoting partout, une gestion d'erreur par convention. Quand un script a besoin de tableaux d'enregistrements, de JSON ou d'un autre parsing, ou d'une vraie gestion d'erreurs, un langage comme Python le fait en lignes lisibles avec un vrai parseur. Le signal est la première structure imbriquée, pas seulement le nombre de lignes.",
+   "example": {
+    "kind": "code",
+    "lang": "text",
+    "before": "# bash : extraire des noms d'un JSON par regex\ngrep '\"name\"' data.json | sed 's/.*: \"\\(.*\\)\".*/\\1/'",
+    "after": "# python\nimport json\nwith open(\"data.json\") as f:\n    for user in json.load(f)[\"users\"]:\n        print(user[\"name\"])"
+   },
+   "pitfall": "On réécrit trop tard, quand le script fait des centaines de lignes de guillemets imbriqués ; et des regex sur du JSON cassent au premier changement de mise en forme, ce qu'un parseur ne fait pas."
+  }
+ },
+ "lc-all-c": {
+  "en": {
+   "why": "Sorting order and character classes follow the system language: the same `sort` gives a different order under `en_US.UTF-8` and under another locale, and `join` complains when its inputs were sorted with different rules. `LC_ALL=C` forces plain byte order, so results are the same on every machine, and `grep` is usually faster too.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "sort a.txt > a.sorted\nsort b.txt > b.sorted\njoin a.sorted b.sorted     # order depends on the system locale",
+    "after": "LC_ALL=C sort a.txt > a.sorted\nLC_ALL=C sort b.txt > b.sorted\nLC_ALL=C join a.sorted b.sorted"
+   },
+   "pitfall": "The C locale compares bytes, so it breaks accent-aware work: `[[:alpha:]]` does not match `é`; use it for machine-readable data, not for text meant for people."
+  },
+  "fr": {
+   "why": "L'ordre de tri et les classes de caractères suivent la langue du système : le même `sort` donne un ordre différent sous `en_US.UTF-8` et sous une autre locale, et `join` se plaint quand ses entrées ont été triées avec des règles différentes. `LC_ALL=C` impose l'ordre brut des octets, donc le résultat est identique sur toutes les machines, et `grep` est souvent plus rapide aussi.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "sort a.txt > a.sorted\nsort b.txt > b.sorted\njoin a.sorted b.sorted     # order depends on the system locale",
+    "after": "LC_ALL=C sort a.txt > a.sorted\nLC_ALL=C sort b.txt > b.sorted\nLC_ALL=C join a.sorted b.sorted"
+   },
+   "pitfall": "La locale C compare des octets, donc elle casse le travail sensible aux accents : `[[:alpha:]]` ne reconnaît pas `é` ; la réserver aux données pour machines, pas aux textes destinés à des humains."
+  }
+ }
+}

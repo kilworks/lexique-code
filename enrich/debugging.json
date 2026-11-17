@@ -1,0 +1,266 @@
+{
+  "read-the-whole-error": {
+    "en": {
+      "why": "An error message usually names the exception type, the reason, and the exact file and line. Skimming the last line and guessing wastes time on a question the message already answered. Read it top to bottom before forming any hypothesis.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "It crashes on startup, fix it.",
+        "after": "It crashes on startup. Full traceback, not a summary:\nTraceback (most recent call last):\n  File \"app.py\", line 12, in load\n    cfg = json.loads(raw)\njson.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)\nRead type, message, file and line first, then say what cause they point to before proposing a fix."
+      },
+      "pitfall": "Reading only the last line, or pasting a trimmed version: the real cause is often in the chain above it (\"During handling of the above exception, another exception occurred\")."
+    },
+    "fr": {
+      "why": "Un message d'erreur donne en général le type d'exception, la raison, le fichier et la ligne exacts. Survoler la dernière ligne et deviner fait perdre du temps sur une question à laquelle le message répondait déjà. Le lire de haut en bas avant toute hypothèse.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ça plante au démarrage, corrige.",
+        "after": "Ça plante au démarrage. Traceback complet, pas un résumé :\nTraceback (most recent call last):\n  File \"app.py\", line 12, in load\n    cfg = json.loads(raw)\njson.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)\nLis d'abord type, message, fichier et ligne, dis la cause qu'ils désignent avant de proposer un correctif."
+      },
+      "pitfall": "Ne lire que la dernière ligne, ou coller une version tronquée : la vraie cause est souvent dans la chaîne au-dessus (\"During handling of the above exception, another exception occurred\")."
+    }
+  },
+  "characterize-before-explaining": {
+    "en": {
+      "why": "A symptom you can only describe vaguely (\"it's slow\") invites a plausible story that may be wrong. Pinning down when, where, how much and since when narrows the causes before you explain anything. The explanation then has to fit all the facts, not just one.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "The export is slow, it's probably the database.",
+        "after": "The export takes 40 s for 10k rows, since Tuesday's deploy, only for tenant 17, every time.\nBefore explaining, list what we know and what we don't: when, where, how much, since when, always or sometimes. Then propose causes that fit all of it."
+      },
+      "pitfall": "Settling on the first plausible story and then only collecting facts that confirm it."
+    },
+    "fr": {
+      "why": "Un symptôme décrit vaguement (\"c'est lent\") appelle une histoire plausible mais peut-être fausse. Fixer quand, où, combien et depuis quand réduit les causes avant d'expliquer quoi que ce soit. L'explication doit ensuite coller à tous les faits, pas à un seul.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "L'export est lent, c'est sûrement la base de données.",
+        "after": "L'export prend 40 s pour 10k lignes, depuis le déploiement de mardi, seulement pour le tenant 17, à chaque fois.\nAvant d'expliquer, liste ce qu'on sait et ce qu'on ignore : quand, où, combien, depuis quand, toujours ou parfois. Puis propose des causes compatibles avec tout ça."
+      },
+      "pitfall": "S'arrêter à la première histoire plausible et ne plus collecter que les faits qui la confirment."
+    }
+  },
+  "instrument": {
+    "en": {
+      "why": "When you don't know why a value is wrong, staring at the code only gives you opinions. A log line or a counter at the doubtful point gives you a fact. Run again and read what actually happened.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def total(items):\n    # total is wrong sometimes, no idea why\n    return sum(i.price * i.qty for i in items)",
+        "after": "import logging\nlog = logging.getLogger(__name__)\n\ndef total(items):\n    for i in items:\n        log.debug(\"item id=%s price=%r qty=%r\", i.id, i.price, i.qty)\n    t = sum(i.price * i.qty for i in items)\n    log.debug(\"total=%r n=%d\", t, len(items))\n    return t\n\n# rerun with logging.basicConfig(level=logging.DEBUG) and read the output"
+      },
+      "pitfall": "Scattering logs everywhere without saying first what you expect to see, so any output looks plausible and nothing is learned."
+    },
+    "fr": {
+      "why": "Quand on ne sait pas pourquoi une valeur est fausse, relire le code ne donne que des opinions. Une ligne de log ou un compteur au point douteux donne un fait. On relance et on lit ce qui s'est vraiment passé.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def total(items):\n    # total faux parfois, aucune idée pourquoi\n    return sum(i.price * i.qty for i in items)",
+        "after": "import logging\nlog = logging.getLogger(__name__)\n\ndef total(items):\n    for i in items:\n        log.debug(\"item id=%s price=%r qty=%r\", i.id, i.price, i.qty)\n    t = sum(i.price * i.qty for i in items)\n    log.debug(\"total=%r n=%d\", t, len(items))\n    return t\n\n# relancer avec logging.basicConfig(level=logging.DEBUG) et lire la sortie"
+      },
+      "pitfall": "Semer des logs partout sans avoir dit avant ce qu'on s'attend à voir : toute sortie paraît plausible et on n'apprend rien."
+    }
+  },
+  "one-variable-at-a-time": {
+    "en": {
+      "why": "If you change three things and it works, you don't know which one fixed it. If it gets worse, you don't know which one broke it. A single change between two attempts makes every result readable.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# still failing, so change three things at once\npip install -U requests urllib3\nsed -i 's/TIMEOUT=5/TIMEOUT=30/' .env\nsystemctl restart app",
+        "after": "# attempt 1: only the timeout\ncp .env .env.bak\nsed -i 's/TIMEOUT=5/TIMEOUT=30/' .env\nsystemctl restart app\ncurl -sf localhost:8080/health; echo $?\n\n# still failing: revert it, then attempt 2: only the upgrade\nmv .env.bak .env\npip install -U requests\nsystemctl restart app\ncurl -sf localhost:8080/health; echo $?"
+      },
+      "pitfall": "Reverting nothing between attempts: the first change stays in place and silently contaminates the second test."
+    },
+    "fr": {
+      "why": "Si on change trois choses et que ça marche, on ne sait pas laquelle a réparé. Si ça empire, on ne sait pas laquelle a cassé. Un seul changement entre deux essais rend chaque résultat lisible.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# ça échoue encore, donc trois changements d'un coup\npip install -U requests urllib3\nsed -i 's/TIMEOUT=5/TIMEOUT=30/' .env\nsystemctl restart app",
+        "after": "# essai 1 : seulement le timeout\ncp .env .env.bak\nsed -i 's/TIMEOUT=5/TIMEOUT=30/' .env\nsystemctl restart app\ncurl -sf localhost:8080/health; echo $?\n\n# toujours en échec : annuler, puis essai 2 : seulement la mise à jour\nmv .env.bak .env\npip install -U requests\nsystemctl restart app\ncurl -sf localhost:8080/health; echo $?"
+      },
+      "pitfall": "Ne rien annuler entre deux essais : le premier changement reste en place et fausse en silence le second test."
+    }
+  },
+  "last-known-good": {
+    "en": {
+      "why": "\"It worked last week\" is the strongest clue you can have: the bug lives in the difference between then and now. Finding the last good commit, config or version turns an open search into a bounded one. git bisect does the narrowing for you.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git log --oneline   # 200 commits, read them all and guess",
+        "after": "git bisect start\ngit bisect bad HEAD\ngit bisect good v1.4.2\n# git checks out a middle commit: run the failing test, then mark it\ngit bisect good    # or: git bisect bad\n# repeat until git names the first bad commit\ngit bisect reset"
+      },
+      "pitfall": "Marking a commit good or bad without really running the test on it: one wrong answer sends the whole bisect the wrong way."
+    },
+    "fr": {
+      "why": "\"Ça marchait la semaine dernière\" est le meilleur indice possible : le bug se cache dans la différence entre alors et maintenant. Retrouver le dernier commit, la dernière config ou version saine transforme une recherche ouverte en recherche bornée. git bisect fait le découpage à ta place.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git log --oneline   # 200 commits, tout lire et deviner",
+        "after": "git bisect start\ngit bisect bad HEAD\ngit bisect good v1.4.2\n# git se place sur un commit du milieu : lancer le test qui échoue, puis le marquer\ngit bisect good    # ou : git bisect bad\n# répéter jusqu'à ce que git nomme le premier mauvais commit\ngit bisect reset"
+      },
+      "pitfall": "Marquer un commit bon ou mauvais sans avoir vraiment lancé le test dessus : une seule mauvaise réponse envoie tout le bisect dans la mauvaise direction."
+    }
+  },
+  "isolate": {
+    "en": {
+      "why": "A bug in a big system has many possible suspects. Removing everything not needed to reproduce it shrinks the search space fast. Disabling components by halves finds the faulty one in a handful of runs instead of reading all the code.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "PLUGINS = [\"auth\", \"cache\", \"metrics\", \"gzip\", \"cors\", \"rate\", \"audit\", \"i18n\"]\n# bug somewhere, reading all 8 plugins one by one",
+        "after": "PLUGINS = [\"auth\", \"cache\", \"metrics\", \"gzip\"]   # run: bug still there?\n# yes: culprit is in these 4, keep halving: [\"auth\", \"cache\"]\n# no: culprit is in the other 4, swap them in and halve again"
+      },
+      "pitfall": "Isolating by hand-picking the plugin you already suspect: halving is mechanical on purpose, so your bias can't skip the real culprit."
+    },
+    "fr": {
+      "why": "Un bug dans un gros système a beaucoup de suspects possibles. Retirer tout ce qui n'est pas nécessaire pour le reproduire réduit vite le champ. Désactiver par moitiés trouve le composant fautif en quelques essais au lieu de lire tout le code.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "PLUGINS = [\"auth\", \"cache\", \"metrics\", \"gzip\", \"cors\", \"rate\", \"audit\", \"i18n\"]\n# bug quelque part, lire les 8 plugins un par un",
+        "after": "PLUGINS = [\"auth\", \"cache\", \"metrics\", \"gzip\"]   # lancer : le bug est encore là ?\n# oui : le fautif est dans ces 4, couper encore : [\"auth\", \"cache\"]\n# non : il est dans les 4 autres, les remettre et couper en deux"
+      },
+      "pitfall": "Isoler en choisissant à la main le plugin qu'on soupçonne déjà : la coupe par moitiés est mécanique exprès, pour que ton biais ne saute pas le vrai fautif."
+    }
+  },
+  "attribution-correlation-causation": {
+    "en": {
+      "why": "Two things happening together proves nothing about one causing the other: traffic, season, another deploy or plain luck can move a metric. Before crediting (or blaming) your own change, find the mechanism and compare against a control that didn't get the change.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Latency dropped 30% after I added the cache, so the cache works. Write it up.",
+        "after": "Latency dropped 30% after the cache deploy, but traffic also fell that day. Compare the same hours against a control (a host without the cache, or the same weekday last week). Show the cache hit rate to prove the mechanism. Only then say how much of the drop the cache explains."
+      },
+      "pitfall": "Crediting your own change for a metric that moved because of seasonality, another deploy or regression to the mean."
+    },
+    "fr": {
+      "why": "Deux choses simultanées ne prouvent pas que l'une cause l'autre : trafic, saison, autre déploiement ou simple hasard peuvent faire bouger une métrique. Avant de s'attribuer le mérite (ou la faute) d'un effet, il faut trouver le mécanisme et comparer à un témoin qui n'a pas reçu le changement.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "La latence a baissé de 30% après mon cache, donc le cache marche. Rédige le compte rendu.",
+        "after": "La latence a baissé de 30% après le déploiement du cache, mais le trafic a aussi chuté ce jour-là. Compare les mêmes heures à un témoin (un hôte sans le cache, ou le même jour de la semaine précédente). Montre le taux de hit du cache pour prouver le mécanisme. Dis ensuite seulement quelle part de la baisse le cache explique."
+      },
+      "pitfall": "S'attribuer la variation d'une métrique qui a bougé à cause de la saisonnalité, d'un autre déploiement ou d'une régression vers la moyenne."
+    }
+  },
+  "call-stack": {
+    "en": {
+      "why": "The call stack (traceback) lists the chain of calls that led to the error, from the entry point down to the failing line. The deepest frame is often inside a library, but the bug is usually in the first frame that belongs to your code, where wrong data was passed or assumed. Read the trace to find that line.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# staring at the deepest frame, inside the JSON library\nsed -n '340,360p' /usr/lib/python3.12/json/decoder.py",
+        "after": "# walk up the trace to the first frame in our code: api.py, line 9\nsed -n '1,15p' api.py\n# the library is fine: r.text is not JSON (empty body or an HTML error page)\n# print r.status_code and r.text[:200] just before json.loads"
+      },
+      "pitfall": "Blaming the library because the last frame is inside it, when the arguments came from our own caller higher up the stack."
+    },
+    "fr": {
+      "why": "La pile d'appels (traceback) liste la chaîne d'appels qui a mené à l'erreur, du point d'entrée jusqu'à la ligne qui échoue. Le frame le plus profond est souvent dans une bibliothèque, mais le bug est en général dans le premier frame de notre code, là où une mauvaise donnée a été passée ou supposée. Lire la trace pour trouver cette ligne.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# on fixe le frame le plus profond, dans la bibliothèque JSON\nsed -n '340,360p' /usr/lib/python3.12/json/decoder.py",
+        "after": "# remonter la trace jusqu'au premier frame de notre code : api.py, ligne 9\nsed -n '1,15p' api.py\n# la bibliothèque n'y est pour rien : r.text n'est pas du JSON (corps vide ou page d'erreur HTML)\n# afficher r.status_code et r.text[:200] juste avant json.loads"
+      },
+      "pitfall": "Accuser la bibliothèque parce que le dernier frame est chez elle, alors que les arguments viennent de notre appelant plus haut dans la pile."
+    }
+  },
+  "strace-network-trace": {
+    "en": {
+      "why": "When logs say nothing, the operating system still knows what the program did: which files it opened, which sockets it touched, where it blocked. strace shows system calls, and a packet capture such as tcpdump shows what really crosses the network. Both give ground truth that doesn't depend on the program's own logging.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "tail -f app.log   # nothing, the program just hangs",
+        "after": "# which files does it try to open, and which fail?\nstrace -f -e trace=file -o trace.txt ./app\ngrep ENOENT trace.txt\n\n# attach to the running process, show only network calls with timestamps\nsudo strace -f -tt -e trace=network -p 4242\n\n# what actually leaves the machine on 443?\nsudo tcpdump -i any -nn port 443"
+      },
+      "pitfall": "Running strace on a wrapper script instead of the real process, or forgetting -f, so the child processes doing the work are never traced."
+    },
+    "fr": {
+      "why": "Quand les logs ne disent rien, le système sait quand même ce que le programme a fait : quels fichiers il a ouverts, quelles sockets il a touchées, où il s'est bloqué. strace montre les appels système, et une capture de paquets comme tcpdump montre ce qui traverse vraiment le réseau. Dans les deux cas, une vérité qui ne dépend pas des logs du programme.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "tail -f app.log   # rien, le programme reste figé",
+        "after": "# quels fichiers essaie-t-il d'ouvrir, et lesquels échouent ?\nstrace -f -e trace=file -o trace.txt ./app\ngrep ENOENT trace.txt\n\n# s'attacher au process en cours, ne montrer que le réseau avec horodatage\nsudo strace -f -tt -e trace=network -p 4242\n\n# qu'est-ce qui sort vraiment de la machine sur le 443 ?\nsudo tcpdump -i any -nn port 443"
+      },
+      "pitfall": "Lancer strace sur un script wrapper au lieu du vrai process, ou oublier -f : les processus fils qui font le travail ne sont alors jamais tracés."
+    }
+  },
+  "heisenbug": {
+    "en": {
+      "why": "A heisenbug disappears or changes when you observe it, because observing (a print, a debugger, a breakpoint) changes the timing. It almost always means a race condition or other concurrency problem. To observe it anyway, record cheaply in memory and read the record afterwards.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def worker():\n    global n\n    tmp = n\n    print(\"read\", tmp)   # slow I/O shifts the timing: the bug changes or vanishes\n    n = tmp + 1",
+        "after": "import collections, threading, time\nevents = collections.deque(maxlen=1000)   # in-memory, very cheap\n\ndef worker():\n    global n\n    tmp = n\n    events.append((time.monotonic_ns(), threading.get_ident(), \"read\", tmp))\n    n = tmp + 1\n\n# after the threads finish (join), dump `events` and read the interleaving"
+      },
+      "pitfall": "Concluding \"fixed\" because the bug vanished once a print was added: the print only moved the timing, the race is still there."
+    },
+    "fr": {
+      "why": "Un heisenbug disparaît ou change quand on l'observe, parce qu'observer (un print, un debugger, un point d'arrêt) modifie le timing. Cela signale presque toujours une race condition ou un autre problème de concurrence. La parade : enregistrer à bas coût en mémoire et lire après coup.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def worker():\n    global n\n    tmp = n\n    print(\"read\", tmp)   # I/O lente, le timing bouge : le bug change ou disparaît\n    n = tmp + 1",
+        "after": "import collections, threading, time\nevents = collections.deque(maxlen=1000)   # en mémoire, très peu coûteux\n\ndef worker():\n    global n\n    tmp = n\n    events.append((time.monotonic_ns(), threading.get_ident(), \"read\", tmp))\n    n = tmp + 1\n\n# une fois les threads terminés (join), afficher `events` et lire l'entrelacement"
+      },
+      "pitfall": "Conclure \"corrigé\" parce que le bug a disparu après l'ajout d'un print : le print a seulement décalé le timing, la race condition est toujours là."
+    }
+  },
+  "latent-bug": {
+    "en": {
+      "why": "A latent bug has been in the code for a long time and only shows up when something else changes: new data, a dependency upgrade, a config tweak, more load. The faulty line can be years old and still be wrong: nothing had triggered it yet. So look at the line and at what changed around it, the trigger.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git blame src/parse.py   # the line is 3 years old, so it can't be that",
+        "after": "# old does not mean innocent: keep the line, and find the trigger that changed around it\ngit log --since=\"3 weeks ago\" --oneline -- config/ requirements.txt\ngit diff v2.3.0 HEAD -- requirements.txt\n# also check: new input shape, new volume, new environment"
+      },
+      "pitfall": "Dismissing a suspect line because it is old: age proves it survived the old conditions, not the new ones."
+    },
+    "fr": {
+      "why": "Un bug latent est dans le code depuis longtemps et n'apparaît que quand autre chose change : nouvelles données, mise à jour d'une dépendance, réglage de config, plus de charge. La ligne fautive peut avoir des années et être fausse quand même : rien ne l'avait encore déclenchée. Il faut donc regarder la ligne et ce qui a changé autour, le déclencheur.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git blame src/parse.py   # la ligne a 3 ans, donc ce n'est pas elle",
+        "after": "# ancienne ne veut pas dire innocente : garder la ligne, et chercher le déclencheur qui a changé autour\ngit log --since=\"3 weeks ago\" --oneline -- config/ requirements.txt\ngit diff v2.3.0 HEAD -- requirements.txt\n# vérifier aussi : nouvelle forme d'entrée, nouveau volume, nouvel environnement"
+      },
+      "pitfall": "Écarter une ligne suspecte parce qu'elle est vieille : son âge prouve qu'elle a survécu aux anciennes conditions, pas aux nouvelles."
+    }
+  },
+  "mask-the-symptom": {
+    "en": {
+      "why": "A try/except that swallows the error or a sleep that \"fixes\" a race makes the failure invisible, not gone. The cause stays and comes back later, harder to find. A real fix removes the cause, or at least waits on the actual condition.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "t = threading.Thread(target=load_config)\nt.start()\ntime.sleep(2)   # config is usually loaded by then\nuse(config)",
+        "after": "from concurrent.futures import ThreadPoolExecutor\npool = ThreadPoolExecutor(max_workers=1)\nfut = pool.submit(load_config)\n# wait for the real result, not a guessed delay:\n# re-raises load_config's error, TimeoutError if it hangs\nfut.result(timeout=5)\nuse(config)"
+      },
+      "pitfall": "Wrapping the failing call in `except Exception: pass` so the crash stops: the program now continues with bad state and fails somewhere else."
+    },
+    "fr": {
+      "why": "Un try/except qui avale l'erreur ou un sleep qui \"répare\" une race rend la panne invisible, pas disparue. La cause reste et revient plus tard, plus dure à trouver. Une vraie correction supprime la cause, ou au moins attend la vraie condition.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "t = threading.Thread(target=load_config)\nt.start()\ntime.sleep(2)   # la config est en général chargée d'ici là\nuse(config)",
+        "after": "from concurrent.futures import ThreadPoolExecutor\npool = ThreadPoolExecutor(max_workers=1)\nfut = pool.submit(load_config)\n# attendre le vrai résultat, pas un délai deviné :\n# relance l'erreur de load_config, TimeoutError s'il bloque\nfut.result(timeout=5)\nuse(config)"
+      },
+      "pitfall": "Entourer l'appel qui échoue d'un `except Exception: pass` pour que le crash s'arrête : le programme continue avec un état faux et plante ailleurs."
+    }
+  }
+}

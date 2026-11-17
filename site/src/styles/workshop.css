@@ -1,0 +1,50 @@
+/* Prompt workshop: input on the left, findings on the right on wide screens */
+.workshop__grid { display: grid; gap: var(--space-10); align-items: start; }
+.workshop__input, .workshop__results, .workshop__block { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.workshop__results { gap: var(--space-8); }
+
+.workshop__textarea {
+  width: 100%;
+  min-height: 14rem;
+  padding: var(--space-3);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  resize: vertical;
+}
+.workshop__textarea::placeholder { color: var(--color-text-muted); opacity: 1; }
+
+.workshop__tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.workshop__try { font-size: var(--text-sm); }
+.workshop__note { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+
+/* fixed min-height so the column does not jump between empty and filled states */
+.workshop__count { min-height: calc(var(--leading-body) * 1em); font-weight: var(--weight-medium); }
+
+.hits, .suggs { display: flex; flex-direction: column; }
+.hit, .sugg { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) 0; border-top: var(--border-hairline) solid var(--color-border); }
+.hit__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); }
+.hit__word { font-family: var(--font-serif); font-size: var(--text-lg); }
+.hit__seen { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+.hit__mark {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.hit__action { font-size: var(--text-sm); }
+
+.sugg__phrase { font-weight: var(--weight-medium); }
+.sugg__result { font-size: var(--text-sm); color: var(--color-text-muted); }
+.sugg__missing, .sugg__done { font-size: var(--text-sm); }
+.sugg__done { display: flex; align-items: center; gap: var(--space-1); color: var(--color-accent); }
+
+@media (min-width: 52em) {
+  .workshop__grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+}

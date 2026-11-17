@@ -1,0 +1,794 @@
+{
+  "trust-boundary": {
+    "en": {
+      "why": "Your code controls its inside, but not what arrives from the network, a file, an environment variable or a person. The trust boundary is the line where that foreign data enters. Validate and bound it there, once, and the rest of the code can rely on clean values.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    n = int(req[\"count\"])\n    return load_items(n)",
+        "after": "def handle(req):\n    n = int(req.get(\"count\", 10))\n    if not 1 <= n <= 100:\n        raise ValueError(\"count must be 1..100\")\n    return load_items(n)"
+      },
+      "pitfall": "Validating deep in the code, or only in the UI, so some paths reach the logic without ever being checked."
+    },
+    "fr": {
+      "why": "Ton code maîtrise son intérieur, pas ce qui arrive du réseau, d'un fichier, d'une variable d'environnement ou d'une personne. La frontière de confiance est la ligne où cette donnée étrangère entre. On valide et on borne à cet endroit, une seule fois, et le reste du code peut compter sur des valeurs propres.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    n = int(req[\"count\"])\n    return load_items(n)",
+        "after": "def handle(req):\n    n = int(req.get(\"count\", 10))\n    if not 1 <= n <= 100:\n        raise ValueError(\"count doit être entre 1 et 100\")\n    return load_items(n)"
+      },
+      "pitfall": "Valider au fond du code, ou seulement dans l'interface, si bien que certains chemins atteignent la logique sans jamais être contrôlés."
+    }
+  },
+  "allowlist-denylist": {
+    "en": {
+      "why": "A denylist tries to list everything bad, and attackers only need one variant you forgot (another case, an encoding, an alias). An allowlist lists the few things you accept and refuses the rest, so the unknown is safe by default. Use it for commands, file types, hosts, fields and enum values.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "BLOCKED = {\"rm\", \"dd\", \"mkfs\"}\nif cmd in BLOCKED:\n    raise ValueError(\"blocked\")\nsubprocess.run([cmd], check=True)",
+        "after": "ALLOWED = {\"ls\", \"df\", \"uptime\"}\nif cmd not in ALLOWED:\n    raise ValueError(\"command not allowed\")\nsubprocess.run([cmd], check=True)"
+      },
+      "pitfall": "Growing a denylist after each incident, which always misses the next variant and gives a false feeling of safety."
+    },
+    "fr": {
+      "why": "Une denylist essaie de lister tout ce qui est mauvais, et il suffit à l'attaquant d'une variante oubliée (autre casse, encodage, alias). Une allowlist énumère le peu qu'on accepte et refuse le reste, donc l'inconnu est sûr par défaut. Valable pour les commandes, types de fichier, hôtes, champs et valeurs d'enum.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "BLOCKED = {\"rm\", \"dd\", \"mkfs\"}\nif cmd in BLOCKED:\n    raise ValueError(\"bloqué\")\nsubprocess.run([cmd], check=True)",
+        "after": "ALLOWED = {\"ls\", \"df\", \"uptime\"}\nif cmd not in ALLOWED:\n    raise ValueError(\"commande non autorisée\")\nsubprocess.run([cmd], check=True)"
+      },
+      "pitfall": "Allonger la denylist après chaque incident : elle rate toujours la variante suivante et donne un faux sentiment de sécurité."
+    }
+  },
+  "injection": {
+    "en": {
+      "why": "Injection happens when input is glued into a string that another interpreter (shell, SQL, HTML) then reads as instructions. A name like x' OR '1'='1 or a host like a; rm -rf ~ stops being data and becomes code. Keep data and instructions in separate channels: arguments as a list, query parameters.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "subprocess.run(f\"ping -c1 {host}\", shell=True)\ncur.execute(f\"SELECT * FROM users WHERE name = '{name}'\")",
+        "after": "subprocess.run([\"ping\", \"-c1\", host], check=True)\ncur.execute(\"SELECT * FROM users WHERE name = ?\", (name,))"
+      },
+      "pitfall": "Fixing the shell but leaving a value that starts with a dash, which the program can still read as an option; put -- before it when the tool supports it."
+    },
+    "fr": {
+      "why": "L'injection arrive quand une entrée est collée dans une chaîne qu'un autre interpréteur (shell, SQL, HTML) lit comme des instructions. Un nom comme x' OR '1'='1 ou un hôte comme a; rm -rf ~ cesse d'être une donnée et devient du code. Il faut garder données et instructions dans des canaux séparés : arguments en liste, paramètres de requête.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "subprocess.run(f\"ping -c1 {host}\", shell=True)\ncur.execute(f\"SELECT * FROM users WHERE name = '{name}'\")",
+        "after": "subprocess.run([\"ping\", \"-c1\", host], check=True)\ncur.execute(\"SELECT * FROM users WHERE name = ?\", (name,))"
+      },
+      "pitfall": "Corriger le shell mais laisser passer une valeur qui commence par un tiret, que le programme peut encore lire comme une option ; mettre -- devant quand l'outil le supporte."
+    }
+  },
+  "path-traversal": {
+    "en": {
+      "why": "A user-supplied name like ../../etc/passwd, once joined to your folder, points outside it. Path traversal lets a download or upload route read or overwrite any file the process can reach. The fix is to compute the final absolute path first, then check it still lives under the allowed root.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "path = os.path.join(\"/srv/files\", name)\nreturn open(path, \"rb\").read()",
+        "after": "ROOT = Path(\"/srv/files\").resolve()\np = (ROOT / name).resolve()\nif not p.is_relative_to(ROOT):\n    raise PermissionError(\"outside root\")\nreturn p.read_bytes()"
+      },
+      "pitfall": "Searching the string for \"../\" instead of resolving the final path; encodings, absolute paths and symlinks get around the string check."
+    },
+    "fr": {
+      "why": "Un nom fourni par l'utilisateur comme ../../etc/passwd, une fois joint à ton dossier, pointe en dehors. Le path traversal permet à une route de téléchargement ou d'envoi de lire ou d'écraser tout fichier accessible au processus. Le remède : calculer d'abord le chemin absolu final, puis vérifier qu'il reste sous la racine autorisée.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "path = os.path.join(\"/srv/files\", name)\nreturn open(path, \"rb\").read()",
+        "after": "ROOT = Path(\"/srv/files\").resolve()\np = (ROOT / name).resolve()\nif not p.is_relative_to(ROOT):\n    raise PermissionError(\"hors de la racine\")\nreturn p.read_bytes()"
+      },
+      "pitfall": "Chercher \"../\" dans la chaîne au lieu de résoudre le chemin final ; encodages, chemins absolus et liens symboliques contournent le test sur la chaîne."
+    }
+  },
+  "ssrf": {
+    "en": {
+      "why": "When your server fetches a URL a user gave (avatar import, webhook, link preview), the user can aim it at places only the server can reach: localhost, the private network, the cloud metadata address 169.254.169.254. SSRF turns your server into their proxy inside your perimeter. Accept only named hosts and refuse internal addresses.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r = requests.get(request.args[\"url\"])",
+        "after": "url = request.args[\"url\"]\nALLOWED_HOSTS = {\"api.example.com\", \"cdn.example.com\"}\nu = urlparse(url)\nif u.scheme != \"https\" or u.hostname not in url = request.args[\"url\"]\nALLOWED_HOSTS:\n    raise ValueError(\"host not allowed\")\nr = requests.get(url, timeout=5, allow_redirects=False)"
+      },
+      "pitfall": "Checking the host once but following redirects, so an allowed host bounces the request to an internal address."
+    },
+    "fr": {
+      "why": "Quand ton serveur va chercher une URL donnée par un utilisateur (import d'avatar, webhook, aperçu de lien), celui-ci peut le diriger vers des endroits que seul le serveur atteint : localhost, le réseau privé, l'adresse de métadonnées cloud 169.254.169.254. La SSRF fait de ton serveur son proxy à l'intérieur de ton périmètre. N'accepte que des hôtes nommés et refuse les adresses internes.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r = requests.get(request.args[\"url\"])",
+        "after": "url = request.args[\"url\"]\nALLOWED_HOSTS = {\"api.example.com\", \"cdn.example.com\"}\nu = urlparse(url)\nif u.scheme != \"https\" or u.hostname not in url = request.args[\"url\"]\nALLOWED_HOSTS:\n    raise ValueError(\"hôte non autorisé\")\nr = requests.get(url, timeout=5, allow_redirects=False)"
+      },
+      "pitfall": "Vérifier l'hôte une fois mais suivre les redirections : un hôte autorisé renvoie alors la requête vers une adresse interne."
+    }
+  },
+  "safe-deserialization": {
+    "en": {
+      "why": "Some formats rebuild arbitrary objects while reading, so reading is already executing. pickle can run any code stored in the file, and yaml.load with yaml.Loader (or UnsafeLoader) can construct arbitrary Python objects. Use formats that only produce plain data (json, yaml.safe_load) for anything that does not come from you.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "obj = pickle.loads(blob)\ncfg = yaml.load(text, Loader=yaml.Loader)",
+        "after": "obj = json.loads(blob)\ncfg = yaml.safe_load(text)"
+      },
+      "pitfall": "Trusting a pickle because it comes from \"our own\" service: anyone who can write the file, cache or message queue can run code on the reader."
+    },
+    "fr": {
+      "why": "Certains formats reconstruisent des objets arbitraires pendant la lecture : lire, c'est déjà exécuter. pickle peut lancer n'importe quel code stocké dans le fichier, et yaml.load avec yaml.Loader (ou UnsafeLoader) peut construire des objets Python arbitraires. Pour tout ce qui ne vient pas de toi, utilise des formats qui ne produisent que des données simples (json, yaml.safe_load).",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "obj = pickle.loads(blob)\ncfg = yaml.load(text, Loader=yaml.Loader)",
+        "after": "obj = json.loads(blob)\ncfg = yaml.safe_load(text)"
+      },
+      "pitfall": "Faire confiance à un pickle parce qu'il vient de \"notre\" service : quiconque peut écrire le fichier, le cache ou la file de messages exécute du code chez le lecteur."
+    }
+  },
+  "secret-out-of-argv-and-logs": {
+    "en": {
+      "why": "Command-line arguments are public on the machine: any user can read them with ps, and they land in shell history and CI logs. A secret given as an argument leaks to all of those. Pass it by stdin, a file with mode 600 or an environment variable, and mask it in your own logs.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker login -u me -p \"$TOKEN\" registry.example.com",
+        "after": "printf '%s' \"$TOKEN\" | docker login -u me --password-stdin registry.example.com"
+      },
+      "pitfall": "Passing the secret as an argument \"just this once\": the full command line stays visible in ps, history and CI output."
+    },
+    "fr": {
+      "why": "Les arguments de ligne de commande sont publics sur la machine : tout utilisateur les lit avec ps, et ils finissent dans l'historique du shell et les logs de CI. Un secret passé en argument fuit partout. Passe-le par stdin, un fichier en mode 600 ou une variable d'environnement, et masque-le dans tes propres logs.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker login -u me -p \"$TOKEN\" registry.example.com",
+        "after": "printf '%s' \"$TOKEN\" | docker login -u me --password-stdin registry.example.com"
+      },
+      "pitfall": "Passer le secret en argument \"juste cette fois\" : la ligne de commande complète reste visible dans ps, l'historique et la sortie de CI."
+    }
+  },
+  "constant-time-comparison": {
+    "en": {
+      "why": "A normal == stops at the first differing character, so a wrong guess that matches more characters takes slightly longer. An attacker measuring response times can recover a signature or token one character at a time. hmac.compare_digest takes the same time wherever the difference is.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "expected = hmac.new(KEY, body, hashlib.sha256).hexdigest()\nif signature == expected:\n    accept()",
+        "after": "expected = hmac.new(KEY, body, hashlib.sha256).hexdigest()\nif hmac.compare_digest(signature, expected):\n    accept()"
+      },
+      "pitfall": "Comparing values of different types (str against bytes) raises TypeError, and a str with non-ASCII characters is also rejected; encode both to bytes first."
+    },
+    "fr": {
+      "why": "Un == normal s'arrête au premier caractère différent : une tentative qui en a plus de corrects prend un peu plus de temps. Un attaquant qui mesure les temps de réponse peut retrouver une signature ou un jeton caractère par caractère. hmac.compare_digest prend le même temps où que soit la différence.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "expected = hmac.new(KEY, body, hashlib.sha256).hexdigest()\nif signature == expected:\n    accept()",
+        "after": "expected = hmac.new(KEY, body, hashlib.sha256).hexdigest()\nif hmac.compare_digest(signature, expected):\n    accept()"
+      },
+      "pitfall": "Comparer des types différents (str contre bytes) lève TypeError, et un str avec des caractères non ASCII est aussi refusé ; encoder les deux en bytes d'abord."
+    }
+  },
+  "defense-in-depth": {
+    "en": {
+      "why": "No single protection is perfect, so stack independent ones. If input validation misses a case, minimal rights limit the damage; if rights are wrong, the firewall still limits who can reach the service. Each layer should work even when another one has failed.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# one layer only: the app validates input\nsudo ./app",
+        "after": "# several layers: dedicated user, closed ports, app validates too\nsudo ufw default deny incoming\nsudo ufw allow 443/tcp\nsudo -u appsvc ./app"
+      },
+      "pitfall": "Stacking layers that all depend on the same assumption (for example three checks that trust the same header), which is one layer with three names."
+    },
+    "fr": {
+      "why": "Aucune protection n'est parfaite, donc on en empile d'indépendantes. Si la validation rate un cas, les droits minimaux limitent les dégâts ; si les droits sont faux, le pare-feu limite encore qui atteint le service. Chaque couche doit tenir même quand une autre a lâché.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# une seule couche : l'app valide l'entrée\nsudo ./app",
+        "after": "# plusieurs couches : utilisateur dédié, ports fermés, l'app valide aussi\nsudo ufw default deny incoming\nsudo ufw allow 443/tcp\nsudo -u appsvc ./app"
+      },
+      "pitfall": "Empiler des couches qui reposent toutes sur la même hypothèse (par exemple trois contrôles qui croient le même en-tête) : c'est une seule couche avec trois noms."
+    }
+  },
+  "least-privilege": {
+    "en": {
+      "why": "A process, key or account should hold only the rights its job needs. When something is compromised or simply buggy, the damage is limited to those rights. A deploy user that may only restart one service is far less dangerous than one with full root and no password.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# /etc/sudoers.d/deploy\ndeploy ALL=(ALL) NOPASSWD:ALL",
+        "after": "# /etc/sudoers.d/deploy, edited with: sudo visudo -f /etc/sudoers.d/deploy\ndeploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart myapp"
+      },
+      "pitfall": "Granting broad rights \"to get it working\" and never narrowing them afterwards, so the convenience becomes permanent."
+    },
+    "fr": {
+      "why": "Un processus, une clé ou un compte ne doit avoir que les droits dont son travail a besoin. Quand quelque chose est compromis, ou simplement bogué, les dégâts se limitent à ces droits. Un utilisateur de déploiement qui peut seulement redémarrer un service est bien moins dangereux qu'un root complet sans mot de passe.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# /etc/sudoers.d/deploy\ndeploy ALL=(ALL) NOPASSWD:ALL",
+        "after": "# /etc/sudoers.d/deploy, édité avec : sudo visudo -f /etc/sudoers.d/deploy\ndeploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart myapp"
+      },
+      "pitfall": "Donner des droits larges \"pour que ça marche\" puis ne jamais les réduire : le confort devient permanent."
+    }
+  },
+  "sanitize-escape": {
+    "en": {
+      "why": "Data is harmless until it is placed into a context with its own syntax: HTML, a shell line, SQL. Escaping encodes the special characters of that context so they are read as plain text. Do it at the moment you output, with the rules of the destination, rather than trying to clean everything at input.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "html = f\"<p>{comment}</p>\"\ncmd = f\"grep {term} app.log\"",
+        "after": "html = f\"<p>{escape(comment)}</p>\"   # from html import escape\ncmd = f\"grep -- {shlex.quote(term)} app.log\""
+      },
+      "pitfall": "Escaping once at input and storing the result, then showing it in another context (JSON, shell, a different HTML place) where that escaping is wrong."
+    },
+    "fr": {
+      "why": "Une donnée est inoffensive jusqu'à ce qu'on la place dans un contexte qui a sa propre syntaxe : HTML, ligne de shell, SQL. Échapper encode les caractères spéciaux de ce contexte pour qu'ils soient lus comme du texte. Fais-le au moment de la sortie, avec les règles de la destination, plutôt que d'essayer de tout nettoyer à l'entrée.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "html = f\"<p>{comment}</p>\"\ncmd = f\"grep {term} app.log\"",
+        "after": "html = f\"<p>{escape(comment)}</p>\"   # from html import escape\ncmd = f\"grep -- {shlex.quote(term)} app.log\""
+      },
+      "pitfall": "Échapper une fois à l'entrée et stocker le résultat, puis l'afficher dans un autre contexte (JSON, shell, autre endroit du HTML) où cet échappement est faux."
+    }
+  },
+  "audit-trail": {
+    "en": {
+      "why": "When something goes wrong, or someone denies doing it, you need to know who did what and when. An audit trail is a separate journal of sensitive actions (login, delete, permission change), written only by appending so nothing is rewritten after the fact. It is for investigation, not for debugging.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "logging.info(\"deleted project\")",
+        "after": "def audit(actor, action, target):\n    line = json.dumps({\"ts\": time.time(), \"actor\": actor,\n                       \"action\": action, \"target\": target})\n    with open(\"audit.log\", \"a\") as f:\n        f.write(line + \"\\n\")\n\naudit(user.id, \"project.delete\", project.id)"
+      },
+      "pitfall": "Letting the application account rewrite or truncate the journal, or writing the secret or full payload into it."
+    },
+    "fr": {
+      "why": "Quand quelque chose tourne mal, ou que quelqu'un nie avoir agi, il faut savoir qui a fait quoi et quand. Une piste d'audit est un journal à part des actions sensibles (connexion, suppression, changement de droits), écrit uniquement en ajout pour que rien ne soit réécrit après coup. Elle sert à enquêter, pas à déboguer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "logging.info(\"deleted project\")",
+        "after": "def audit(actor, action, target):\n    line = json.dumps({\"ts\": time.time(), \"actor\": actor,\n                       \"action\": action, \"target\": target})\n    with open(\"audit.log\", \"a\") as f:\n        f.write(line + \"\\n\")\n\naudit(user.id, \"project.delete\", project.id)"
+      },
+      "pitfall": "Laisser le compte de l'application réécrire ou tronquer le journal, ou y écrire le secret ou la charge utile complète."
+    }
+  },
+  "rotation": {
+    "en": {
+      "why": "Every secret can leak and should expire sooner or later. Rotation is replacing it on a schedule or after a suspected leak. It only works if the system can hold two valid secrets for a while, so you can deploy the new one everywhere and then retire the old one without an outage.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "KEY = os.environ[\"API_KEY\"]\ndef valid(k):\n    return hmac.compare_digest(k, KEY)",
+        "after": "# overlap window: accept new and old, remove old after the switch\nKEYS = [os.environ[\"API_KEY_NEW\"], os.environ.get(\"API_KEY_OLD\", \"\")]\ndef valid(k):\n    return any(hmac.compare_digest(k, v) for v in KEYS if v)"
+      },
+      "pitfall": "Replacing the secret in one step, which breaks the consumers still using the old one, or never removing the old secret so it stays valid forever."
+    },
+    "fr": {
+      "why": "Tout secret peut fuiter et doit expirer un jour. La rotation, c'est le remplacer à date fixe ou après une fuite supposée. Elle ne marche que si le système sait accepter deux secrets valides un temps, pour déployer le nouveau partout puis retirer l'ancien sans coupure.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "KEY = os.environ[\"API_KEY\"]\ndef valid(k):\n    return hmac.compare_digest(k, KEY)",
+        "after": "# fenêtre de recouvrement : accepter la nouvelle et l'ancienne, retirer l'ancienne après la bascule\nKEYS = [os.environ[\"API_KEY_NEW\"], os.environ.get(\"API_KEY_OLD\", \"\")]\ndef valid(k):\n    return any(hmac.compare_digest(k, v) for v in KEYS if v)"
+      },
+      "pitfall": "Remplacer le secret en une seule étape, ce qui casse les clients qui utilisent encore l'ancien, ou ne jamais retirer l'ancien qui reste valide pour toujours."
+    }
+  },
+  "threat-model": {
+    "en": {
+      "why": "Security work without a target is guesswork, because you can defend against everything and still miss the real risk. A threat model answers three questions in a few lines: who attacks, what they want, and by which door. Write it first, then choose protections that actually address it.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Make the upload endpoint secure.",
+        "after": "Threat model: attacker = anonymous internet user, goal = code execution\nor reading other users' files, entry = the upload form and the filename.\nGiven that, review the upload endpoint and list the protections it needs,\nmost important first. Skip threats outside this model."
+      },
+      "pitfall": "Writing a generic list of every possible threat; if you cannot say who attacks and how, you are protecting against nothing in particular."
+    },
+    "fr": {
+      "why": "Faire de la sécurité sans cible, c'est deviner : on peut tout défendre et rater le vrai risque. Un modèle de menace répond en quelques lignes à trois questions : qui attaque, que veut-il, par quelle porte. On l'écrit d'abord, puis on choisit des protections qui y répondent vraiment.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Sécurise l'endpoint d'upload.",
+        "after": "Modèle de menace : attaquant = internaute anonyme, but = exécution de code\nou lecture des fichiers des autres, entrée = le formulaire d'upload et le nom de fichier.\nDans ce cadre, passe en revue l'endpoint d'upload et liste les protections\nnécessaires, les plus importantes d'abord. Ignore les menaces hors modèle."
+      },
+      "pitfall": "Écrire une liste générique de toutes les menaces possibles ; si tu ne sais pas dire qui attaque et comment, tu ne protèges contre rien de précis."
+    }
+  },
+  "attack-surface": {
+    "en": {
+      "why": "The attack surface is everything an outsider can reach: open ports, routes, debug endpoints, admin panels, options, third-party code. Each exposed piece is a chance for a bug to be exploited. Removing what you do not need is cheaper and safer than defending it.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker run -d -p 6379:6379 redis",
+        "after": "docker run -d -p 127.0.0.1:6379:6379 redis\nss -tlnp    # list what actually listens"
+      },
+      "pitfall": "Counting only open ports, when routes, debug flags, admin panels, unused dependencies and permissive options are surface too."
+    },
+    "fr": {
+      "why": "La surface d'attaque, c'est tout ce qu'un extérieur peut atteindre : ports ouverts, routes, endpoints de debug, panneaux d'admin, options, code tiers. Chaque élément exposé est une chance qu'un bug soit exploité. Retirer ce qui ne sert pas coûte moins cher et protège mieux que le défendre.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker run -d -p 6379:6379 redis",
+        "after": "docker run -d -p 127.0.0.1:6379:6379 redis\nss -tlnp    # liste ce qui écoute vraiment"
+      },
+      "pitfall": "Ne compter que les ports ouverts, alors que routes, drapeaux de debug, panneaux d'admin, dépendances inutilisées et options permissives sont aussi de la surface."
+    }
+  },
+  "authn-authz": {
+    "en": {
+      "why": "Authentication (authn) establishes who you are, authorization (authz) decides what you may do. A login screen only solves the first. Every request that touches an object must also check that this user has the right on that object.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "@login_required\ndef get_invoice(id):\n    return Invoice.get(id)",
+        "after": "@login_required\ndef get_invoice(id):\n    inv = Invoice.get(id)\n    if inv is None or inv.owner_id != current_user.id:\n        abort(404)\n    return inv"
+      },
+      "pitfall": "Treating \"logged in\" as \"allowed\": any authenticated user can then reach everything the endpoint exposes."
+    },
+    "fr": {
+      "why": "L'authentification (authn) établit qui tu es, l'autorisation (authz) décide ce que tu peux faire. Un écran de connexion ne règle que la première. Chaque requête qui touche un objet doit aussi vérifier que cet utilisateur a le droit sur cet objet.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "@login_required\ndef get_invoice(id):\n    return Invoice.get(id)",
+        "after": "@login_required\ndef get_invoice(id):\n    inv = Invoice.get(id)\n    if inv is None or inv.owner_id != current_user.id:\n        abort(404)\n    return inv"
+      },
+      "pitfall": "Prendre \"connecté\" pour \"autorisé\" : n'importe quel utilisateur authentifié atteint alors tout ce que l'endpoint expose."
+    }
+  },
+  "idor": {
+    "en": {
+      "why": "IDOR (insecure direct object reference) is when /orders/1042 works for any user who simply changes 1042 to 1043. The id is a pointer, not a permission. The server must verify, on every access, that the current user owns or may read that object.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "SELECT * FROM orders WHERE id = ?;\n-- params: (order_id,)",
+        "after": "SELECT * FROM orders WHERE id = ? AND user_id = ?;\n-- params: (order_id, current_user_id)"
+      },
+      "pitfall": "Using hard-to-guess ids and calling it done: unguessable ids help but are not a check, they leak through links and logs."
+    },
+    "fr": {
+      "why": "Une IDOR (référence directe d'objet non sécurisée), c'est quand /orders/1042 marche pour n'importe quel utilisateur qui change simplement 1042 en 1043. L'id est un pointeur, pas une permission. Le serveur doit vérifier, à chaque accès, que l'utilisateur courant possède cet objet ou a le droit de le lire.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "SELECT * FROM orders WHERE id = ?;\n-- paramètres : (order_id,)",
+        "after": "SELECT * FROM orders WHERE id = ? AND user_id = ?;\n-- paramètres : (order_id, current_user_id)"
+      },
+      "pitfall": "Utiliser des ids impossibles à deviner et s'arrêter là : ça aide mais ce n'est pas un contrôle, et les ids fuitent par les liens et les logs."
+    }
+  },
+  "xss-csrf": {
+    "en": {
+      "why": "XSS means an attacker gets their script to run inside your page, usually because user text was inserted as HTML. CSRF means another site makes the visitor's browser send a request to yours, with their cookies attached. Escape on display and add a CSP for the first; SameSite cookies and an anti-CSRF token for the second.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "el.innerHTML = comment;\n// Set-Cookie: sid=abc",
+        "after": "el.textContent = comment;\n// Set-Cookie: sid=abc; HttpOnly; Secure; SameSite=Lax"
+      },
+      "pitfall": "Fixing only one of them: an XSS can read the anti-CSRF token and send requests as the user, so the CSRF protection does not save you."
+    },
+    "fr": {
+      "why": "Une XSS, c'est un attaquant qui fait tourner son script dans ta page, en général parce qu'un texte utilisateur a été inséré comme HTML. Une CSRF, c'est un autre site qui fait envoyer au navigateur du visiteur une requête vers le tien, cookies inclus. Échappe à l'affichage et ajoute une CSP pour la première ; cookies SameSite et jeton anti-CSRF pour la seconde.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "el.innerHTML = comment;\n// Set-Cookie: sid=abc",
+        "after": "el.textContent = comment;\n// Set-Cookie: sid=abc; HttpOnly; Secure; SameSite=Lax"
+      },
+      "pitfall": "N'en corriger qu'une : une XSS peut lire le jeton anti-CSRF et envoyer des requêtes au nom de l'utilisateur, donc la protection CSRF ne te sauve pas."
+    }
+  },
+  "cryptographic-randomness": {
+    "en": {
+      "why": "The random module is built for simulations: it is fast and reproducible, and its internal state can be recovered from enough outputs. Anything an attacker must not guess (session ids, reset tokens, API keys) needs the operating system's cryptographic source. In Python that is secrets or os.urandom.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "token = \"\".join(random.choices(string.ascii_letters, k=24))",
+        "after": "token = secrets.token_urlsafe(32)"
+      },
+      "pitfall": "Seeding random with the time or a \"long\" seed and thinking it is unpredictable; the problem is the generator, not the seed."
+    },
+    "fr": {
+      "why": "Le module random est fait pour les simulations : il est rapide et reproductible, et son état interne peut se retrouver à partir d'assez de sorties. Tout ce qu'un attaquant ne doit pas deviner (ids de session, jetons de réinitialisation, clés d'API) demande la source cryptographique du système. En Python, c'est secrets ou os.urandom.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "token = \"\".join(random.choices(string.ascii_letters, k=24))",
+        "after": "token = secrets.token_urlsafe(32)"
+      },
+      "pitfall": "Initialiser random avec l'heure ou une graine \"longue\" en pensant que c'est imprévisible ; le problème est le générateur, pas la graine."
+    }
+  },
+  "password-hashing": {
+    "en": {
+      "why": "If a database leaks, passwords stored in clear are instantly lost, and fast hashes like bare SHA-256 can be brute-forced at billions of guesses per second. A password hash is deliberately slow and salted, so each password must be attacked separately. Use argon2 or bcrypt, never your own scheme.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "h = hashlib.sha256(password.encode()).hexdigest()",
+        "after": "ph = PasswordHasher()          # from argon2 import PasswordHasher\nh = ph.hash(password)          # salt is generated and stored inside h\nph.verify(h, password)         # raises on mismatch"
+      },
+      "pitfall": "Salting a fast hash (SHA-256 plus a salt) and believing it is enough: the function itself must be deliberately slow (argon2 is also memory-hard)."
+    },
+    "fr": {
+      "why": "Si une base fuit, des mots de passe en clair sont perdus aussitôt, et des hachages rapides comme SHA-256 nu se forcent à des milliards d'essais par seconde. Un hachage de mot de passe est volontairement lent et salé, donc chaque mot de passe doit être attaqué séparément. Utilise argon2 ou bcrypt, jamais ton propre schéma.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "h = hashlib.sha256(password.encode()).hexdigest()",
+        "after": "ph = PasswordHasher()          # from argon2 import PasswordHasher\nh = ph.hash(password)          # le sel est généré et stocké dans h\nph.verify(h, password)         # lève une exception si ça ne correspond pas"
+      },
+      "pitfall": "Saler un hachage rapide (SHA-256 plus un sel) et croire que ça suffit : la fonction elle-même doit être volontairement lente (argon2 est en plus gourmande en mémoire)."
+    }
+  },
+  "verified-tls": {
+    "en": {
+      "why": "TLS gives you encryption plus proof of who is on the other end. With verification off (-k, verify=False) you still get encryption, but to anyone who answers, including a man in the middle. When a certificate error appears, fix the cause: trust the right CA, renew the certificate, correct the hostname.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "curl -k https://internal.example.com/api",
+        "after": "curl --cacert /etc/ssl/internal-ca.pem https://internal.example.com/api"
+      },
+      "pitfall": "Disabling verification \"only in dev\" and shipping it, because the flag is never removed."
+    },
+    "fr": {
+      "why": "TLS apporte le chiffrement plus la preuve de qui est en face. Avec la vérification coupée (-k, verify=False) tu gardes le chiffrement, mais vers n'importe qui qui répond, y compris un attaquant placé entre les deux (man in the middle). Quand une erreur de certificat apparaît, corrige la cause : faire confiance à la bonne CA, renouveler le certificat, corriger le nom d'hôte.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "curl -k https://internal.example.com/api",
+        "after": "curl --cacert /etc/ssl/internal-ca.pem https://internal.example.com/api"
+      },
+      "pitfall": "Désactiver la vérification \"seulement en dev\" et la livrer, parce que l'option n'est jamais retirée."
+    }
+  },
+  "supply-chain": {
+    "en": {
+      "why": "Each dependency is code written by someone else that runs with your rights, along with its own dependencies. Attackers publish look-alike names or hijack a maintainer account. Keep few dependencies, pin exact versions with their hashes, and skim what you add before installing it.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pip install somepackage",
+        "after": "# requirements.txt lines look like: name==1.2.3 --hash=sha256:<digest>\npip install --require-hashes -r requirements.txt"
+      },
+      "pitfall": "Pinning versions but not hashes: a tampered file served for that same version (compromised index or mirror, a wheel added later) installs without complaint."
+    },
+    "fr": {
+      "why": "Chaque dépendance est du code écrit par quelqu'un d'autre qui tourne avec tes droits, avec ses propres dépendances. Des attaquants publient des noms qui ressemblent ou prennent le compte d'un mainteneur. Garde peu de dépendances, épingle les versions exactes avec leurs hash, et survole ce que tu ajoutes avant de l'installer.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pip install somepackage",
+        "after": "# lignes de requirements.txt : name==1.2.3 --hash=sha256:<digest>\npip install --require-hashes -r requirements.txt"
+      },
+      "pitfall": "Épingler les versions mais pas les hash : un fichier modifié servi pour cette même version (index ou miroir compromis, wheel ajoutée après coup) s'installe sans un mot."
+    }
+  },
+  "token-scope-and-lifetime": {
+    "en": {
+      "why": "Tokens do leak: in logs, repositories, browser tools. What matters is the damage a leaked token can do, which is bounded by what it permits (scope) and for how long (lifetime). A narrow, short-lived token turns a breach into a small incident.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "claims = {\"sub\": user_id, \"scope\": \"*\"}",
+        "after": "claims = {\"sub\": user_id, \"scope\": \"read:reports\",\n          \"exp\": int(time.time()) + 900}   # 15 minutes"
+      },
+      "pitfall": "Issuing one long-lived, all-purpose token \"so nothing breaks\"; the first leak then equals a full compromise."
+    },
+    "fr": {
+      "why": "Les jetons fuitent : dans les logs, les dépôts, les outils du navigateur. Ce qui compte, c'est le dégât qu'un jeton fuité peut faire, borné par ce qu'il permet (portée) et pendant combien de temps (durée de vie). Un jeton étroit et de courte durée transforme une brèche en petit incident.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "claims = {\"sub\": user_id, \"scope\": \"*\"}",
+        "after": "claims = {\"sub\": user_id, \"scope\": \"read:reports\",\n          \"exp\": int(time.time()) + 900}   # 15 minutes"
+      },
+      "pitfall": "Émettre un seul jeton longue durée à tout faire \"pour que rien ne casse\" ; la première fuite équivaut alors à une compromission totale."
+    }
+  },
+  "minimization": {
+    "en": {
+      "why": "Data you never collected cannot leak, be subpoenaed or be misused. Minimization means keeping only what the feature needs and not copying personal data into logs, analytics or error reports. Where you must handle a field, mask it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "logger.info(\"login %s\", user.__dict__)",
+        "after": "logger.info(\"login user_id=%s\", user.id)"
+      },
+      "pitfall": "Masking at display time while the raw value is still stored and logged upstream; the real fix is not to collect it."
+    },
+    "fr": {
+      "why": "Une donnée jamais collectée ne peut ni fuiter, ni être réclamée, ni être détournée. Minimiser, c'est ne garder que ce dont la fonctionnalité a besoin et ne pas recopier de données personnelles dans les logs, l'analytics ou les rapports d'erreur. Quand tu dois manipuler un champ, masque-le.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "logger.info(\"login %s\", user.__dict__)",
+        "after": "logger.info(\"login user_id=%s\", user.id)"
+      },
+      "pitfall": "Masquer à l'affichage alors que la valeur brute reste stockée et loguée en amont ; le vrai remède est de ne pas la collecter."
+    }
+  },
+  "input-bomb-zip-redos": {
+    "en": {
+      "why": "Some inputs are tiny but expensive to process: a zip of a few kilobytes that expands to gigabytes, deeply nested JSON, a regular expression that backtracks for minutes (ReDoS). They exhaust memory, disk or CPU and take the service down. Set limits on size, depth, count and time before doing the work.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with zipfile.ZipFile(path) as z:\n    z.extractall(dest)",
+        "after": "MAX_BYTES, MAX_FILES = 50 * 1024 * 1024, 1000\nwith zipfile.ZipFile(path) as z:\n    infos = z.infolist()\n    if len(infos) > MAX_FILES or sum(i.file_size for i in infos) > MAX_BYTES:\n        raise ValueError(\"archive too large\")\n    z.extractall(dest)"
+      },
+      "pitfall": "Trusting the compressed size or the file name: what counts is the uncompressed size and the cost of processing, so cap those."
+    },
+    "fr": {
+      "why": "Certaines entrées sont minuscules mais coûteuses à traiter : un zip de quelques kilo-octets qui se décompresse en gigaoctets, un JSON très imbriqué, une expression régulière qui fait du backtracking pendant des minutes (ReDoS). Elles épuisent mémoire, disque ou CPU et font tomber le service. Pose des limites de taille, profondeur, nombre et durée avant de faire le travail.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with zipfile.ZipFile(path) as z:\n    z.extractall(dest)",
+        "after": "MAX_BYTES, MAX_FILES = 50 * 1024 * 1024, 1000\nwith zipfile.ZipFile(path) as z:\n    infos = z.infolist()\n    if len(infos) > MAX_FILES or sum(i.file_size for i in infos) > MAX_BYTES:\n        raise ValueError(\"archive trop grosse\")\n    z.extractall(dest)"
+      },
+      "pitfall": "Se fier à la taille compressée ou au nom du fichier : ce qui compte, c'est la taille décompressée et le coût du traitement, donc plafonne-les."
+    }
+  },
+  "sandbox": {
+    "en": {
+      "why": "When you must run code you do not trust (a downloaded script, a user's plugin, an agent's output), do not run it where your secrets and network are. A sandbox is a separate place: a dedicated user, a container or a VM, with no network and none of your credentials. If it misbehaves, it only damages itself.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python untrusted.py",
+        "after": "docker run --rm --network none --read-only --cap-drop ALL \\\n  --user 65534 -v \"$PWD/job\":/job:ro python:3.12-slim python /job/untrusted.py"
+      },
+      "pitfall": "Mounting the Docker socket or your home directory into the \"sandbox\", which hands the unknown code the whole host."
+    },
+    "fr": {
+      "why": "Quand tu dois exécuter du code auquel tu ne fais pas confiance (script téléchargé, plugin d'un utilisateur, sortie d'un agent), ne le lance pas là où sont tes secrets et ton réseau. Un bac à sable est un endroit séparé : utilisateur dédié, conteneur ou VM, sans réseau et sans tes identifiants. S'il déraille, il n'abîme que lui-même.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python untrusted.py",
+        "after": "docker run --rm --network none --read-only --cap-drop ALL \\\n  --user 65534 -v \"$PWD/job\":/job:ro python:3.12-slim python /job/untrusted.py"
+      },
+      "pitfall": "Monter le socket Docker ou ton dossier personnel dans le \"bac à sable\" : c'est donner toute la machine au code inconnu."
+    }
+  },
+  "file-permissions": {
+    "en": {
+      "why": "On Unix every file says who may read and write it. With the usual default (umask 022), a new file is readable by every user on the machine, which is wrong for keys, tokens and state files. Create them private (umask 077) and keep them at mode 600.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "printf '%s' \"$KEY\" > key.pem",
+        "after": "(umask 077; printf '%s' \"$KEY\" > key.pem)\nchmod 600 key.pem\nls -l key.pem    # -rw-------"
+      },
+      "pitfall": "Creating the file with default permissions and chmod-ing afterwards: for that moment anyone could read it, so set umask before creating."
+    },
+    "fr": {
+      "why": "Sous Unix, chaque fichier dit qui peut le lire et l'écrire. Avec le défaut habituel (umask 022), un nouveau fichier est lisible par tous les utilisateurs de la machine, ce qui est faux pour des clés, jetons et fichiers d'état. Crée-les privés (umask 077) et garde-les en mode 600.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "printf '%s' \"$KEY\" > key.pem",
+        "after": "(umask 077; printf '%s' \"$KEY\" > key.pem)\nchmod 600 key.pem\nls -l key.pem    # -rw-------"
+      },
+      "pitfall": "Créer le fichier avec les permissions par défaut puis faire chmod : pendant ce court moment n'importe qui peut le lire, donc règle umask avant de créer."
+    }
+  },
+  "cors": {
+    "en": {
+      "why": "Browsers stop a page on one site from reading responses of another site's API unless that API says it is fine, through CORS headers. If you allow any origin together with cookies, any website a user visits can read their data from your API. List the exact origins you trust.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "resp.headers[\"Access-Control-Allow-Origin\"] = request.headers[\"Origin\"]\nresp.headers[\"Access-Control-Allow-Credentials\"] = \"true\"",
+        "after": "ALLOWED = {\"https://app.example.com\"}\norigin = request.headers.get(\"Origin\")\nif origin in ALLOWED:\n    resp.headers[\"Access-Control-Allow-Origin\"] = origin\n    resp.headers[\"Access-Control-Allow-Credentials\"] = \"true\"\n    resp.headers[\"Vary\"] = \"Origin\""
+      },
+      "pitfall": "Thinking CORS protects the server: it only tells browsers what to share, curl ignores it, so you still need real authentication on the API."
+    },
+    "fr": {
+      "why": "Les navigateurs empêchent une page d'un site de lire les réponses de l'API d'un autre site, sauf si cette API l'autorise par des en-têtes CORS. Si tu autorises n'importe quelle origine avec des cookies, tout site que l'utilisateur visite peut lire ses données via ton API. Liste les origines exactes de confiance.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "resp.headers[\"Access-Control-Allow-Origin\"] = request.headers[\"Origin\"]\nresp.headers[\"Access-Control-Allow-Credentials\"] = \"true\"",
+        "after": "ALLOWED = {\"https://app.example.com\"}\norigin = request.headers.get(\"Origin\")\nif origin in ALLOWED:\n    resp.headers[\"Access-Control-Allow-Origin\"] = origin\n    resp.headers[\"Access-Control-Allow-Credentials\"] = \"true\"\n    resp.headers[\"Vary\"] = \"Origin\""
+      },
+      "pitfall": "Croire que CORS protège le serveur : il dit seulement aux navigateurs quoi partager, curl l'ignore, donc il faut quand même une vraie authentification sur l'API."
+    }
+  },
+  "session-cookie": {
+    "en": {
+      "why": "The session cookie is the key to a logged-in account, so protect it with its flags. HttpOnly hides it from page scripts (limits XSS theft), Secure sends it only over HTTPS, SameSite stops it riding along on cross-site requests. Give it a limited lifetime.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "Set-Cookie: sid=abc123",
+        "after": "Set-Cookie: sid=abc123; HttpOnly; Secure; SameSite=Lax; Max-Age=3600; Path=/"
+      },
+      "pitfall": "Keeping the same session identifier across login, which allows session fixation; issue a new one when the user authenticates."
+    },
+    "fr": {
+      "why": "Le cookie de session est la clé d'un compte connecté, donc protège-le avec ses attributs. HttpOnly le cache aux scripts de la page (limite le vol par XSS), Secure ne l'envoie qu'en HTTPS, SameSite l'empêche de partir avec des requêtes venues d'un autre site. Donne-lui une durée de vie limitée.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "Set-Cookie: sid=abc123",
+        "after": "Set-Cookie: sid=abc123; HttpOnly; Secure; SameSite=Lax; Max-Age=3600; Path=/"
+      },
+      "pitfall": "Garder le même identifiant de session avant et après la connexion, ce qui permet la fixation de session ; en émettre un nouveau à l'authentification."
+    }
+  },
+  "no-homemade-crypto": {
+    "en": {
+      "why": "Cryptography fails in subtle ways that look fine in testing: a homemade scheme can be broken by people who study this full time. Established libraries have been attacked for years and fixed. Use a recognized library and its highest-level API, which picks modes, nonces and authentication for you.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def encrypt(data, key):\n    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))",
+        "after": "from cryptography.fernet import Fernet\nkey = Fernet.generate_key()\nf = Fernet(key)\ntoken = f.encrypt(data)\ndata = f.decrypt(token)"
+      },
+      "pitfall": "Using a good library but at a low level (raw AES with no authentication, a reused nonce) and calling it safe; take the high-level API."
+    },
+    "fr": {
+      "why": "La crypto échoue de façon subtile, sans que ça se voie en test : un schéma maison peut être cassé par des gens qui n'étudient que ça. Les bibliothèques établies ont été attaquées pendant des années et corrigées. Utilise une bibliothèque reconnue et son API de plus haut niveau, qui choisit pour toi modes, nonces et authentification.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def encrypt(data, key):\n    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))",
+        "after": "from cryptography.fernet import Fernet\nkey = Fernet.generate_key()\nf = Fernet(key)\ntoken = f.encrypt(data)\ndata = f.decrypt(token)"
+      },
+      "pitfall": "Utiliser une bonne bibliothèque mais en bas niveau (AES brut sans authentification, nonce réutilisé) et la déclarer sûre ; prends l'API de haut niveau."
+    }
+  },
+  "patches-cve": {
+    "en": {
+      "why": "A CVE is a publicly listed vulnerability, and attackers scan for the known ones in popular libraries. Running a vulnerable version is like leaving a documented door open. Audit your dependencies regularly and update the affected package.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# dependencies installed once, never checked again",
+        "after": "npm audit\npip-audit -r requirements.txt\npip install --upgrade somepackage   # then run the tests"
+      },
+      "pitfall": "Running a blanket \"update everything\" that breaks the app, then dropping updates altogether; bump the vulnerable package alone and run the tests."
+    },
+    "fr": {
+      "why": "Une CVE est une vulnérabilité répertoriée publiquement, et les attaquants cherchent celles qui sont connues dans les bibliothèques populaires. Faire tourner une version vulnérable, c'est laisser ouverte une porte documentée. Audite régulièrement tes dépendances et mets à jour le paquet concerné.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# dépendances installées une fois, jamais revérifiées",
+        "after": "npm audit\npip-audit -r requirements.txt\npip install --upgrade somepackage   # puis lancer les tests"
+      },
+      "pitfall": "Lancer un \"tout mettre à jour\" général qui casse l'application, puis abandonner les mises à jour ; monte le seul paquet vulnérable et lance les tests."
+    }
+  },
+  "uniform-error": {
+    "en": {
+      "why": "Different error messages tell an attacker which emails have an account, which they can then target with guessing or phishing. Return the same message and take the same time whether the user is unknown or the password is wrong. The same goes for password reset and signup.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "user = find(email)\nif not user:\n    return error(\"no such account\")\nif not check(user.hash, password):\n    return error(\"wrong password\")",
+        "after": "user = find(email)\nok = check(user.hash if user else DUMMY_HASH, password)  # always hash\nif not user or not ok:\n    return error(\"invalid credentials\")"
+      },
+      "pitfall": "Using the same message but a different duration (hashing only when the user exists), or letting the reset page reveal the account."
+    },
+    "fr": {
+      "why": "Des messages d'erreur différents disent à un attaquant quels emails ont un compte, qu'il peut ensuite viser par devinette ou hameçonnage. Renvoie le même message et mets le même temps, que l'utilisateur soit inconnu ou le mot de passe faux. Pareil pour la réinitialisation et l'inscription.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "user = find(email)\nif not user:\n    return error(\"compte inconnu\")\nif not check(user.hash, password):\n    return error(\"mauvais mot de passe\")",
+        "after": "user = find(email)\nok = check(user.hash if user else DUMMY_HASH, password)  # toujours hacher\nif not user or not ok:\n    return error(\"identifiants invalides\")"
+      },
+      "pitfall": "Mettre le même message mais une durée différente (hacher seulement si l'utilisateur existe), ou laisser la page de réinitialisation révéler le compte."
+    }
+  },
+  "confused-deputy": {
+    "en": {
+      "why": "A confused deputy is a trusted program that uses its own broad rights to do something a less privileged caller asked for. The caller could not have done it alone, but the deputy does not check. The rule is simple: authorize using the requester's rights, not the tool's. Agents and bots with a powerful token are the classic case.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def export(requester, doc_id):\n    return docs.get(doc_id)    # service account reads everything",
+        "after": "def export(requester, doc_id):\n    doc = docs.get(doc_id)\n    if not can_read(requester, doc):\n        raise PermissionError(\"requester may not read this\")\n    return doc"
+      },
+      "pitfall": "Assuming the request is fine because it came through your trusted service; the service's rights say nothing about the person asking."
+    },
+    "fr": {
+      "why": "Un adjoint confus est un programme de confiance qui utilise ses propres droits étendus pour faire ce qu'un appelant moins privilégié a demandé. L'appelant n'aurait pas pu le faire seul, mais l'adjoint ne vérifie pas. La règle : autoriser selon les droits du demandeur, pas ceux de l'outil. Les agents et bots avec un jeton puissant en sont le cas classique.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def export(requester, doc_id):\n    return docs.get(doc_id)    # le compte de service lit tout",
+        "after": "def export(requester, doc_id):\n    doc = docs.get(doc_id)\n    if not can_read(requester, doc):\n        raise PermissionError(\"le demandeur ne peut pas lire ceci\")\n    return doc"
+      },
+      "pitfall": "Supposer que la requête est bonne parce qu'elle est passée par ton service de confiance ; les droits du service ne disent rien de la personne qui demande."
+    }
+  },
+  "jwt": {
+    "en": {
+      "why": "A JWT is only a signed claim, and it is trustworthy only if you verify everything: the signature, the algorithm you expect, the expiry and the audience (who the token is meant for). Decoding without checking just reads attacker-controlled JSON. Let a maintained library verify it and tell it what you require.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "claims = jwt.decode(token, options={\"verify_signature\": False})",
+        "after": "claims = jwt.decode(\n    token, PUBLIC_KEY,\n    algorithms=[\"RS256\"],             # enforced, not read from the token\n    audience=\"my-api\",\n    options={\"require\": [\"exp\", \"aud\"]},\n)"
+      },
+      "pitfall": "Letting the token header choose the algorithm (including \"none\"), instead of fixing the accepted algorithms in your code."
+    },
+    "fr": {
+      "why": "Un JWT n'est qu'une affirmation signée, et on ne peut s'y fier que si on vérifie tout : la signature, l'algorithme attendu, l'expiration et l'audience (à qui le jeton est destiné). Décoder sans vérifier lit juste du JSON contrôlé par l'attaquant. Laisse une bibliothèque maintenue le vérifier et dis-lui ce que tu exiges.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "claims = jwt.decode(token, options={\"verify_signature\": False})",
+        "after": "claims = jwt.decode(\n    token, PUBLIC_KEY,\n    algorithms=[\"RS256\"],             # imposé, pas lu dans le jeton\n    audience=\"my-api\",\n    options={\"require\": [\"exp\", \"aud\"]},\n)"
+      },
+      "pitfall": "Laisser l'en-tête du jeton choisir l'algorithme (y compris \"none\"), au lieu de fixer dans ton code les algorithmes acceptés."
+    }
+  },
+  "measured-exposure": {
+    "en": {
+      "why": "Hardening has a cost, and effort spent on something nobody can reach is effort not spent on what they can. Before locking down or raising an alert, measure what is truly exposed: which ports listen, and which answer from outside. Protect according to that evidence, not the config you assume.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# assume redis is open to the internet, spend a day on TLS and ACLs",
+        "after": "ss -tlnp                            # on the server: bound to 127.0.0.1 or 0.0.0.0?\nnc -vz -w 3 SERVER_PUBLIC_IP 6379   # from another network: reachable?"
+      },
+      "pitfall": "Judging from the config file or a scanner report instead of testing from where an attacker stands, another machine on another network."
+    },
+    "fr": {
+      "why": "Durcir a un coût, et l'effort mis sur ce que personne n'atteint n'est pas mis sur ce qu'on atteint. Avant de verrouiller ou de lever une alerte, mesure ce qui est vraiment exposé : quels ports écoutent, et lesquels répondent de l'extérieur. Protège selon cette preuve, pas selon la config que tu supposes.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# on suppose redis ouvert sur internet, une journée sur TLS et ACL",
+        "after": "ss -tlnp                            # sur le serveur : lié à 127.0.0.1 ou 0.0.0.0 ?\nnc -vz -w 3 IP_PUBLIQUE_SERVEUR 6379   # depuis un autre réseau : joignable ?"
+      },
+      "pitfall": "Juger d'après le fichier de config ou un rapport de scanner au lieu de tester depuis la position d'un attaquant, une autre machine sur un autre réseau."
+    }
+  },
+  "targeted-secret-read": {
+    "en": {
+      "why": "Printing a whole secrets file puts every key in the terminal scrollback, the logs and, with an agent, in the model's context. Read only the one key you need, use it without echoing it, and verify by a property such as its length or the first few characters of a hash. What was shown once is hard to take back.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Read the .env file and tell me if it is correct.",
+        "after": "Check that .env has an API_KEY line. Report only yes or no and the length\nof the value. Never print the value or the other lines."
+      },
+      "pitfall": "Echoing the value \"to check it is right\": it is now in scrollback and logs; verify by length or a hash prefix instead."
+    },
+    "fr": {
+      "why": "Afficher un fichier de secrets en entier met chaque clé dans l'historique du terminal, les logs et, avec un agent, dans le contexte du modèle. Lis seulement la clé dont tu as besoin, utilise-la sans l'afficher, et vérifie par une propriété comme sa longueur ou le début d'un hash. Ce qui a été montré une fois ne se reprend pas.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Lis le fichier .env et dis-moi s'il est correct.",
+        "after": "Vérifie que .env a une ligne API_KEY. Donne seulement oui ou non et la longueur\nde la valeur. N'affiche jamais la valeur ni les autres lignes."
+      },
+      "pitfall": "Afficher la valeur \"pour vérifier qu'elle est bonne\" : elle est maintenant dans l'historique et les logs ; vérifie plutôt par la longueur ou un préfixe de hash."
+    }
+  }
+}

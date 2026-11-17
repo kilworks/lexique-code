@@ -1,0 +1,178 @@
+{
+  "transaction": {
+    "en": {
+      "why": "A transfer, an order or an import is rarely one write but several. If the process dies between the second and the third, you are left with half a change that nobody can explain. A transaction makes the group succeed or fail as a whole.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "db.execute(\"UPDATE accounts SET balance = balance - 50 WHERE id = 1\")\ndb.commit()\n# crash here: money left account 1, never reached account 2\ndb.execute(\"UPDATE accounts SET balance = balance + 50 WHERE id = 2\")\ndb.commit()",
+        "after": "with db:  # sqlite3: commit on success, rollback on exception\n    db.execute(\"UPDATE accounts SET balance = balance - 50 WHERE id = 1\")\n    db.execute(\"UPDATE accounts SET balance = balance + 50 WHERE id = 2\")"
+      },
+      "pitfall": "Committing in the middle of the sequence, or catching the exception inside the block, which silently turns the rollback into a partial write."
+    },
+    "fr": {
+      "why": "Un virement, une commande ou un import n'est presque jamais une seule écriture mais plusieurs. Si le processus meurt entre la deuxième et la troisième, il reste la moitié d'un changement que personne ne sait expliquer. Une transaction fait réussir ou échouer le groupe d'un bloc.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "db.execute(\"UPDATE accounts SET balance = balance - 50 WHERE id = 1\")\ndb.commit()\n# crash ici : l'argent a quitté le compte 1, jamais arrivé au compte 2\ndb.execute(\"UPDATE accounts SET balance = balance + 50 WHERE id = 2\")\ndb.commit()",
+        "after": "with db:  # sqlite3 : commit si tout passe, rollback sur exception\n    db.execute(\"UPDATE accounts SET balance = balance - 50 WHERE id = 1\")\n    db.execute(\"UPDATE accounts SET balance = balance + 50 WHERE id = 2\")"
+      },
+      "pitfall": "Commiter au milieu de la séquence, ou attraper l'exception dans le bloc, ce qui transforme sans bruit l'annulation en écriture partielle."
+    }
+  },
+  "constraint": {
+    "en": {
+      "why": "A check in the application only protects the paths that remember to call it: the second service, the import script and the manual fix all skip it. A constraint lives in the database, so every writer is held to it, and it is also race-free.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- app code: SELECT id FROM users WHERE email = ?\n-- then INSERT if nothing came back (two requests can both pass)\nCREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);",
+        "after": "CREATE TABLE users (\n  id    INTEGER PRIMARY KEY,\n  email TEXT NOT NULL UNIQUE\n);\nCREATE TABLE orders (\n  id      INTEGER PRIMARY KEY,\n  user_id INTEGER NOT NULL REFERENCES users(id)  -- SQLite: needs PRAGMA foreign_keys = ON\n);"
+      },
+      "pitfall": "Adding the constraint but still pre-checking in the code only for the error message, then forgetting to handle the constraint violation the database will raise anyway."
+    },
+    "fr": {
+      "why": "Une vérification dans l'application ne protège que les chemins qui pensent à l'appeler : le deuxième service, le script d'import et la correction manuelle la sautent. Une contrainte vit dans la base, donc tous les écrivains y sont soumis, et deux requêtes simultanées ne peuvent pas la contourner.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- code applicatif : SELECT id FROM users WHERE email = ?\n-- puis INSERT si rien ne revient (deux requêtes peuvent passer en même temps)\nCREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);",
+        "after": "CREATE TABLE users (\n  id    INTEGER PRIMARY KEY,\n  email TEXT NOT NULL UNIQUE\n);\nCREATE TABLE orders (\n  id      INTEGER PRIMARY KEY,\n  user_id INTEGER NOT NULL REFERENCES users(id)  -- SQLite : exige PRAGMA foreign_keys = ON\n);"
+      },
+      "pitfall": "Ajouter la contrainte mais garder la pré-vérification dans le code pour le seul message d'erreur, puis oublier de gérer la violation de contrainte que la base lèvera de toute façon."
+    }
+  },
+  "upsert": {
+    "en": {
+      "why": "Read-then-write has a gap: between your SELECT and your INSERT or UPDATE, another request can slip in and you get a duplicate or a lost update. An upsert hands the decision to the database, which does it atomically in a single statement. It needs a unique key to detect the conflict.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "SELECT n FROM counters WHERE name = 'hits';\n-- row missing? INSERT INTO counters (name, n) VALUES ('hits', 1);\n-- row there?   UPDATE counters SET n = n + 1 WHERE name = 'hits';",
+        "after": "-- name is PRIMARY KEY or UNIQUE (PostgreSQL, SQLite)\nINSERT INTO counters (name, n) VALUES ('hits', 1)\nON CONFLICT (name) DO UPDATE SET n = counters.n + 1;"
+      },
+      "pitfall": "Writing ON CONFLICT on a column with no unique index, which errors out, or overwriting every column when only one should change."
+    },
+    "fr": {
+      "why": "Lire puis écrire laisse un trou : entre ton SELECT et ton INSERT ou UPDATE, une autre requête peut s'intercaler et tu obtiens un doublon ou une mise à jour perdue. L'upsert confie la décision à la base, qui la prend de façon atomique en une seule instruction. Il faut une clé unique pour détecter le conflit.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "SELECT n FROM counters WHERE name = 'hits';\n-- ligne absente ? INSERT INTO counters (name, n) VALUES ('hits', 1);\n-- ligne présente ? UPDATE counters SET n = n + 1 WHERE name = 'hits';",
+        "after": "-- name est PRIMARY KEY ou UNIQUE (PostgreSQL, SQLite)\nINSERT INTO counters (name, n) VALUES ('hits', 1)\nON CONFLICT (name) DO UPDATE SET n = counters.n + 1;"
+      },
+      "pitfall": "Écrire ON CONFLICT sur une colonne sans index unique, ce qui échoue, ou écraser toutes les colonnes alors qu'une seule doit changer."
+    }
+  },
+  "isolation-level": {
+    "en": {
+      "why": "Concurrent transactions can see each other's work in different ways depending on the isolation level: only committed data, a frozen snapshot, or full serial order. The default is usually not enough for a read-modify-write, where two transactions read the same value and both write back. Know which level your database gives you, and lock the row when you read it to change it.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "BEGIN;\nSELECT stock FROM items WHERE id = 7;      -- 1\n-- another transaction reads 1 as well\nUPDATE items SET stock = 0 WHERE id = 7;   -- both sell the last unit\nCOMMIT;",
+        "after": "BEGIN;\nSELECT stock FROM items WHERE id = 7 FOR UPDATE;  -- row locked until COMMIT\nUPDATE items SET stock = stock - 1 WHERE id = 7 AND stock > 0;\nCOMMIT;"
+      },
+      "pitfall": "Assuming the default level makes read-then-update safe, when in PostgreSQL's default (READ COMMITTED) two transactions can read the same value and both overwrite it."
+    },
+    "fr": {
+      "why": "Des transactions concurrentes se voient plus ou moins selon le niveau d'isolation : uniquement les données validées, un instantané figé, ou comme si elles passaient l'une après l'autre. Le niveau par défaut ne suffit souvent pas pour un lire-modifier-écrire, où deux transactions lisent la même valeur et réécrivent chacune. Sache quel niveau ta base te donne, et verrouille la ligne quand tu la lis pour la modifier.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "BEGIN;\nSELECT stock FROM items WHERE id = 7;      -- 1\n-- une autre transaction lit 1 aussi\nUPDATE items SET stock = 0 WHERE id = 7;   -- les deux vendent la dernière unité\nCOMMIT;",
+        "after": "BEGIN;\nSELECT stock FROM items WHERE id = 7 FOR UPDATE;  -- ligne verrouillée jusqu'au COMMIT\nUPDATE items SET stock = stock - 1 WHERE id = 7 AND stock > 0;\nCOMMIT;"
+      },
+      "pitfall": "Croire que le niveau par défaut rend lire puis modifier sûr, alors que dans le défaut de PostgreSQL (READ COMMITTED) deux transactions peuvent lire la même valeur et l'écraser chacune."
+    }
+  },
+  "query-plan": {
+    "en": {
+      "why": "A slow query is slow for a reason the database can tell you: a full table scan, a bad join order, an index it ignores. Guessing an index and hoping is how you end up with five useless ones. EXPLAIN shows the plan the database actually chose, so you fix what is really there.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- slow, so add an index and see\nCREATE INDEX idx_orders_status ON orders (status);",
+        "after": "EXPLAIN ANALYZE\nSELECT * FROM orders WHERE customer_id = 42 AND status = 'open';\n-- read it: Seq Scan on orders? rows removed by filter? actual time?\n-- only then decide which index, if any"
+      },
+      "pitfall": "Running EXPLAIN on an empty dev table, where the planner picks a sequential scan because it is cheaper there, and drawing the wrong conclusion about production."
+    },
+    "fr": {
+      "why": "Une requête lente l'est pour une raison que la base peut te dire : un scan complet de la table, un mauvais ordre de jointures, un index ignoré. Deviner un index et croiser les doigts, c'est comme ça qu'on en accumule cinq inutiles. EXPLAIN montre le plan que la base a vraiment choisi, donc tu corriges le vrai problème.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- lent, donc j'ajoute un index et je regarde\nCREATE INDEX idx_orders_status ON orders (status);",
+        "after": "EXPLAIN ANALYZE\nSELECT * FROM orders WHERE customer_id = 42 AND status = 'open';\n-- à lire : Seq Scan sur orders ? lignes retirées par le filtre ? temps réel ?\n-- ensuite seulement, choisir quel index, s'il en faut un"
+      },
+      "pitfall": "Lancer EXPLAIN sur une table de dev quasi vide, où le planificateur choisit un scan séquentiel parce qu'il y est moins cher, et en tirer une mauvaise conclusion pour la production."
+    }
+  },
+  "sqlite-in-wal": {
+    "en": {
+      "why": "In SQLite's default rollback-journal mode a writer blocks readers, so a busy app throws \"database is locked\". WAL (write-ahead log) lets readers keep reading while one writer appends, which fits most small services. There is still only one writer at a time, so you set a wait instead of failing at once.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import sqlite3\ndb = sqlite3.connect(\"app.db\")\n# rollback journal: while one connection writes, readers wait, then fail\n# with \"database is locked\" once the 5 s default timeout runs out",
+        "after": "import sqlite3\ndb = sqlite3.connect(\"app.db\")\ndb.execute(\"PRAGMA journal_mode=WAL\")    # persists in the file\ndb.execute(\"PRAGMA busy_timeout=15000\")  # per connection: wait up to 15 s for the write lock"
+      },
+      "pitfall": "Thinking WAL allows several writers: it does not, and it needs a local disk (not a network share) because every connection coordinates through shared memory in the -shm file."
+    },
+    "fr": {
+      "why": "Dans le mode journal par défaut de SQLite, un écrivain bloque les lecteurs, donc une appli chargée lève \"database is locked\". Le WAL (write-ahead log) laisse les lecteurs lire pendant qu'un seul écrivain ajoute, ce qui convient à la plupart des petits services. Il n'y a toujours qu'un écrivain à la fois : on règle une attente au lieu d'échouer tout de suite.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import sqlite3\ndb = sqlite3.connect(\"app.db\")\n# journal rollback : pendant qu'une connexion écrit, les lecteurs attendent puis\n# échouent avec \"database is locked\" au bout des 5 s d'attente par défaut",
+        "after": "import sqlite3\ndb = sqlite3.connect(\"app.db\")\ndb.execute(\"PRAGMA journal_mode=WAL\")    # persiste dans le fichier\ndb.execute(\"PRAGMA busy_timeout=15000\")  # par connexion : attend jusqu'à 15 s le verrou d'écriture"
+      },
+      "pitfall": "Croire que le WAL autorise plusieurs écrivains : non, et il exige un disque local (pas un partage réseau) car toutes les connexions se coordonnent par mémoire partagée via le fichier -shm."
+    }
+  },
+  "versioned-migration": {
+    "en": {
+      "why": "Editing the CREATE TABLE and hoping every environment catches up is how dev, staging and prod end up with three different schemas. Numbered migration scripts, each applied once in order and recorded in a table, make the schema reproducible: any database can be brought to the current version, and you can see where it stands.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- schema.sql edited by hand, rerun \"somewhere\"\nCREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);",
+        "after": "-- migrations/0002_add_email.sql (the runner skips versions already recorded)\nALTER TABLE users ADD COLUMN email TEXT;\nINSERT INTO schema_migrations (version) VALUES (2);"
+      },
+      "pitfall": "Editing a migration that has already been applied somewhere: write a new one instead, or the environments silently diverge."
+    },
+    "fr": {
+      "why": "Modifier le CREATE TABLE en espérant que tous les environnements suivent, c'est comme ça que dev, recette et prod finissent avec trois schémas différents. Des scripts de migration numérotés, chacun joué une fois dans l'ordre et noté dans une table, rendent le schéma reproductible : toute base peut être amenée à la version courante, et on voit où elle en est.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "-- schema.sql modifié à la main, rejoué \"quelque part\"\nCREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);",
+        "after": "-- migrations/0002_add_email.sql (le runner saute les versions déjà notées)\nALTER TABLE users ADD COLUMN email TEXT;\nINSERT INTO schema_migrations (version) VALUES (2);"
+      },
+      "pitfall": "Modifier une migration déjà appliquée quelque part : écrire plutôt une nouvelle migration, sinon les environnements divergent sans bruit."
+    }
+  },
+  "hot-backup": {
+    "en": {
+      "why": "A database file that is being written is not a consistent snapshot: copying it with cp can catch it mid-write, and you get a backup that looks fine and fails to open on the day you need it. The database's own tool takes a consistent copy while it keeps serving.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp /data/app.db /backups/app.db   # file open, copy may be torn",
+        "after": "sqlite3 /data/app.db \".backup '/backups/app.db'\"\n# PostgreSQL: pg_dump -Fc mydb > /backups/mydb.dump"
+      },
+      "pitfall": "Never test-restoring the backup: a backup is only proven when you have opened it and counted rows on another machine."
+    },
+    "fr": {
+      "why": "Un fichier de base en cours d'écriture n'est pas un instantané cohérent : un cp peut le prendre en pleine écriture, et tu obtiens une sauvegarde qui a l'air bonne et ne s'ouvre pas le jour où tu en as besoin. L'outil de la base fait une copie cohérente pendant qu'elle continue de servir.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp /data/app.db /backups/app.db   # fichier ouvert, la copie peut être corrompue",
+        "after": "sqlite3 /data/app.db \".backup '/backups/app.db'\"\n# PostgreSQL : pg_dump -Fc mydb > /backups/mydb.dump"
+      },
+      "pitfall": "Ne jamais tester la restauration : une sauvegarde n'est prouvée qu'une fois ouverte et ses lignes comptées sur une autre machine."
+    }
+  }
+}

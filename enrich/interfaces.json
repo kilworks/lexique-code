@@ -1,0 +1,288 @@
+{
+  "machine-output": {
+    "en": {
+      "why": "A script that parses human-readable output breaks the day someone rewords a line or adds a column. A `--json` flag next to the readable output gives programs a stable contract, and fields that are never renamed keep every caller alive.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# readable only: callers must scrape the text\nprint(f\"Deployed {n} files in {secs:.1f}s\")",
+        "after": "if args.json:\n    print(json.dumps({\"files\": n, \"seconds\": round(secs, 1)}))\nelse:\n    print(f\"Deployed {n} files in {secs:.1f}s\")"
+      },
+      "pitfall": "Adding the flag but letting the JSON drift (renamed keys, extra log lines on stdout) is worse than no flag: send logs to stderr and treat field names as frozen."
+    },
+    "fr": {
+      "why": "Un script qui parse une sortie lisible casse le jour où quelqu'un reformule une ligne ou ajoute une colonne. Un flag `--json` à côté de la sortie lisible donne aux programmes un contrat stable, et des champs jamais renommés ne cassent aucun appelant.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# lisible seulement : les appelants doivent scraper le texte\nprint(f\"Deployed {n} files in {secs:.1f}s\")",
+        "after": "if args.json:\n    print(json.dumps({\"files\": n, \"seconds\": round(secs, 1)}))\nelse:\n    print(f\"Deployed {n} files in {secs:.1f}s\")"
+      },
+      "pitfall": "Ajouter le flag mais laisser le JSON dériver (clés renommées, logs en plus sur stdout) est pire que pas de flag : les logs vont sur stderr et les noms de champs sont figés."
+    }
+  },
+  "non-interactive": {
+    "en": {
+      "why": "A prompt that waits for a keypress hangs forever in CI, in cron or when another program calls your tool. A non-interactive tool never blocks: it takes an explicit `--yes`, and when there is no terminal and no `--yes` it fails fast with a clear message.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "answer = input(\"Delete everything? [y/N] \")\nif answer.lower() != \"y\":\n    sys.exit(1)",
+        "after": "if not args.yes:\n    if not sys.stdin.isatty():\n        sys.exit(\"refusing to delete without --yes (no terminal)\")\n    if input(\"Delete everything? [y/N] \").lower() != \"y\":\n        sys.exit(1)"
+      },
+      "pitfall": "Detecting the TTY but then defaulting to 'yes' when there is none: unattended mode must be stricter, not looser, for destructive actions."
+    },
+    "fr": {
+      "why": "Un prompt qui attend une touche reste bloqué à jamais en CI, dans cron ou quand un autre programme appelle ton outil. Un outil non interactif ne bloque jamais : il accepte un `--yes` explicite, et sans terminal ni `--yes` il échoue tout de suite avec un message clair.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "answer = input(\"Delete everything? [y/N] \")\nif answer.lower() != \"y\":\n    sys.exit(1)",
+        "after": "if not args.yes:\n    if not sys.stdin.isatty():\n        sys.exit(\"refus de supprimer sans --yes (pas de terminal)\")\n    if input(\"Delete everything? [y/N] \").lower() != \"y\":\n        sys.exit(1)"
+      },
+      "pitfall": "Détecter le TTY puis répondre « oui » par défaut quand il n'y en a pas : en mode non surveillé, une action destructive doit être plus stricte, pas plus permissive."
+    }
+  },
+  "versioned-api": {
+    "en": {
+      "why": "Clients you do not control (mobile apps, partner scripts) cannot all update the day you change a response. Putting a version in the URL or a header lets the old client keep its old contract while new clients get the new one.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# the field \"name\" silently becomes \"full_name\" for everyone\ncurl https://api.example.com/users/42",
+        "after": "# v1 keeps returning \"name\"\ncurl https://api.example.com/v1/users/42\n# the rename ships as v2 only\ncurl https://api.example.com/v2/users/42"
+      },
+      "pitfall": "Versioning but still making breaking changes inside v1 'just this once': a break is any change that can make an old client fail, such as a removed field, a renamed field or a changed type."
+    },
+    "fr": {
+      "why": "Les clients que tu ne contrôles pas (apps mobiles, scripts de partenaires) ne se mettent pas tous à jour le jour où tu changes une réponse. Une version dans l'URL ou dans un en-tête laisse l'ancien client garder son ancien contrat pendant que les nouveaux reçoivent le nouveau.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# le champ \"name\" devient \"full_name\" en silence pour tout le monde\ncurl https://api.example.com/users/42",
+        "after": "# la v1 continue de renvoyer \"name\"\ncurl https://api.example.com/v1/users/42\n# le renommage sort en v2 uniquement\ncurl https://api.example.com/v2/users/42"
+      },
+      "pitfall": "Versionner mais continuer à casser dans la v1 « juste cette fois » : est cassant tout changement qui peut faire échouer un ancien client : champ retiré, champ renommé ou type changé."
+    }
+  },
+  "http-verbs": {
+    "en": {
+      "why": "Browsers, caches, crawlers and retry libraries all assume that GET only reads and that PUT and DELETE can be repeated safely. If your API follows those meanings, a retry after a timeout is harmless; if it does not, a prefetch can delete data.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# a GET that changes state, and a POST used for everything\ncurl \"https://api.example.com/users/42?action=delete\"\ncurl -X POST https://api.example.com/users/42/update -d '{\"name\":\"Ada\"}'",
+        "after": "# create: each call makes a new user, so it is not safe to repeat blindly\ncurl -X POST https://api.example.com/users \\\n  -H \"Content-Type: application/json\" -d '{\"name\":\"Ada\"}'\n# replace the resource: repeating it gives the same result\ncurl -X PUT https://api.example.com/users/42 \\\n  -H \"Content-Type: application/json\" -d '{\"name\":\"Ada\"}'\n# delete it: repeating it leaves the same end state\ncurl -X DELETE https://api.example.com/users/42"
+      },
+      "pitfall": "A GET with a side effect (delete link, counter bump, 'unsubscribe' URL) gets triggered by link previews and crawlers long before a human clicks it."
+    },
+    "fr": {
+      "why": "Navigateurs, caches, crawlers et bibliothèques de retry supposent tous qu'un GET ne fait que lire et qu'on peut répéter un PUT ou un DELETE sans danger. Si ton API respecte ces sens, un retry après un timeout est inoffensif ; sinon, un préchargement peut effacer des données.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# un GET qui change l'état, et un POST utilisé pour tout\ncurl \"https://api.example.com/users/42?action=delete\"\ncurl -X POST https://api.example.com/users/42/update -d '{\"name\":\"Ada\"}'",
+        "after": "# créer : chaque appel crée un nouvel utilisateur, donc pas de répétition à l'aveugle\ncurl -X POST https://api.example.com/users \\\n  -H \"Content-Type: application/json\" -d '{\"name\":\"Ada\"}'\n# remplacer la ressource : le répéter donne le même résultat\ncurl -X PUT https://api.example.com/users/42 \\\n  -H \"Content-Type: application/json\" -d '{\"name\":\"Ada\"}'\n# la supprimer : le répéter laisse le même état final\ncurl -X DELETE https://api.example.com/users/42"
+      },
+      "pitfall": "Un GET avec un effet de bord (lien de suppression, compteur, URL de désinscription) est déclenché par les aperçus de liens et les crawlers bien avant qu'un humain clique."
+    }
+  },
+  "honest-status-codes": {
+    "en": {
+      "why": "Clients, proxies, monitoring and retry logic all read the status code first and the body second. A 200 that carries an error hides failures from dashboards and makes callers treat a broken call as a success.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "if (!user) {\n  return Response.json({ ok: false, error: \"user not found\" }, { status: 200 });\n}",
+        "after": "if (!user) {\n  return Response.json({ error: \"user not found\" }, { status: 404 });\n}"
+      },
+      "pitfall": "Using 400 or 500 for everything is only a half fix: 4xx means the caller must change something, 5xx means the server failed, and retry logic depends on that difference."
+    },
+    "fr": {
+      "why": "Clients, proxies, monitoring et logique de retry lisent d'abord le code d'état, ensuite le corps. Un 200 qui porte une erreur cache les pannes aux tableaux de bord et pousse les appelants à prendre un appel raté pour un succès.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "if (!user) {\n  return Response.json({ ok: false, error: \"utilisateur introuvable\" }, { status: 200 });\n}",
+        "after": "if (!user) {\n  return Response.json({ error: \"utilisateur introuvable\" }, { status: 404 });\n}"
+      },
+      "pitfall": "Mettre 400 ou 500 partout ne règle que la moitié : 4xx veut dire que l'appelant doit changer quelque chose, 5xx que le serveur a échoué, et la logique de retry dépend de cette différence."
+    }
+  },
+  "signed-webhook": {
+    "en": {
+      "why": "A webhook URL is public, so anyone can POST to it and claim to be the payment provider. The sender signs the body with a shared secret; you recompute the HMAC, check the timestamp is recent, and drop event ids you have already seen so a captured request cannot be replayed.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "@app.post(\"/hook\")\ndef hook():\n    process(request.json)   # trusts whoever calls\n    return \"\", 204",
+        "after": "def verify(body, ts, sig, secret, event_id, seen):\n    if abs(time.time() - int(ts)) > 300:\n        return False                      # too old or from the future\n    msg = ts.encode() + b\".\" + body\n    good = hmac.new(secret, msg, hashlib.sha256).hexdigest()\n    if not hmac.compare_digest(good, sig):\n        return False                      # forged or altered\n    if event_id in seen:\n        return False                      # replay\n    seen.add(event_id)\n    return True"
+      },
+      "pitfall": "Comparing signatures with `==` (timing leak) or hashing the parsed JSON instead of the raw bytes: the signature only matches the exact bytes that were sent."
+    },
+    "fr": {
+      "why": "L'URL d'un webhook est publique : n'importe qui peut y faire un POST en se faisant passer pour le prestataire de paiement. L'émetteur signe le corps avec un secret partagé ; tu recalcules le HMAC, tu vérifies que l'horodatage est récent, et tu écartes les ids d'événement déjà vus pour qu'une requête capturée ne puisse pas être rejouée.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "@app.post(\"/hook\")\ndef hook():\n    process(request.json)   # fait confiance à n'importe qui\n    return \"\", 204",
+        "after": "def verify(body, ts, sig, secret, event_id, seen):\n    if abs(time.time() - int(ts)) > 300:\n        return False                      # trop vieux ou dans le futur\n    msg = ts.encode() + b\".\" + body\n    good = hmac.new(secret, msg, hashlib.sha256).hexdigest()\n    if not hmac.compare_digest(good, sig):\n        return False                      # falsifié ou modifié\n    if event_id in seen:\n        return False                      # rejeu\n    seen.add(event_id)\n    return True"
+      },
+      "pitfall": "Comparer les signatures avec `==` (fuite par le temps de calcul) ou hasher le JSON déjà parsé au lieu des octets bruts : la signature ne correspond qu'aux octets exacts qui ont été envoyés."
+    }
+  },
+  "push-pull": {
+    "en": {
+      "why": "Push means the source calls you when something happens: instant, but the source must be able to reach you and you must be up. Pull means you ask on your own schedule: slightly slower, but it works behind a NAT and survives an outage on either side because you simply ask again and resume from a cursor.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# push: needs a public URL, so it cannot run on a laptop behind a NAT\n@app.post(\"/events\")\ndef on_event():\n    handle(request.json)\n    return \"\", 204",
+        "after": "# pull: we call out, and resume from the last id after any outage\ncursor = load_cursor()\nwhile True:\n    try:\n        r = requests.get(URL + \"/events\", params={\"after\": cursor}, timeout=10)\n        r.raise_for_status()\n        for ev in r.json():\n            handle(ev)\n            cursor = ev[\"id\"]\n            save_cursor(cursor)\n    except requests.RequestException:\n        pass                       # source down: try again next round\n    time.sleep(30)"
+      },
+      "pitfall": "Choosing pull without a cursor (or push without retries on the sender side): after an outage you either re-read everything or silently lose the events in the gap."
+    },
+    "fr": {
+      "why": "Push, c'est la source qui t'appelle quand quelque chose arrive : immédiat, mais elle doit pouvoir te joindre et tu dois être en ligne. Pull, c'est toi qui demandes à ton rythme : un peu plus lent, mais ça marche derrière un NAT et ça survit à une panne d'un côté comme de l'autre, car tu redemandes et reprends depuis un curseur.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# push : exige une URL publique, impossible sur un portable derrière un NAT\n@app.post(\"/events\")\ndef on_event():\n    handle(request.json)\n    return \"\", 204",
+        "after": "# pull : on appelle nous-mêmes, et on reprend au dernier id après une panne\ncursor = load_cursor()\nwhile True:\n    try:\n        r = requests.get(URL + \"/events\", params={\"after\": cursor}, timeout=10)\n        r.raise_for_status()\n        for ev in r.json():\n            handle(ev)\n            cursor = ev[\"id\"]\n            save_cursor(cursor)\n    except requests.RequestException:\n        pass                       # source en panne : on réessaie au tour suivant\n    time.sleep(30)"
+      },
+      "pitfall": "Choisir pull sans curseur (ou push sans retry côté émetteur) : après une panne, soit tu relis tout, soit tu perds en silence les événements du trou."
+    }
+  },
+  "stateless": {
+    "en": {
+      "why": "If a server keeps your session in its own memory, the second request must hit the same server, and a restart wipes everything. A stateless service treats each request as self-contained and keeps state in a database or cache with a name, so you can add, kill or replace instances freely.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cart = []                       # lives in this process only\n\n@app.post(\"/add\")\ndef add():\n    cart.append(request.json[\"item\"])\n    return \"\", 204",
+        "after": "@app.post(\"/carts/<cart_id>/items\")\ndef add(cart_id):\n    db.execute(\n        \"INSERT INTO cart_items (cart_id, item) VALUES (?, ?)\",\n        (cart_id, request.json[\"item\"]),\n    )\n    return \"\", 204"
+      },
+      "pitfall": "Calling a service stateless while a module-level dict, a local file or a sticky-session load balancer still holds hidden state: it only shows when you run two instances."
+    },
+    "fr": {
+      "why": "Si un serveur garde ta session dans sa propre mémoire, la deuxième requête doit retomber sur le même serveur, et un redémarrage efface tout. Un service sans état traite chaque requête comme autonome et garde l'état dans une base ou un cache nommé, donc on peut ajouter, tuer ou remplacer des instances librement.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cart = []                       # vit dans ce processus seulement\n\n@app.post(\"/add\")\ndef add():\n    cart.append(request.json[\"item\"])\n    return \"\", 204",
+        "after": "@app.post(\"/carts/<cart_id>/items\")\ndef add(cart_id):\n    db.execute(\n        \"INSERT INTO cart_items (cart_id, item) VALUES (?, ?)\",\n        (cart_id, request.json[\"item\"]),\n    )\n    return \"\", 204"
+      },
+      "pitfall": "Dire qu'un service est stateless alors qu'un dict global, un fichier local ou un load balancer à sessions collantes cache encore de l'état : ça ne se voit qu'au moment de lancer deux instances."
+    }
+  },
+  "built-in-help": {
+    "en": {
+      "why": "When `--help` is enough to use a tool, nobody has to open a wiki, and an agent can discover it on its own. Good help shows the usage line, one or two real examples, and what each exit code means.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "parser = argparse.ArgumentParser()\nparser.add_argument(\"path\")\nparser.add_argument(\"-f\", action=\"store_true\")",
+        "after": "parser = argparse.ArgumentParser(\n    prog=\"sync\",\n    description=\"Copy new files from PATH to the backup disk.\",\n    epilog=\"examples:\\n  sync ~/photos\\n  sync ~/photos --force\\n\\n\"\n           \"exit codes: 0 ok, 1 error, 2 bad usage\",\n    formatter_class=argparse.RawDescriptionHelpFormatter,\n)\nparser.add_argument(\"path\", help=\"folder to back up\")\nparser.add_argument(\"-f\", \"--force\", action=\"store_true\",\n                    help=\"overwrite files that differ\")"
+      },
+      "pitfall": "Writing help that lists the flags but never says what the tool does or how it fails: the examples and the exit codes are what people actually look for."
+    },
+    "fr": {
+      "why": "Quand `--help` suffit pour se servir d'un outil, personne n'a besoin d'ouvrir un wiki, et un agent peut le découvrir tout seul. Une bonne aide montre la ligne d'usage, un ou deux vrais exemples, et ce que signifie chaque code de sortie.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "parser = argparse.ArgumentParser()\nparser.add_argument(\"path\")\nparser.add_argument(\"-f\", action=\"store_true\")",
+        "after": "parser = argparse.ArgumentParser(\n    prog=\"sync\",\n    description=\"Copie les nouveaux fichiers de PATH vers le disque de sauvegarde.\",\n    epilog=\"exemples :\\n  sync ~/photos\\n  sync ~/photos --force\\n\\n\"\n           \"codes de sortie : 0 ok, 1 erreur, 2 mauvais usage\",\n    formatter_class=argparse.RawDescriptionHelpFormatter,\n)\nparser.add_argument(\"path\", help=\"dossier à sauvegarder\")\nparser.add_argument(\"-f\", \"--force\", action=\"store_true\",\n                    help=\"écraser les fichiers qui diffèrent\")"
+      },
+      "pitfall": "Écrire une aide qui liste les flags sans dire ce que fait l'outil ni comment il échoue : les exemples et les codes de sortie sont ce que les gens cherchent vraiment."
+    }
+  },
+  "announced-limits": {
+    "en": {
+      "why": "A client that does not know your ceiling will hit it by accident and then hammer you with retries. When the API states its limits in headers and answers `429` with `Retry-After`, clients can slow down on their own instead of retrying blindly.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if too_many_requests(user):\n    return \"slow down\", 500",
+        "after": "if too_many_requests(user):\n    return (\n        jsonify(error=\"rate_limited\"),\n        429,\n        {\"Retry-After\": \"30\", \"X-RateLimit-Remaining\": \"0\"},\n    )"
+      },
+      "pitfall": "Announcing a limit in the docs only, or sending `Retry-After` with a value that is not true: clients will obey the header exactly, so it must match what the server really enforces."
+    },
+    "fr": {
+      "why": "Un client qui ne connaît pas ton plafond va le heurter par accident, puis te marteler de retries. Quand l'API annonce ses limites dans les en-têtes et répond `429` avec `Retry-After`, les clients ralentissent d'eux-mêmes au lieu de réessayer à l'aveugle.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if too_many_requests(user):\n    return \"slow down\", 500",
+        "after": "if too_many_requests(user):\n    return (\n        jsonify(error=\"rate_limited\"),\n        429,\n        {\"Retry-After\": \"30\", \"X-RateLimit-Remaining\": \"0\"},\n    )"
+      },
+      "pitfall": "Annoncer la limite seulement dans la doc, ou envoyer un `Retry-After` qui n'est pas vrai : les clients obéissent à l'en-tête à la lettre, il doit donc correspondre à ce que le serveur applique réellement."
+    }
+  },
+  "error-contract": {
+    "en": {
+      "why": "If every endpoint reports errors differently (a string here, an HTML page there), each client needs special parsing code. A fixed error shape lets the client branch on a machine code, show the human message, and highlight the faulty field without guessing.",
+      "example": {
+        "kind": "code",
+        "lang": "json",
+        "before": "{ \"error\": \"Invalid\" }",
+        "after": "{\n  \"error\": {\n    \"code\": \"invalid_email\",\n    \"message\": \"This email address is not valid.\",\n    \"field\": \"email\"\n  }\n}"
+      },
+      "pitfall": "Making clients parse the human message: wording changes with translations and polish, so only the machine code is safe to branch on."
+    },
+    "fr": {
+      "why": "Si chaque endpoint rapporte les erreurs à sa façon (une chaîne ici, une page HTML là), chaque client a besoin de code de parsing spécifique. Une forme d'erreur fixe permet au client de brancher sur un code machine, d'afficher le message humain et de surligner le champ fautif sans deviner.",
+      "example": {
+        "kind": "code",
+        "lang": "json",
+        "before": "{ \"error\": \"Invalid\" }",
+        "after": "{\n  \"error\": {\n    \"code\": \"invalid_email\",\n    \"message\": \"Cette adresse e-mail n'est pas valide.\",\n    \"field\": \"email\"\n  }\n}"
+      },
+      "pitfall": "Faire parser le message humain par les clients : le texte change avec les traductions et les retouches, seul le code machine est sûr pour décider."
+    }
+  },
+  "long-running-task": {
+    "en": {
+      "why": "A request that takes minutes hits proxy and client timeouts, and when it dies you cannot tell if the work happened. Return a task id right away, let the client ask for the status, and keep the result somewhere it can fetch later.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# blocks for 90 s, then a timeout hides whether the report was built\ncurl -X POST https://api.example.com/reports -d '{\"year\":2025}'",
+        "after": "curl -i -X POST https://api.example.com/reports -d '{\"year\":2025}'\n# HTTP/1.1 202 Accepted\n# Location: /tasks/abc123\n\ncurl https://api.example.com/tasks/abc123\n# {\"status\":\"running\"}  then later  {\"status\":\"done\",\"result_url\":\"/reports/77\"}"
+      },
+      "pitfall": "Returning the task id but never storing the outcome: if the status disappears when the worker restarts, the client polls forever."
+    },
+    "fr": {
+      "why": "Une requête qui dure des minutes se heurte aux timeouts du proxy et du client, et quand elle meurt on ne sait pas si le travail a eu lieu. Rends un id de tâche tout de suite, laisse le client demander l'état, et garde le résultat à un endroit où il peut le récupérer plus tard.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# bloque 90 s, puis un timeout cache si le rapport a été construit\ncurl -X POST https://api.example.com/reports -d '{\"year\":2025}'",
+        "after": "curl -i -X POST https://api.example.com/reports -d '{\"year\":2025}'\n# HTTP/1.1 202 Accepted\n# Location: /tasks/abc123\n\ncurl https://api.example.com/tasks/abc123\n# {\"status\":\"running\"}  puis plus tard  {\"status\":\"done\",\"result_url\":\"/reports/77\"}"
+      },
+      "pitfall": "Rendre l'id de tâche sans jamais stocker l'issue : si l'état disparaît au redémarrage du worker, le client interroge indéfiniment."
+    }
+  },
+  "consistent-naming": {
+    "en": {
+      "why": "When one endpoint says `userId`, another `user_id` and a third `uid`, every caller has to remember exceptions and gets bitten by the one it forgot. One convention for names and casing makes the interface guessable: once you know two endpoints, you can predict the third.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "GET /getUsers          -> [{ \"userId\": 1, \"created_at\": \"...\" }]\nGET /user/42/list      -> [{ \"uid\": 42, \"CreatedOn\": \"...\" }]",
+        "after": "GET /users             -> [{ \"user_id\": 1, \"created_at\": \"...\" }]\nGET /users/42/orders   -> [{ \"user_id\": 42, \"created_at\": \"...\" }]"
+      },
+      "pitfall": "Fixing the new endpoints but leaving the old ones as they are: the mix is the problem, so either migrate behind a version or write the convention down and hold the line from now on."
+    },
+    "fr": {
+      "why": "Quand un endpoint dit `userId`, un autre `user_id` et un troisième `uid`, chaque appelant doit retenir des exceptions et se fait piéger par celle qu'il a oubliée. Une seule convention de noms et de casse rend l'interface devinable : quand on connaît deux endpoints, on prédit le troisième.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "GET /getUsers          -> [{ \"userId\": 1, \"created_at\": \"...\" }]\nGET /user/42/list      -> [{ \"uid\": 42, \"CreatedOn\": \"...\" }]",
+        "after": "GET /users             -> [{ \"user_id\": 1, \"created_at\": \"...\" }]\nGET /users/42/orders   -> [{ \"user_id\": 42, \"created_at\": \"...\" }]"
+      },
+      "pitfall": "Corriger les nouveaux endpoints en laissant les anciens tels quels : c'est le mélange qui pose problème, donc soit on migre derrière une version, soit on écrit la convention et on la tient à partir de maintenant."
+    }
+  }
+}

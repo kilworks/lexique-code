@@ -1,0 +1,486 @@
+{
+  "ultrathink": {
+    "en": {
+      "why": "Some questions have several plausible causes and costly wrong turns. The keyword tells the agent to spend its effort on this turn reasoning before it touches anything. Use it when a wrong first move is expensive, not for routine edits.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Why is the nightly import job slow? Fix it.",
+        "after": "ultrathink: why is the nightly import job slow? List the 3 likeliest causes, the risk of each fix, then pick one and say why."
+      },
+      "pitfall": "Using it on trivial tasks burns time and tokens, and deep reasoning is still not proof, so the conclusion needs checking anyway."
+    },
+    "fr": {
+      "why": "Certaines questions ont plusieurs causes plausibles et un faux départ coûte cher. Le mot-clé demande à l'agent de consacrer ce tour à raisonner avant de toucher à quoi que ce soit. À employer quand une erreur initiale coûte cher, pas pour des modifications de routine.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Pourquoi le job d'import de nuit est lent ? Corrige.",
+        "after": "ultrathink : pourquoi le job d'import de nuit est lent ? Liste les 3 causes les plus probables, le risque de chaque correctif, puis choisis-en un et dis pourquoi."
+      },
+      "pitfall": "L'employer sur des tâches triviales gaspille temps et tokens, et un long raisonnement ne vaut pas preuve : la conclusion reste à vérifier."
+    }
+  },
+  "effort": {
+    "en": {
+      "why": "The effort level sets the trade-off between depth on one side and speed and cost on the other, for the whole session. Low gives short direct answers, high or max makes the agent explore more and verify more before answering. Set it to match the stakes of the task at hand.",
+      "example": {
+        "kind": "command",
+        "lang": "text",
+        "before": "/effort low\nCheck this migration for data loss.",
+        "after": "/effort high\nCheck this migration for data loss, and run the tests before you answer."
+      },
+      "pitfall": "Leaving the level on max for trivial edits is slow and costly, and leaving it on low for a risky audit gives a shallow answer that looks confident."
+    },
+    "fr": {
+      "why": "Le niveau d'effort arbitre, pour toute la session, entre la profondeur d'un côté, la vitesse et le coût de l'autre. En bas, des réponses courtes et directes ; en haut, l'agent explore et vérifie davantage avant de répondre. À régler selon l'enjeu de la tâche en cours.",
+      "example": {
+        "kind": "command",
+        "lang": "text",
+        "before": "/effort low\nVérifie que cette migration ne perd pas de données.",
+        "after": "/effort high\nVérifie que cette migration ne perd pas de données, et lance les tests avant de répondre."
+      },
+      "pitfall": "Laisser le niveau au maximum pour des retouches triviales est lent et cher, et le laisser bas pour un audit risqué donne une réponse superficielle mais assurée."
+    }
+  },
+  "skim-quick": {
+    "en": {
+      "why": "Sometimes you need a quick orientation, not an investigation. A skim keeps the agent from reading half the repo to answer a small question. The price is that the answer is partial, so it must say what it did not check.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Look at the repo and tell me about the auth.",
+        "after": "Quick skim: where is auth handled? 3 lines max, a grep is enough, and tell me what you did not check."
+      },
+      "pitfall": "A skim read as a full verdict: without the stated limits, a partial answer gets trusted as if it were complete."
+    },
+    "fr": {
+      "why": "Parfois il faut une orientation rapide, pas une enquête. Le survol évite que l'agent lise la moitié du dépôt pour une petite question. Le prix : la réponse est partielle, elle doit donc dire ce qu'elle n'a pas vérifié.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Regarde le dépôt et parle-moi de l'authentification.",
+        "after": "Survol rapide : où est gérée l'authentification ? 3 lignes max, un grep suffit, et dis-moi ce que tu n'as pas vérifié."
+      },
+      "pitfall": "Prendre un survol pour un verdict complet : sans limites annoncées, une réponse partielle est crue comme si elle était entière."
+    }
+  },
+  "plan-first": {
+    "en": {
+      "why": "An agent that starts editing right away can spend ten steps going the wrong way. Asking for the plan first moves the disagreement to a cheap moment, before any file changes. You review the steps, the files and the risks, then give the go-ahead.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Migrate the config loader to the new schema.",
+        "after": "Plan first: migrate the config loader to the new schema. List the steps, the files you will touch and the risks. Change nothing until I say go."
+      },
+      "pitfall": "A plan too vague to judge (no file named, no risk) gets approved anyway, and the agent then starts editing without waiting for the go."
+    },
+    "fr": {
+      "why": "Un agent qui édite tout de suite peut faire dix pas dans la mauvaise direction. Demander le plan d'abord déplace le désaccord à un moment bon marché, avant tout changement de fichier. Tu relis les étapes, les fichiers et les risques, puis tu donnes le feu vert.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Migre le chargeur de config vers le nouveau schéma.",
+        "after": "Plan d'abord : migre le chargeur de config vers le nouveau schéma. Liste les étapes, les fichiers touchés et les risques. Ne change rien avant mon feu vert."
+      },
+      "pitfall": "Un plan trop vague pour être jugé (aucun fichier nommé, aucun risque) est approuvé quand même, et l'agent se met à éditer sans attendre le feu vert."
+    }
+  },
+  "propose-only": {
+    "en": {
+      "why": "Sometimes you want options to think with, not changes in your tree. This mode forbids action and asks for numbered proposals you can answer by number. It is the right mode when the problem is still being shaped.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "CI is flaky, deal with it.",
+        "after": "Propose only: give me 3 numbered options to make CI less flaky. Touch nothing, run nothing that changes state."
+      },
+      "pitfall": "Slipping in one small edit or a state-changing command anyway: propose only means read-only."
+    },
+    "fr": {
+      "why": "Parfois tu veux des options pour réfléchir, pas des changements dans ton arbre. Ce mode interdit l'action et demande des propositions numérotées auxquelles tu réponds par leur numéro. C'est le bon mode quand le problème se forme encore.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "La CI est instable, règle ça.",
+        "after": "Propose seulement : donne-moi 3 options numérotées pour rendre la CI moins instable. Ne touche à rien, ne lance rien qui change un état."
+      },
+      "pitfall": "Glisser quand même une petite modification ou une commande qui change un état : propose seulement veut dire lecture seule."
+    }
+  },
+  "autonomous-don-t-ask": {
+    "en": {
+      "why": "Constant confirmation questions turn a ten-minute task into an hour of back and forth. Telling the agent to decide alone inside a defined scope lets it keep moving. It records its choices so you can review them afterwards, and it still stops before anything it cannot undo.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Rename the helper. Ask me before each file.",
+        "after": "Autonomous: rename parse_cfg to load_config across the repo and fix the imports. Don't ask. List your choices at the end. Stop only before something irreversible (deleting files, force push)."
+      },
+      "pitfall": "Autonomy without a written scope: \"don't ask\" does not cover irreversible actions or files outside the task."
+    },
+    "fr": {
+      "why": "Les questions de confirmation permanentes transforment une tâche de dix minutes en une heure d'allers-retours. Dire à l'agent de décider seul dans un périmètre défini le laisse avancer. Il note ses choix pour que tu les relises ensuite, et il s'arrête quand même avant ce qui ne se défait pas.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Renomme la fonction utilitaire. Demande-moi avant chaque fichier.",
+        "after": "Autonome : renomme parse_cfg en load_config dans tout le dépôt et corrige les imports. Ne demande pas. Liste tes choix à la fin. Arrête-toi seulement devant l'irréversible (suppression de fichiers, force push)."
+      },
+      "pitfall": "Une autonomie sans périmètre écrit : « sans demander » ne couvre ni l'irréversible ni les fichiers hors tâche."
+    }
+  },
+  "scope-don-t-touch": {
+    "en": {
+      "why": "An agent that sees something nearby that looks wrong will often fix it, and your diff becomes impossible to review. A written scope names what is allowed and what is forbidden. Anything outside the list gets reported, not changed.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Clean up the payments module.",
+        "after": "Scope: only src/payments/refund.py and its test. Do not touch: the schema, other modules, the lockfile. If you spot something else, list it, do not fix it."
+      },
+      "pitfall": "Keeping the scope in your head instead of writing it down, then accepting an out-of-list fix because it was \"to help\"."
+    },
+    "fr": {
+      "why": "Un agent qui voit quelque chose de louche à côté le corrige souvent, et ton diff devient impossible à relire. Un périmètre écrit nomme ce qui est autorisé et ce qui est interdit. Tout ce qui est hors liste est signalé, pas modifié.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Nettoie le module de paiements.",
+        "after": "Périmètre : uniquement src/payments/refund.py et son test. Ne touche pas : le schéma, les autres modules, le lockfile. Si tu vois autre chose, liste-le, ne le corrige pas."
+      },
+      "pitfall": "Garder le périmètre dans sa tête au lieu de l'écrire, puis accepter une correction hors liste parce qu'elle était « pour aider »."
+    }
+  },
+  "explicit-assumptions": {
+    "en": {
+      "why": "A vague request forces the agent to fill gaps silently, and a wrong guess surfaces three files later. Writing the assumptions down first makes each guess visible. You fix a wrong one in a single line before any code exists.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Add pagination to the API.",
+        "after": "Add pagination to the API. Before coding, list your assumptions (cursor or offset, default page size, which endpoints). I will correct them in one line."
+      },
+      "pitfall": "Listing assumptions and then coding without waiting for the correction, or burying the one that matters among trivial ones."
+    },
+    "fr": {
+      "why": "Une demande vague oblige l'agent à combler les trous en silence, et une mauvaise supposition apparaît trois fichiers plus loin. Écrire les hypothèses d'abord rend chaque pari visible. Tu corriges la mauvaise en une ligne avant que le moindre code n'existe.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ajoute la pagination à l'API.",
+        "after": "Ajoute la pagination à l'API. Avant de coder, liste tes hypothèses (curseur ou offset, taille de page par défaut, quels endpoints). Je les corrigerai en une ligne."
+      },
+      "pitfall": "Lister les hypothèses puis coder sans attendre la correction, ou noyer la seule qui compte parmi des détails triviaux."
+    }
+  },
+  "restate": {
+    "en": {
+      "why": "Misunderstandings are cheapest to catch before work starts. One sentence saying what the agent understood and what it will deliver lets you stop it early if the two do not match. It costs seconds and saves a wrong hour.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Make the export faster.",
+        "after": "Make the export faster. First restate in one sentence what you understood and what you will deliver, then go."
+      },
+      "pitfall": "Echoing the request's own words back instead of committing to a concrete deliverable, so the misunderstanding stays hidden."
+    },
+    "fr": {
+      "why": "Un malentendu se rattrape au moindre coût avant que le travail commence. Une phrase qui dit ce que l'agent a compris et ce qu'il va livrer te permet de l'arrêter tôt si les deux ne collent pas. Ça coûte quelques secondes et évite une heure perdue.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Rends l'export plus rapide.",
+        "after": "Rends l'export plus rapide. D'abord reformule en une phrase ce que tu as compris et ce que tu vas livrer, puis vas-y."
+      },
+      "pitfall": "Renvoyer les mots mêmes de la demande au lieu de s'engager sur un livrable concret : le malentendu reste caché."
+    }
+  },
+  "blocking-question": {
+    "en": {
+      "why": "Every question you ask interrupts the person, so only a question that truly blocks the work deserves one. Grouping them and attaching a recommendation lets the person answer all at once with a yes or a number. Everything else, decide and move on.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Which database? Which naming? Tabs or spaces? Should I add a test? (asked one at a time over an hour)",
+        "after": "Two blocking questions, answer together: 1) SQLite or Postgres for tests? I recommend SQLite, it is faster. 2) Keep the old endpoint? I recommend yes for one release. I decide everything else."
+      },
+      "pitfall": "Asking what the code already answers or what has a safe default, which trains the person to ignore your questions."
+    },
+    "fr": {
+      "why": "Chaque question interrompt la personne, donc seule une question qui bloque vraiment le travail mérite d'être posée. Les grouper et y joindre une recommandation permet de répondre d'un coup par un oui ou un numéro. Pour le reste, décider et avancer.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Quelle base de données ? Quel nommage ? Tabulations ou espaces ? Je rajoute un test ? (posées une par une pendant une heure)",
+        "after": "Deux questions bloquantes, réponds aux deux : 1) SQLite ou Postgres pour les tests ? Je recommande SQLite, plus rapide. 2) Garder l'ancien endpoint ? Je recommande oui pour une version. Je tranche tout le reste."
+      },
+      "pitfall": "Demander ce que le code répond déjà ou ce qui a une valeur par défaut sûre : la personne apprend à ignorer tes questions."
+    }
+  },
+  "take-stock": {
+    "en": {
+      "why": "Changing something you have not looked at is how you break the thing next to it. Taking stock means observing what exists right now (files, services, versions) before the first edit. The inventory then tells you what the change can touch.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "sed -i 's/8080/9090/' config.yaml",
+        "after": "git status -s\ngrep -rn \"8080\" .\nss -ltnp | grep 8080\n# only now edit, knowing every place 8080 appears"
+      },
+      "pitfall": "Taking stock from memory or from an old note instead of observing now, so the inventory is already out of date."
+    },
+    "fr": {
+      "why": "C'est en modifiant ce qu'on n'a pas regardé qu'on casse ce qui est à côté. L'état des lieux consiste à observer ce qui existe maintenant (fichiers, services, versions) avant la première modification. L'inventaire dit ensuite ce que le changement peut toucher.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "sed -i 's/8080/9090/' config.yaml",
+        "after": "git status -s\ngrep -rn \"8080\" .\nss -ltnp | grep 8080\n# seulement maintenant modifier, en sachant où 8080 apparaît"
+      },
+      "pitfall": "Faire l'état des lieux de mémoire ou d'après une vieille note au lieu d'observer maintenant : l'inventaire est déjà périmé."
+    }
+  },
+  "step-by-step": {
+    "en": {
+      "why": "When several changes land before the first check, a red result does not say which one broke it. Working one step at a time, with its own check, keeps the cause obvious. Each green check is a point you can safely go back to.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# edit modules a, b, c and d\npytest",
+        "after": "# edit module a\npytest tests/test_a.py -q\n# edit module b\npytest tests/test_a.py tests/test_b.py -q\n# and so on"
+      },
+      "pitfall": "Steps so big that a failing check still does not tell you which change caused it."
+    },
+    "fr": {
+      "why": "Quand plusieurs changements arrivent avant la première vérification, un résultat rouge ne dit pas lequel a cassé. Travailler une étape à la fois, avec sa propre vérification, garde la cause évidente. Chaque vérification verte est un point sûr où revenir.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# modifier les modules a, b, c et d\npytest",
+        "after": "# modifier le module a\npytest tests/test_a.py -q\n# modifier le module b\npytest tests/test_a.py tests/test_b.py -q\n# et ainsi de suite"
+      },
+      "pitfall": "Des étapes si grosses qu'une vérification qui échoue ne dit toujours pas quel changement en est la cause."
+    }
+  },
+  "stop-condition": {
+    "en": {
+      "why": "An agent told to keep going until it works can loop for an hour or do something drastic to make a test pass. A written stop condition fixes in advance when it must quit and hand back. It turns a runaway task into one with a known worst case.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Keep fixing until the tests pass.",
+        "after": "Fix the failing tests. Stop and report after 3 failed attempts on the same test, after 20 tool calls, or before anything irreversible (migration, deletion). Hand back the state reached."
+      },
+      "pitfall": "A vague criterion (\"if it gets hard\") that cannot be checked, or a written one that nobody enforces."
+    },
+    "fr": {
+      "why": "Un agent à qui on dit de continuer jusqu'à ce que ça marche peut tourner une heure ou faire quelque chose de radical pour qu'un test passe. Une condition d'arrêt écrite fixe à l'avance quand il doit s'arrêter et rendre la main. La tâche qui s'emballe devient une tâche dont on connaît le pire cas.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Continue de corriger jusqu'à ce que les tests passent.",
+        "after": "Corrige les tests qui échouent. Arrête-toi et fais un rapport après 3 échecs sur le même test, après 20 appels d'outils, ou avant toute chose irréversible (migration, suppression). Rends l'état atteint."
+      },
+      "pitfall": "Un critère flou (« si ça devient dur ») impossible à vérifier, ou un critère écrit que personne ne fait respecter."
+    }
+  },
+  "budget": {
+    "en": {
+      "why": "Open-ended exploration has no natural end, and tokens, time and calls all cost something. A budget gives the task a ceiling you can count against. When the ceiling is hit, the agent stops and hands back what it has instead of quietly continuing.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Research every library for this and tell me the best one.",
+        "after": "Compare the libraries for this and pick one. Budget: 10 tool calls and 15 minutes. Count as you go. At the cap, stop and hand back what you have and what is left."
+      },
+      "pitfall": "Setting a budget but not counting, so the overrun is only noticed after the money is spent."
+    },
+    "fr": {
+      "why": "Une exploration sans borne n'a pas de fin naturelle, et tokens, temps et appels coûtent tous quelque chose. Un budget donne à la tâche un plafond contre lequel compter. Au plafond, l'agent s'arrête et rend ce qu'il a au lieu de continuer en douce.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Passe en revue toutes les bibliothèques pour ça et dis-moi la meilleure.",
+        "after": "Compare les bibliothèques pour ça et choisis-en une. Budget : 10 appels d'outils et 15 minutes. Compte au fur et à mesure. Au plafond, arrête-toi et rends ce que tu as et ce qui reste."
+      },
+      "pitfall": "Fixer un budget sans le compter : le dépassement n'est vu qu'une fois l'argent dépensé."
+    }
+  },
+  "single-pass": {
+    "en": {
+      "why": "Review and fix loops rarely converge: each round of fixes creates new nits to fix. A single pass means one wave of review, one wave of corrections, and then you stop. What was not fixed goes on a list instead of triggering another round.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Review it and keep improving it until it is perfect.",
+        "after": "One review pass, then one fix pass. No third round. List what you left unfixed and why."
+      },
+      "pitfall": "Letting a second or third pass in \"just to be sure\", which polishes forever and each time risks new regressions."
+    },
+    "fr": {
+      "why": "Les boucles revue puis correction convergent rarement : chaque tour de corrections crée de nouvelles remarques à corriger. Une passe unique, c'est une vague de revue, une de corrections, puis on s'arrête. Ce qui n'est pas corrigé va dans une liste au lieu de déclencher un nouveau tour.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Relis-le et continue de l'améliorer jusqu'à ce qu'il soit parfait.",
+        "after": "Une passe de revue, puis une passe de corrections. Pas de troisième tour. Liste ce que tu n'as pas corrigé et pourquoi."
+      },
+      "pitfall": "Laisser entrer une deuxième ou troisième passe « pour être sûr » : on polit sans fin et chaque tour risque de nouvelles régressions."
+    }
+  },
+  "change-method": {
+    "en": {
+      "why": "Repeating an action that failed twice is a guess with the same odds as before. After the second failure of the same gesture, the agent must change its approach instead of trying a slight variant. That means finding the root cause, reading the error source, or comparing with a repo that works.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Still failing. Try again.",
+        "after": "Same failure twice: change method. No third attempt like the first two. Find the root cause: read where the error is raised, or compare with a reference repo that works, then tell me what you found."
+      },
+      "pitfall": "Changing one parameter and calling it a new method, when it is the same action with the same blind spot."
+    },
+    "fr": {
+      "why": "Répéter un geste qui a échoué deux fois est un pari aux mêmes chances qu'avant. Au deuxième échec du même geste, l'agent doit changer d'approche au lieu d'essayer une petite variante. Concrètement : chercher la cause racine, lire d'où l'erreur est levée, ou comparer avec un dépôt qui marche.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ça échoue toujours. Réessaie.",
+        "after": "Même échec deux fois : change de méthode. Pas de troisième essai comme les deux premiers. Trouve la cause racine : lis l'endroit où l'erreur est levée, ou compare avec un dépôt de référence qui marche, puis dis-moi ce que tu as trouvé."
+      },
+      "pitfall": "Changer un paramètre et appeler ça une nouvelle méthode, alors que c'est le même geste avec le même angle mort."
+    }
+  },
+  "no-passive-waiting": {
+    "en": {
+      "why": "Staring at a running task, or checking it every few seconds, wastes the time you could use. Either do the thing right now, or start the long task in the background and work on something else meanwhile. Come back to check the result once, when it matters.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Start the export and wait until it finishes.",
+        "after": "Start the export in the background. While it runs, write the tests for the importer. Check the export once the tests are written."
+      },
+      "pitfall": "Polling in a loop is still waiting: start the next useful task, and if there truly is none, say so and hand back instead of watching."
+    },
+    "fr": {
+      "why": "Fixer une tâche qui tourne, ou la vérifier toutes les quelques secondes, gaspille un temps utilisable. Soit on le fait tout de suite, soit on lance la tâche longue en arrière-plan et on avance autre chose en attendant. On revient vérifier le résultat une fois, quand ça compte.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Lance l'export et attends qu'il finisse.",
+        "after": "Lance l'export en arrière-plan. Pendant qu'il tourne, écris les tests de l'import. Vérifie l'export une fois les tests écrits."
+      },
+      "pitfall": "Interroger en boucle, c'est encore attendre : lancer la tâche utile suivante, et s'il n'y en a vraiment aucune, le dire et rendre la main plutôt que surveiller."
+    }
+  },
+  "delegate-parallelize": {
+    "en": {
+      "why": "Work that splits into independent pieces does not need to run one piece after another. Sub-agents running in parallel finish sooner, and a cheaper model is enough for mechanical pieces. The main agent stays responsible: it checks every returned result before reporting.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Go through the 40 modules one after the other and fix the typos.",
+        "after": "Split the 40 modules into 4 groups and give each to a sub-agent in parallel. Use a small model, typos are mechanical. When they return, check each diff yourself before you report."
+      },
+      "pitfall": "Delegating pieces that depend on each other's output, or reporting the sub-agents' results without checking them."
+    },
+    "fr": {
+      "why": "Un travail qui se découpe en morceaux indépendants n'a pas besoin de les enchaîner. Des sous-agents en parallèle finissent plus tôt, et un modèle moins cher suffit pour le mécanique. L'agent principal reste responsable : il vérifie chaque retour avant de rendre compte.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Passe les 40 modules l'un après l'autre et corrige les fautes de frappe.",
+        "after": "Découpe les 40 modules en 4 groupes et donne chacun à un sous-agent en parallèle. Prends un petit modèle, les fautes de frappe sont mécaniques. À leur retour, vérifie chaque diff toi-même avant de faire ton rapport."
+      },
+      "pitfall": "Déléguer des morceaux qui dépendent du résultat des autres, ou rapporter les retours des sous-agents sans les vérifier."
+    }
+  },
+  "fresh-context": {
+    "en": {
+      "why": "An author who just wrote something tends to read what they meant, not what is there. A reviewer starting from scratch sees only the result and spots what the author's reasoning had made invisible. The trick is to give the reviewer the work, not the story of how you got there.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "You wrote it, now review it yourself.",
+        "after": "Start a reviewer with a fresh context. Give it only the diff and the spec, not your reasoning or your own notes. Ask it for defects."
+      },
+      "pitfall": "Handing the reviewer your explanation too, which leads it to agree with you instead of looking."
+    },
+    "fr": {
+      "why": "Un auteur qui vient d'écrire quelque chose lit ce qu'il voulait dire, pas ce qui est là. Un relecteur qui repart de zéro ne voit que le résultat et repère ce que le raisonnement de l'auteur avait rendu invisible. L'astuce : lui donner le travail, pas l'histoire de comment tu y es arrivé.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Tu l'as écrit, relis-le toi-même.",
+        "after": "Lance un relecteur avec un contexte frais. Donne-lui seulement le diff et la spec, pas ton raisonnement ni tes notes. Demande-lui les défauts."
+      },
+      "pitfall": "Lui donner aussi ton explication : il finit par être d'accord avec toi au lieu de regarder."
+    }
+  },
+  "critique-first": {
+    "en": {
+      "why": "When one step both finds problems and fixes them, nobody decides which problems are worth fixing. Asking for the verdict first separates the two: the defects are listed and ranked by severity. Fixing starts only after you agree on what to fix.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Review this PR and fix whatever you find.",
+        "after": "Critique first: list the defects ranked by severity (blocker, major, minor). Do not fix anything until I tell you which ones to fix."
+      },
+      "pitfall": "Letting critique and fixes mix in one pass, so the diff grows with cosmetic changes nobody chose."
+    },
+    "fr": {
+      "why": "Quand une même étape trouve les problèmes et les corrige, personne ne décide lesquels valent d'être corrigés. Demander le verdict d'abord sépare les deux : les défauts sont listés et classés par gravité. La correction ne commence qu'après accord sur ce qu'on corrige.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Relis cette PR et corrige ce que tu trouves.",
+        "after": "Critique d'abord : liste les défauts classés par gravité (bloquant, majeur, mineur). Ne corrige rien tant que je ne t'ai pas dit lesquels corriger."
+      },
+      "pitfall": "Laisser critique et corrections se mélanger dans une même passe : le diff enfle de changements cosmétiques que personne n'a choisis."
+    }
+  },
+  "provenance-known-inherited": {
+    "en": {
+      "why": "A claim can come from something you observed a minute ago or from a document someone wrote last month. They look identical in a report, but only the first one is verified. Marking which is which tells the reader what to trust and what to re-check.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "The README says the service listens on 9000, so it does.",
+        "after": "For each claim, say whether it is observed now (with the command and its output) or inherited (README, notes). Before saying the service listens on 9000, run ss -ltnp and show the line."
+      },
+      "pitfall": "Presenting an old document's content as a current fact because rereading it felt like checking."
+    },
+    "fr": {
+      "why": "Une affirmation peut venir de ce que tu as observé il y a une minute ou d'un document écrit le mois dernier. Dans un rapport elles se ressemblent, mais seule la première est vérifiée. Marquer laquelle est laquelle dit au lecteur ce qu'il peut croire et ce qu'il doit revérifier.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Le README dit que le service écoute sur 9000, donc c'est le cas.",
+        "after": "Pour chaque affirmation, dis si elle est observée maintenant (avec la commande et sa sortie) ou héritée (README, notes). Avant de dire que le service écoute sur 9000, lance ss -ltnp et montre la ligne."
+      },
+      "pitfall": "Présenter le contenu d'un vieux document comme un fait actuel parce que le relire a donné l'impression de vérifier."
+    }
+  },
+  "handoff": {
+    "en": {
+      "why": "A session ends when the context runs out or when you leave, and the next session starts knowing nothing. A handoff file written for that reader holds what works, what was decided and why, what is left, and the next command to run. With it, work resumes in a minute without asking the previous author anything.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "I am out of context, see you tomorrow.",
+        "after": "Write HANDOFF-2026-11-17.md: current state (what works, what does not), decisions and why, leftovers, and the exact next command to run. A fresh session must be able to resume from this file alone."
+      },
+      "pitfall": "A handoff that tells the story of what was done but gives no next command, so the reader still has to guess where to start."
+    },
+    "fr": {
+      "why": "Une session se termine quand le contexte est plein ou quand tu pars, et la suivante démarre sans rien savoir. Un fichier de passation écrit pour ce lecteur contient ce qui marche, ce qui a été décidé et pourquoi, ce qui reste, et la prochaine commande à lancer. Avec lui, le travail reprend en une minute sans rien demander à l'auteur précédent.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Je n'ai plus de contexte, à demain.",
+        "after": "Écris HANDOFF-2026-11-17.md : état actuel (ce qui marche, ce qui ne marche pas), décisions et pourquoi, restes, et la prochaine commande exacte à lancer. Une session neuve doit pouvoir reprendre avec ce seul fichier."
+      },
+      "pitfall": "Une passation qui raconte ce qui a été fait mais ne donne aucune prochaine commande : le lecteur doit encore deviner par où commencer."
+    }
+  }
+}

@@ -1,0 +1,794 @@
+{
+ "root-cause": {
+  "en": {
+   "why": "A symptom is where the bug shows up, the cause is where it starts. Patching the symptom hides the failure and lets it come back somewhere else. Use it when several odd failures seem unrelated: one cause often explains them all.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# crash: AttributeError: 'NoneType' object has no attribute 'email'\ndef send_receipt(order):\n    if order.user is None:   # silences the crash, hides the bug\n        return\n    mail(order.user.email)",
+    "after": "# why is order.user None? the old CSV import skipped unknown customers.\n# fix there, once, and fail loudly:\ndef import_order(row):\n    user = users_by_legacy_id[row[\"customer\"]]   # KeyError if unknown\n    return Order(user=user, total=row[\"total\"])"
+   },
+   "pitfall": "Stopping at the first plausible explanation instead of checking that it explains every symptom."
+  },
+  "fr": {
+   "why": "Un symptôme est l'endroit où le bug se voit, la cause est l'endroit où il naît. Corriger le symptôme cache la panne et la laisse revenir ailleurs. À utiliser quand plusieurs pannes bizarres semblent sans lien : une seule cause les explique souvent toutes.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# crash : AttributeError: 'NoneType' object has no attribute 'email'\ndef send_receipt(order):\n    if order.user is None:   # fait taire le crash, cache le bug\n        return\n    mail(order.user.email)",
+    "after": "# pourquoi order.user vaut None ? l'ancien import CSV ignorait les clients inconnus.\n# corriger là, une fois, et échouer bruyamment :\ndef import_order(row):\n    user = users_by_legacy_id[row[\"customer\"]]   # KeyError si inconnu\n    return Order(user=user, total=row[\"total\"])"
+   },
+   "pitfall": "S'arrêter à la première explication plausible sans vérifier qu'elle rend compte de tous les symptômes."
+  }
+ },
+ "minimal-repro": {
+  "en": {
+   "why": "A bug buried in a big input or a big app is hard to reason about. Shrinking it to the smallest case that still fails removes noise and often reveals the cause on its own. It also gives you a test to keep after the fix.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "The export crashes sometimes. Fix it.",
+    "after": "The export crashes with ValueError on export_input.csv (5000 rows).\nFirst, minimal repro: keep removing rows and columns until you have the\nsmallest file that still raises the error. Show me that file and the exact\ncommand. Only then look for the cause and fix it."
+   },
+   "pitfall": "Fixing before the case is small, so the fix is guessed against noise instead of the real trigger."
+  },
+  "fr": {
+   "why": "Un bug noyé dans une grosse entrée ou une grosse appli est difficile à raisonner. Le réduire au plus petit cas qui échoue encore retire le bruit et révèle souvent la cause tout seul. On obtient aussi un test à garder après la correction.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "L'export plante parfois. Corrige.",
+    "after": "L'export plante avec une ValueError sur export_input.csv (5000 lignes).\nD'abord, repro minimal : retire des lignes et des colonnes jusqu'au plus petit\nfichier qui lève encore l'erreur. Montre-moi ce fichier et la commande exacte.\nEnsuite seulement cherche la cause et corrige."
+   },
+   "pitfall": "Corriger avant que le cas soit petit : le correctif est deviné dans le bruit au lieu de viser le vrai déclencheur."
+  }
+ },
+ "bisect": {
+  "en": {
+   "why": "When something worked before and is broken now, the faulty change is in the history between the two states. Halving that range each time finds it in about log2(n) steps instead of reading every commit. It works for inputs too: remove half the file and see which half still fails.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# scrolling the log and guessing\ngit log --oneline\n# \"maybe it was this one?\"",
+    "after": "git bisect start\ngit bisect bad HEAD\ngit bisect good v1.4.0\ngit bisect run pytest tests/test_export.py -x\ngit bisect reset"
+   },
+   "pitfall": "Using a test that is flaky or that fails for another reason, so bisect points at the wrong commit with full confidence."
+  },
+  "fr": {
+   "why": "Quand ça marchait avant et que ça casse maintenant, le changement fautif est dans l'historique entre les deux états. Couper cet intervalle en deux à chaque étape le trouve en environ log2(n) pas, au lieu de relire chaque commit. Ça marche aussi sur les entrées : enlever la moitié du fichier et voir quelle moitié échoue encore.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# on fait défiler le log et on devine\ngit log --oneline\n# \"c'était peut-être celui-là ?\"",
+    "after": "git bisect start\ngit bisect bad HEAD\ngit bisect good v1.4.0\ngit bisect run pytest tests/test_export.py -x\ngit bisect reset"
+   },
+   "pitfall": "Utiliser un test instable ou qui échoue pour une autre raison : bisect désigne alors le mauvais commit avec aplomb."
+  }
+ },
+ "falsifiable-hypothesis": {
+  "en": {
+   "why": "A hypothesis you cannot disprove is just a feeling. Writing the measurement that would kill it forces you to test it, and a failed test tells you something. Use it before changing code on a hunch.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "I think the cache is the problem. Fix it.",
+    "after": "Hypothesis: the cache serves stale prices.\nIt is false if the wrong price still appears when the cache is bypassed.\nRun that check first and report the result before changing any code.\nIf the hypothesis dies, propose the next one with its own kill test."
+   },
+   "pitfall": "Writing a hypothesis so vague (it is a timing thing) that no measurement could ever contradict it."
+  },
+  "fr": {
+   "why": "Une hypothèse qu'on ne peut pas réfuter n'est qu'une intuition. Écrire la mesure qui la tuerait oblige à la tester, et un test raté apprend quelque chose. À utiliser avant de modifier du code sur un pressentiment.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Je pense que c'est le cache. Corrige.",
+    "after": "Hypothèse : le cache sert des prix périmés.\nElle est fausse si le mauvais prix apparaît encore quand le cache est contourné.\nLance ce contrôle d'abord et donne le résultat avant de toucher au code.\nSi l'hypothèse meurt, propose la suivante avec son propre test de réfutation."
+   },
+   "pitfall": "Formuler l'hypothèse si vaguement (c'est un truc de timing) qu'aucune mesure ne pourra jamais la contredire."
+  }
+ },
+ "pre-mortem": {
+  "en": {
+   "why": "A pre-mortem assumes the project already failed and asks why. Imagining the failure in the past makes people name risks they would otherwise politely skip. It is cheap before a release or a migration and expensive after.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Deploy the migration tonight.",
+    "after": "Before deploying the migration, run a pre-mortem: it is a month later and\nit went badly. List the 5 most likely reasons, rank them, and cover the\ntop 3 with a check or a rollback step. Then deploy."
+   },
+   "pitfall": "Listing vague fears instead of concrete failures, so nothing in the list can be checked or covered."
+  },
+  "fr": {
+   "why": "Un pré-mortem suppose que le projet a déjà échoué et demande pourquoi. Imaginer l'échec au passé fait nommer des risques qu'on passerait sinon poliment sous silence. C'est peu cher avant une livraison ou une migration, très cher après.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Déploie la migration ce soir.",
+    "after": "Avant de déployer la migration, fais un pré-mortem : on est un mois plus tard\net ça s'est mal passé. Liste les 5 raisons les plus probables, classe-les,\net pare les 3 premières avec un contrôle ou une étape de rollback. Ensuite déploie."
+   },
+   "pitfall": "Lister des craintes vagues au lieu de pannes concrètes : rien dans la liste ne peut être vérifié ni paré."
+  }
+ },
+ "adversarial-red-team": {
+  "en": {
+   "why": "Tests written by the author tend to use the inputs the author imagined. A red-team pass switches sides: you try to break the work with hostile inputs, odd orderings and broken assumptions. It finds the bugs that real users and attackers will find anyway.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "def parse_age(s):\n    return int(s)\n\nassert parse_age(\"42\") == 42",
+    "after": "def parse_age(s):\n    if not (isinstance(s, str) and s.isascii() and s.isdigit() and len(s) <= 3):\n        raise ValueError(s)\n    return int(s)\n\nfor bad in [\"\", \"-1\", \"4 2\", \"1e3\", \"9\" * 1000, None]:\n    try:\n        parse_age(bad)\n        print(\"ACCEPTED\", repr(bad)[:20])\n    except ValueError:\n        pass"
+   },
+   "pitfall": "Attacking only with the cases you already handle, so the red team confirms your design instead of testing it."
+  },
+  "fr": {
+   "why": "Les tests écrits par l'auteur utilisent les entrées que l'auteur a imaginées. Une passe red team change de camp : on cherche à casser le travail avec des entrées hostiles, des ordres inattendus et des hypothèses fausses. On trouve les bugs que les vrais utilisateurs et les attaquants trouveront de toute façon.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "def parse_age(s):\n    return int(s)\n\nassert parse_age(\"42\") == 42",
+    "after": "def parse_age(s):\n    if not (isinstance(s, str) and s.isascii() and s.isdigit() and len(s) <= 3):\n        raise ValueError(s)\n    return int(s)\n\nfor bad in [\"\", \"-1\", \"4 2\", \"1e3\", \"9\" * 1000, None]:\n    try:\n        parse_age(bad)\n        print(\"ACCEPTE\", repr(bad)[:20])\n    except ValueError:\n        pass"
+   },
+   "pitfall": "N'attaquer qu'avec les cas déjà gérés : la red team confirme alors le design au lieu de le tester."
+  }
+ },
+ "steelman": {
+  "en": {
+   "why": "The opposite of a strawman: you state the strongest honest version of the option you are about to reject. If you cannot argue for it well, you do not understand the choice yet. It protects decisions from being made against a weak caricature.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Redis or Postgres for the job queue? Postgres is obviously fine.",
+    "after": "We are leaning towards Postgres and rejecting Redis. Before deciding,\nwrite the strongest honest case for Redis (throughput, blocking pop, TTL).\nThen say what would have to be true for it to win. Then recommend."
+   },
+   "pitfall": "Writing the best version of the rejected option so weakly that the decision was already made."
+  },
+  "fr": {
+   "why": "L'inverse de l'homme de paille : on énonce la version honnête la plus forte de l'option qu'on s'apprête à rejeter. Si on ne sait pas la défendre, on n'a pas encore compris le choix. Ça évite de décider contre une caricature.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Redis ou Postgres pour la file de jobs ? Postgres ira très bien.",
+    "after": "On penche pour Postgres et on écarte Redis. Avant de trancher, écris le\nmeilleur argumentaire honnête pour Redis (débit, pop bloquant, TTL).\nDis ce qui devrait être vrai pour qu'il gagne. Ensuite recommande."
+   },
+   "pitfall": "Écrire la meilleure version de l'option rejetée si mollement que la décision était déjà prise."
+  }
+ },
+ "exhaustive-contractual": {
+  "en": {
+   "why": "When a task says \"all\", \"each\" or gives a number, the number is a contract. A subset that looks complete is a silent failure. Counting forces every item to be either done or named with a reason.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Fix the old_api usages in the repos.",
+    "after": "repos.txt lists 40 repos. For each one, report one line:\nrepo, usages found, fixed yes/no. If you skip a repo, name it and say why.\nEnd with \"processed N/40\". A subset is a failure."
+   },
+   "pitfall": "Counting only what was processed and never comparing it to the total, so skipped items disappear."
+  },
+  "fr": {
+   "why": "Quand une tâche dit \"tout\", \"chaque\" ou donne un chiffre, le chiffre est un contrat. Un sous-ensemble qui a l'air complet est un échec silencieux. Compter force chaque item à être traité ou nommé avec une raison.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Corrige les usages de old_api dans les dépôts.",
+    "after": "repos.txt liste 40 dépôts. Pour chacun, une ligne :\ndépôt, usages trouvés, corrigé oui/non. Si tu sautes un dépôt, nomme-le et dis pourquoi.\nTermine par \"traités N/40\". Un sous-ensemble est un échec."
+   },
+   "pitfall": "Compter seulement ce qui a été traité sans le comparer au total : les items sautés disparaissent."
+  }
+ },
+ "edge-cases": {
+  "en": {
+   "why": "Code usually works on the typical input and breaks at the borders. Empty, one, many, huge, negative, unicode and missing are the borders that fail most often. List them on purpose, then give each one a test.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "def average(xs):\n    return sum(xs) / len(xs)\n\ndef test_average():\n    assert average([1, 2, 3]) == 2",
+    "after": "import pytest\n\ndef average(xs):\n    if not xs:\n        raise ValueError(\"empty\")\n    return sum(xs) / len(xs)\n\nCASES = [([1], 1), ([1, 2, 3], 2), ([-1, 1], 0), ([10**18] * 2, 10**18)]\nfor xs, want in CASES:\n    assert average(xs) == want\nwith pytest.raises(ValueError):\n    average([])"
+   },
+   "pitfall": "Testing only the edges you thought of while writing the code, which are exactly the ones already handled."
+  },
+  "fr": {
+   "why": "Le code marche en général sur l'entrée typique et casse aux bords. Vide, un, beaucoup, énorme, négatif, unicode et absent sont les bords qui échouent le plus souvent. On les liste exprès, puis on donne un test à chacun.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "def average(xs):\n    return sum(xs) / len(xs)\n\ndef test_average():\n    assert average([1, 2, 3]) == 2",
+    "after": "import pytest\n\ndef average(xs):\n    if not xs:\n        raise ValueError(\"vide\")\n    return sum(xs) / len(xs)\n\nCASES = [([1], 1), ([1, 2, 3], 2), ([-1, 1], 0), ([10**18] * 2, 10**18)]\nfor xs, want in CASES:\n    assert average(xs) == want\nwith pytest.raises(ValueError):\n    average([])"
+   },
+   "pitfall": "Ne tester que les bords imaginés en écrivant le code, c'est-à-dire ceux qui sont déjà gérés."
+  }
+ },
+ "case-matrix": {
+  "en": {
+   "why": "When behaviour depends on several inputs at once, testing each input alone misses the combinations. A table of input values against states makes every cell visible, and a missing cell is a missing test. Use it for rules like pricing, permissions and shipping.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "def shipping(total, member):\n    return 0 if member or total >= 50 else 5\n\ndef test_shipping():\n    assert shipping(60, False) == 0",
+    "after": "import pytest\n\ndef shipping(total, member):\n    return 0 if member or total >= 50 else 5\n\n# one row per cell: total x member\n@pytest.mark.parametrize(\"total,member,expected\", [\n    (0, True, 0), (10, True, 0), (60, True, 0),\n    (0, False, 5), (49.99, False, 5), (50, False, 0), (60, False, 0),\n])\ndef test_shipping(total, member, expected):\n    assert shipping(total, member) == expected"
+   },
+   "pitfall": "Filling the table with the combinations that are easy to write and skipping the awkward cells where bugs hide."
+  },
+  "fr": {
+   "why": "Quand le comportement dépend de plusieurs entrées à la fois, tester chaque entrée seule rate les combinaisons. Un tableau valeurs d'entrée contre états rend chaque case visible, et une case absente est un test absent. Utile pour les règles de prix, de droits, de livraison.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "def shipping(total, member):\n    return 0 if member or total >= 50 else 5\n\ndef test_shipping():\n    assert shipping(60, False) == 0",
+    "after": "import pytest\n\ndef shipping(total, member):\n    return 0 if member or total >= 50 else 5\n\n# une ligne par case : total x membre\n@pytest.mark.parametrize(\"total,member,expected\", [\n    (0, True, 0), (10, True, 0), (60, True, 0),\n    (0, False, 5), (49.99, False, 5), (50, False, 0), (60, False, 0),\n])\ndef test_shipping(total, member, expected):\n    assert shipping(total, member) == expected"
+   },
+   "pitfall": "Remplir le tableau avec les combinaisons faciles à écrire et sauter les cases pénibles où les bugs se cachent."
+  }
+ },
+ "acceptance-criteria": {
+  "en": {
+   "why": "Acceptance criteria are the checks that say a task is finished, written before the work starts. Without them, \"done\" means \"I stopped\". They also give you the exact list to verify at the end.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Add a password reset.",
+    "after": "Add a password reset. Done when:\n1. an unknown email gets the same response as a known one,\n2. the token expires after 1 hour,\n3. a token works only once,\n4. existing sessions are revoked after a reset,\n5. tests for 1 to 4 pass.\nAt the end, verify each point and show the proof for it."
+   },
+   "pitfall": "Writing criteria so loose (works well, is secure) that nobody could ever say one has failed."
+  },
+  "fr": {
+   "why": "Les critères d'acceptation sont les contrôles qui disent qu'une tâche est finie, écrits avant de commencer. Sans eux, \"fini\" veut dire \"j'ai arrêté\". Ils donnent aussi la liste exacte à vérifier à la fin.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Ajoute une réinitialisation de mot de passe.",
+    "after": "Ajoute une réinitialisation de mot de passe. Fini quand :\n1. un email inconnu reçoit la même réponse qu'un email connu,\n2. le jeton expire au bout d'1 heure,\n3. un jeton ne marche qu'une fois,\n4. les sessions existantes sont révoquées après une réinitialisation,\n5. les tests des points 1 à 4 passent.\nÀ la fin, vérifie chaque point et montre la preuve."
+   },
+   "pitfall": "Écrire des critères si flous (marche bien, est sûr) que personne ne pourrait jamais dire qu'un seul a échoué."
+  }
+ },
+ "surgical-minimal-diff": {
+  "en": {
+   "why": "A small diff is easy to review, easy to revert and unlikely to break something unrelated. Reformatting a file or renaming things on the side buries the real change and creates merge conflicts. Change what the task needs, and nothing else.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "$ git diff --stat\n src/api.py | 412 ++++++++++++-----\n# editor reformatted the whole file and renamed variables\n# the 3 real lines are impossible to find",
+    "after": "$ git diff --stat\n src/api.py | 3 ++-\n# only the lines the fix needs\n# reformatting, if wanted, goes in its own separate commit"
+   },
+   "pitfall": "Running the formatter or a rename over the whole file while fixing one line."
+  },
+  "fr": {
+   "why": "Un petit diff se relit vite, se révoque facilement et risque peu de casser autre chose. Reformater un fichier ou renommer au passage noie le vrai changement et crée des conflits de merge. On change ce que la tâche demande, rien d'autre.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "$ git diff --stat\n src/api.py | 412 ++++++++++++-----\n# l'éditeur a reformaté tout le fichier et renommé des variables\n# les 3 vraies lignes sont introuvables",
+    "after": "$ git diff --stat\n src/api.py | 3 ++-\n# seulement les lignes dont le correctif a besoin\n# un reformatage, si voulu, va dans son propre commit"
+   },
+   "pitfall": "Lancer le formateur ou un renommage sur tout le fichier pour corriger une seule ligne."
+  }
+ },
+ "spike-throwaway": {
+  "en": {
+   "why": "A spike is code written only to learn whether something is possible or how it behaves. Because it is meant to be thrown away, you can skip tests and structure and go fast. The risk is that it quietly becomes the real code, so keep it isolated and keep only the notes.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# prototype hacked on main, then built upon\ngit checkout main\n# ...quick hack for websocket reconnect, committed as is\ngit commit -am \"ws reconnect\"",
+    "after": "git switch -c spike/ws-reconnect\n# hack freely, measure, write what you learned in ~/notes/ws-reconnect.md\ngit add -A && git commit -m \"spike: throwaway\"\ngit switch main\ngit branch -D spike/ws-reconnect   # the notes live outside the repo, the code goes\n# then write the real version from scratch, with tests"
+   },
+   "pitfall": "Letting the spike grow into the product, so its shortcuts become the foundation."
+  },
+  "fr": {
+   "why": "Un spike est du code écrit seulement pour savoir si quelque chose est possible ou comment ça se comporte. Comme il est fait pour être jeté, on peut sauter tests et structure et aller vite. Le risque est qu'il devienne en silence le vrai code : on l'isole et on ne garde que les notes.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# prototype bricolé sur main, puis construit dessus\ngit checkout main\n# ...hack rapide pour la reconnexion websocket, commité tel quel\ngit commit -am \"ws reconnect\"",
+    "after": "git switch -c spike/ws-reconnect\n# bricoler librement, mesurer, noter ce qu'on a appris dans ~/notes/ws-reconnect.md\ngit add -A && git commit -m \"spike: throwaway\"\ngit switch main\ngit branch -D spike/ws-reconnect   # les notes vivent hors du dépôt, le code part\n# puis réécrire la vraie version de zéro, avec des tests"
+   },
+   "pitfall": "Laisser le spike grossir jusqu'à devenir le produit : ses raccourcis deviennent alors les fondations."
+  }
+ },
+ "read-only": {
+  "en": {
+   "why": "In read-only mode you look and report but change nothing: no writes, no restarts, no config edits. It is the safe way to investigate a live system, where a well-meant fix can make things worse. Any change is proposed and waits for a yes.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Look at why the server is slow.",
+    "after": "Read-only: investigate why the server is slow. No writes, no restarts,\nno config edits. Use only observation commands (ps, top -b -n1, df -h,\nlog files). Report what you see and the change you would make, then wait."
+   },
+   "pitfall": "Slipping in one harmless restart to see if it helps, which also destroys the evidence."
+  },
+  "fr": {
+   "why": "En lecture seule, on regarde et on rapporte sans rien changer : aucune écriture, aucun redémarrage, aucune modif de config. C'est la façon sûre d'enquêter sur un système en production, où un correctif bien intentionné peut aggraver les choses. Tout changement est proposé et attend un oui.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Regarde pourquoi le serveur est lent.",
+    "after": "Lecture seule : enquête sur la lenteur du serveur. Aucune écriture, aucun\nredémarrage, aucune modif de config. Seulement des commandes d'observation\n(ps, top -b -n1, df -h, fichiers de log). Rapporte ce que tu vois et le\nchangement que tu ferais, puis attends."
+   },
+   "pitfall": "Glisser un redémarrage inoffensif pour voir si ça aide, ce qui détruit aussi les preuves."
+  }
+ },
+ "one-way-door-two-way-door": {
+  "en": {
+   "why": "A two-way door can be walked back through: renaming a local variable, a feature behind a flag. A one-way door cannot: dropping a column, deleting a bucket, sending an email. Move fast through the first kind and slow down on the second.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Clean up the database schema.",
+    "after": "Clean up the schema. Reversible changes (rename a local helper, add a\nnullable column, add an index): go ahead. Irreversible ones (DROP COLUMN,\nDROP TABLE, deleting rows): stop and ask me first, with what is lost and\nhow it could be restored."
+   },
+   "pitfall": "Treating every change as equally dangerous, so the reversible ones get slowed down as much as the real risks."
+  },
+  "fr": {
+   "why": "Une porte à double sens se repasse dans l'autre sens : renommer une variable locale, une fonctionnalité derrière un flag. Une porte à sens unique non : supprimer une colonne, supprimer un bucket, envoyer un email. On avance vite sur la première sorte et on ralentit sur la seconde.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Nettoie le schéma de la base.",
+    "after": "Nettoie le schéma. Changements réversibles (renommer un helper local, ajouter\nune colonne nullable, ajouter un index) : vas-y. Irréversibles (DROP COLUMN,\nDROP TABLE, suppression de lignes) : arrête-toi et demande-moi d'abord, avec\nce qui est perdu et comment le restaurer."
+   },
+   "pitfall": "Traiter tout changement comme également dangereux : les réversibles sont ralentis autant que les vrais risques."
+  }
+ },
+ "explicit-trade-off": {
+  "en": {
+   "why": "Every real choice gives something up. Naming the cost of the chosen option lets the next person judge whether it still makes sense. A choice presented with only benefits usually has a hidden bill.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Which database should we use?",
+    "after": "Which database should we use? Give your pick and, in one line each,\nwhat we gain and what we pay. Add the condition under which you would\nchange your mind."
+   },
+   "pitfall": "Listing a cost so small or generic (some complexity) that it does not actually weigh against the choice."
+  },
+  "fr": {
+   "why": "Tout vrai choix renonce à quelque chose. Nommer le coût de l'option choisie permet au suivant de juger si elle a encore du sens. Un choix présenté avec seulement des avantages cache en général une facture.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Quelle base de données utiliser ?",
+    "after": "Quelle base de données utiliser ? Donne ton choix et, en une ligne chacun,\nce qu'on gagne et ce qu'on paie. Ajoute la condition qui te ferait changer d'avis."
+   },
+   "pitfall": "Citer un coût si petit ou générique (un peu de complexité) qu'il ne pèse pas vraiment contre le choix."
+  }
+ },
+ "first-principles": {
+  "en": {
+   "why": "First principles means ignoring what is usual and rebuilding the answer from the real constraints and numbers. Habit says \"everyone uses a CDN\"; the numbers may say you do not need one yet. Use it when a convention is expensive or when two experts disagree.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "We need a CDN, everyone has one.",
+    "after": "Do not assume we need a CDN. Recompute from the numbers:\n200 req/s x 300 KB = 60 MB/s = 480 Mbit/s, on a 1 Gbit/s link.\nDoes bandwidth force a CDN? If not, decide on latency and cost instead,\nand show the calculation."
+   },
+   "pitfall": "Calling a rule of thumb a first principle without actually recomputing it from measured numbers."
+  },
+  "fr": {
+   "why": "Les premiers principes consistent à ignorer l'habitude et à reconstruire la réponse depuis les vraies contraintes et les vrais chiffres. L'habitude dit \"tout le monde a un CDN\" ; les chiffres disent peut-être qu'on n'en a pas encore besoin. À utiliser quand une convention coûte cher ou que deux experts ne s'accordent pas.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Il nous faut un CDN, tout le monde en a un.",
+    "after": "Ne suppose pas qu'on a besoin d'un CDN. Recalcule depuis les chiffres :\n200 req/s x 300 Ko = 60 Mo/s = 480 Mbit/s, sur un lien de 1 Gbit/s.\nLa bande passante impose-t-elle un CDN ? Sinon, décide sur la latence et\nle coût, et montre le calcul."
+   },
+   "pitfall": "Appeler premier principe une règle empirique sans la recalculer vraiment depuis des chiffres mesurés."
+  }
+ },
+ "show-the-proof": {
+  "en": {
+   "why": "\"It works\" is a claim, not a result. Showing the command, its output and what that output proves lets anyone check the claim and see what it does not cover. It is the line between done and believed done.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "The service is up and working.",
+    "after": "$ systemctl is-active myapp\nactive\n$ curl -s -o /dev/null -w \"%{http_code}\\n\" http://localhost:8080/health\n200\n# proves: the process runs and answers the health route.\n# does not prove: that the data it returns is correct."
+   },
+   "pitfall": "Showing an output that is real but proves less than the claim (a process is running, so the feature works)."
+  },
+  "fr": {
+   "why": "Dire \"ça marche\" est une affirmation, pas un résultat. Montrer la commande, sa sortie et ce qu'elle prouve permet à chacun de vérifier, et de voir ce qu'elle ne couvre pas. C'est la ligne entre fini et cru fini.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "Le service est up et fonctionne.",
+    "after": "$ systemctl is-active myapp\nactive\n$ curl -s -o /dev/null -w \"%{http_code}\\n\" http://localhost:8080/health\n200\n# prouve : le processus tourne et répond sur la route health.\n# ne prouve pas : que les données renvoyées sont justes."
+   },
+   "pitfall": "Montrer une sortie réelle qui prouve moins que l'affirmation (un processus tourne, donc la fonctionnalité marche)."
+  }
+ },
+ "timebox": {
+  "en": {
+   "why": "Open-ended searches expand to fill all available time. A timebox fixes the maximum you will spend, and at the deadline you stop and report. You get a result either way: what was found, what was ruled out, what is still open.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Find out why the CI is slow.",
+    "after": "Spend at most 20 minutes finding why the CI is slow. At the deadline, stop\nand report: what you found, what you ruled out, what is still open, and\nwhat the next 20 minutes would test. No fix yet."
+   },
+   "pitfall": "Quietly extending the time because the answer feels close, which is exactly what the timebox is there to prevent."
+  },
+  "fr": {
+   "why": "Une recherche sans limite grossit jusqu'à occuper tout le temps disponible. Un timebox fixe le maximum qu'on y passe, et à l'échéance on s'arrête et on rend compte. On obtient un résultat dans tous les cas : ce qui est trouvé, ce qui est écarté, ce qui reste ouvert.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Trouve pourquoi la CI est lente.",
+    "after": "Passe 20 minutes au maximum à chercher pourquoi la CI est lente. À l'échéance,\narrête-toi et rapporte : ce que tu as trouvé, ce que tu as écarté, ce qui reste\nouvert, et ce que les 20 minutes suivantes testeraient. Pas de correctif encore."
+   },
+   "pitfall": "Rallonger discrètement parce que la réponse semble proche, ce que le timebox sert justement à empêcher."
+  }
+ },
+ "tracer-bullet-walking-skeleton": {
+  "en": {
+   "why": "A tracer bullet is a thin slice that runs through every layer for one real case, crude but working. It proves the pieces connect before you invest in any of them. Then you thicken each step one at a time, always with something that runs.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# parser.py   80% done, nothing calls it\n# db.py       schema for 12 tables, untested\n# api.py      not started\n# nothing runs end to end yet",
+    "after": "import csv\n\ndef main():\n    row = next(csv.reader(open(\"orders.csv\")))     # real input\n    order = {\"id\": row[0], \"total\": float(row[1])}  # crude parse\n    save(order)                                     # real sqlite insert\n    print(fetch(order[\"id\"]))                       # real output\n# ugly but it runs: now harden parse, then save, then fetch"
+   },
+   "pitfall": "Making the first slice so fake (hardcoded data, no real input or output) that it proves nothing about the connections."
+  },
+  "fr": {
+   "why": "Un tracer bullet est une tranche mince qui traverse toutes les couches pour un cas réel, grossière mais fonctionnelle. Elle prouve que les pièces se raccordent avant d'investir dans l'une d'elles. Ensuite on épaissit chaque étape une à une, avec toujours quelque chose qui tourne.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# parser.py   fait à 80 %, personne ne l'appelle\n# db.py       schéma de 12 tables, non testé\n# api.py      pas commencé\n# rien ne tourne de bout en bout",
+    "after": "import csv\n\ndef main():\n    row = next(csv.reader(open(\"orders.csv\")))     # vraie entrée\n    order = {\"id\": row[0], \"total\": float(row[1])}  # parse grossier\n    save(order)                                     # vrai insert sqlite\n    print(fetch(order[\"id\"]))                       # vraie sortie\n# moche mais ça tourne : on renforce parse, puis save, puis fetch"
+   },
+   "pitfall": "Faire une première tranche si factice (données en dur, ni vraie entrée ni vraie sortie) qu'elle ne prouve rien sur les raccords."
+  }
+ },
+ "vertical-slice": {
+  "en": {
+   "why": "A vertical slice cuts through all layers (UI, API, storage) to deliver one small working behaviour. A horizontal layer, such as the whole database for every entity, has no use until the other layers exist. Slices give you something demonstrable and testable at each step.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "First build the whole database layer for all entities, then the API, then the UI.",
+    "after": "Build \"create a note\" end to end: one form field, POST /notes, one table,\nand the list shown on screen. Nothing for edit, delete or tags yet.\nShow it working, then we pick the next slice."
+   },
+   "pitfall": "Choosing a slice so wide that it is really a layer in disguise and nothing can be demonstrated."
+  },
+  "fr": {
+   "why": "Une tranche verticale traverse toutes les couches (UI, API, stockage) pour livrer un petit comportement qui marche. Une couche horizontale, comme toute la base pour toutes les entités, ne sert à rien tant que les autres couches n'existent pas. Les tranches donnent à chaque étape quelque chose de démontrable et de testable.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Construis d'abord toute la couche base pour toutes les entités, puis l'API, puis l'UI.",
+    "after": "Construis \"créer une note\" de bout en bout : un champ de formulaire, POST /notes,\nune table, et la liste affichée à l'écran. Rien pour modifier, supprimer ou les tags.\nMontre que ça marche, puis on choisit la tranche suivante."
+   },
+   "pitfall": "Choisir une tranche si large que c'est une couche déguisée et que rien n'est démontrable."
+  }
+ },
+ "non-goals": {
+  "en": {
+   "why": "Non-goals are the things you decide not to do, written down. They stop scope creep before it starts, because each \"while we are at it\" can be checked against the list. They also tell a reviewer what is missing on purpose.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Build a CLI to rename photos.",
+    "after": "Goal: rename photos by their EXIF date.\nNon-goals: no GUI, no video files, no undo, no cloud sync.\nIf a change needs one of these, stop and ask me instead of adding it."
+   },
+   "pitfall": "Listing non-goals nobody wanted anyway, instead of the tempting extras that will actually creep in."
+  },
+  "fr": {
+   "why": "Les non-objectifs sont ce qu'on décide de ne pas faire, par écrit. Ils arrêtent la dérive de périmètre avant qu'elle commence, car chaque \"tant qu'on y est\" peut être confronté à la liste. Ils disent aussi au relecteur ce qui manque exprès.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Construis une CLI pour renommer des photos.",
+    "after": "Objectif : renommer les photos selon leur date EXIF.\nNon-objectifs : pas d'interface graphique, pas de vidéos, pas d'annulation, pas de synchro cloud.\nSi un changement en demande un, arrête-toi et demande-moi au lieu de l'ajouter."
+   },
+   "pitfall": "Lister des non-objectifs que personne ne voulait, au lieu des extras tentants qui vont vraiment s'infiltrer."
+  }
+ },
+ "inversion": {
+  "en": {
+   "why": "Inversion asks how to guarantee failure, then checks you are not doing any of it. It is often easier to list ways to fail than ways to succeed, and the list is concrete. Use it when \"make it reliable\" or \"make it good\" is too vague to act on.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Make the deploy reliable.",
+    "after": "Inversion: list what would guarantee the deploy fails (no rollback,\nmigrations run by hand, missing secrets, no health check after release).\nThen check which of these we do today and fix those first."
+   },
+   "pitfall": "Listing failures in the abstract and never checking the real setup against each one."
+  },
+  "fr": {
+   "why": "L'inversion demande comment garantir l'échec, puis vérifie qu'on n'en fait rien. Il est souvent plus facile de lister des façons d'échouer que de réussir, et la liste est concrète. À utiliser quand \"rends-le fiable\" ou \"rends-le bon\" est trop vague pour agir.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Rends le déploiement fiable.",
+    "after": "Inversion : liste ce qui garantirait l'échec du déploiement (pas de rollback,\nmigrations lancées à la main, secrets absents, pas de health check après release).\nVérifie ensuite lesquels on fait aujourd'hui et corrige ceux-là d'abord."
+   },
+   "pitfall": "Lister des échecs en théorie sans jamais confronter l'installation réelle à chacun."
+  }
+ },
+ "five-whys": {
+  "en": {
+   "why": "Each \"why\" moves from a symptom one step closer to the cause, and stopping early leaves you fixing a symptom. The rule that makes it work: every answer needs proof, not a guess. The number five is a guide, you stop when the cause is something you can fix for good.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Outage: the disk was full.\nFix: delete the logs.",
+    "after": "1. Why was the app down? The DB refused writes.   proof: \"No space left on device\" in the log\n2. Why? The disk was at 100%.                       proof: df -h\n3. Why? /var/log held 80 GB.                        proof: du -sh /var/log/*\n4. Why? app.log is never rotated.                   proof: ls /etc/logrotate.d has no app entry\n5. Why? The deploy script does not install it.      proof: grep logrotate deploy.sh finds nothing\nFix: install the logrotate file in the deploy script."
+   },
+   "pitfall": "Answering a why with a plausible guess and no check, so the chain ends at a cause that is only a story."
+  },
+  "fr": {
+   "why": "Chaque \"pourquoi\" rapproche d'un cran le symptôme de la cause, et s'arrêter tôt laisse à corriger un symptôme. La règle qui fait marcher la méthode : chaque réponse a sa preuve, pas une supposition. Cinq est un repère, on s'arrête quand la cause est quelque chose qu'on peut corriger pour de bon.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Panne : le disque était plein.\nCorrectif : supprimer les logs.",
+    "after": "1. Pourquoi l'app était down ? La base refusait les écritures.   preuve : \"No space left on device\" dans le log\n2. Pourquoi ? Le disque était à 100 %.                            preuve : df -h\n3. Pourquoi ? /var/log pesait 80 Go.                              preuve : du -sh /var/log/*\n4. Pourquoi ? app.log n'a aucune rotation.                        preuve : ls /etc/logrotate.d sans entrée app\n5. Pourquoi ? Le script de déploiement ne l'installe pas.         preuve : grep logrotate deploy.sh ne trouve rien\nCorrectif : installer le fichier logrotate dans le script de déploiement."
+   },
+   "pitfall": "Répondre à un pourquoi par une supposition plausible sans contrôle : la chaîne finit sur une cause qui n'est qu'une histoire."
+  }
+ },
+ "differential-diagnosis": {
+  "en": {
+   "why": "When something works in one place and fails in another, the cause lives in the difference between them. Comparing the healthy and the broken case (versions, config, environment, input) narrows the search to a short list. It beats reading code at random.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# works locally, fails on the server\n# \"let's reinstall everything and see\"",
+    "after": "# compare the healthy and the broken environment\ndiff <(pip freeze) <(ssh prod pip freeze)\ndiff <(env | sort) <(ssh prod env | sort)\ndiff config.local.yml <(ssh prod cat /srv/app/config.yml)\n# each line of difference is a suspect; test them one at a time"
+   },
+   "pitfall": "Changing several differences at once, so even when it starts working you do not know which one mattered."
+  },
+  "fr": {
+   "why": "Quand ça marche à un endroit et échoue à un autre, la cause se trouve dans la différence entre les deux. Comparer le cas sain et le cas cassé (versions, config, environnement, entrée) réduit la recherche à une courte liste. C'est mieux que lire du code au hasard.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# marche en local, échoue sur le serveur\n# \"réinstallons tout et voyons\"",
+    "after": "# comparer l'environnement sain et l'environnement cassé\ndiff <(pip freeze) <(ssh prod pip freeze)\ndiff <(env | sort) <(ssh prod env | sort)\ndiff config.local.yml <(ssh prod cat /srv/app/config.yml)\n# chaque ligne de différence est un suspect ; les tester un par un"
+   },
+   "pitfall": "Changer plusieurs différences à la fois : quand ça remarche, on ne sait pas laquelle comptait."
+  }
+ },
+ "occam-s-razor": {
+  "en": {
+   "why": "Among explanations that fit the facts, the simplest is usually right, and it is also the cheapest to check. Wrong path, missing permission, a typo in config and an unset variable cause most failures. Rule those out before suspecting a kernel bug or a compiler fault.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# \"Permission denied\" writing /var/data/out.csv\n# \"probably a filesystem driver bug, let's try another kernel\"",
+    "after": "ls -ld /var/data /var/data/out.csv   # does it exist, who owns it?\nid                                   # which user am I running as?\ntouch /var/data/test && rm /var/data/test   # can this user write there?\n# only if all of this is fine, look for something exotic"
+   },
+   "pitfall": "Using simplicity as an excuse to stop at the first mundane cause without actually checking that it is the one."
+  },
+  "fr": {
+   "why": "Parmi les explications compatibles avec les faits, la plus simple est en général la bonne, et c'est aussi la moins chère à vérifier. Mauvais chemin, droit manquant, faute de frappe dans la config et variable non définie causent la plupart des pannes. On les écarte avant de soupçonner un bug de noyau ou de compilateur.",
+   "example": {
+    "kind": "command",
+    "lang": "bash",
+    "before": "# \"Permission denied\" en écrivant /var/data/out.csv\n# \"sûrement un bug du driver de fichiers, essayons un autre noyau\"",
+    "after": "ls -ld /var/data /var/data/out.csv   # existe-t-il, à qui appartient-il ?\nid                                   # sous quel utilisateur je tourne ?\ntouch /var/data/test && rm /var/data/test   # cet utilisateur peut-il y écrire ?\n# seulement si tout est bon, chercher quelque chose d'exotique"
+   },
+   "pitfall": "Prendre la simplicité pour prétexte de s'arrêter à la première cause banale sans vérifier que c'est bien elle."
+  }
+ },
+ "second-order-effects": {
+  "en": {
+   "why": "A fix changes the system, and the change has its own consequences one step later. Moving load, filling a queue or retrying more all shift the problem rather than remove it. Ask \"and then what happens?\" before shipping.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Add retries to the API client to fix the timeouts.",
+    "after": "Add retries to the API client to fix the timeouts. Second-order check:\nif the server is slow because it is overloaded, 3 retries multiply its load\nby up to 4. Use exponential backoff with jitter and a retry cap, then compare\nthe server request rate before and after the change."
+   },
+   "pitfall": "Verifying that the original symptom is gone and never looking at what the fix did to its neighbours."
+  },
+  "fr": {
+   "why": "Un correctif change le système, et ce changement a ses propres conséquences un cran plus loin. Déplacer la charge, remplir une file ou réessayer davantage déplacent le problème au lieu de le supprimer. On demande \"et ensuite, que se passe-t-il ?\" avant de livrer.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Ajoute des retries au client API pour corriger les timeouts.",
+    "after": "Ajoute des retries au client API pour corriger les timeouts. Contrôle de second\nordre : si le serveur est lent parce qu'il est surchargé, 3 retries multiplient\nsa charge jusqu'à 4. Utilise un backoff exponentiel avec jitter et un plafond de\nretries, puis compare le taux de requêtes du serveur avant et après."
+   },
+   "pitfall": "Vérifier que le symptôme d'origine a disparu sans regarder ce que le correctif a fait à ses voisins."
+  }
+ },
+ "goodhart-s-law": {
+  "en": {
+   "why": "When a measure becomes a target, people and code optimise the number instead of what it stood for. Coverage can hit 95% with tests that assert nothing. Check the real effect the metric was meant to indicate.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Raise the test coverage to 95%.",
+    "after": "Raise the test coverage to 95%, and prove the number means something:\nchange a `>` to `>=` in pricing.py and run pytest. If the suite stays green,\nthose tests do not check behaviour. Report the coverage and the result of\nthat check, and revert the change afterwards."
+   },
+   "pitfall": "Celebrating the metric going up without checking whether the thing it measures actually improved."
+  },
+  "fr": {
+   "why": "Quand une mesure devient une cible, les gens et le code optimisent le chiffre plutôt que ce qu'il représentait. La couverture peut atteindre 95 % avec des tests qui n'assertent rien. On vérifie l'effet réel que la mesure devait indiquer.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Monte la couverture de tests à 95 %.",
+    "after": "Monte la couverture de tests à 95 %, et prouve que le chiffre veut dire quelque\nchose : change un `>` en `>=` dans pricing.py et lance pytest. Si la suite reste\nverte, ces tests ne vérifient pas le comportement. Rapporte la couverture et le\nrésultat de ce contrôle, puis annule la modification."
+   },
+   "pitfall": "Fêter la mesure qui monte sans vérifier que la chose qu'elle mesure s'est vraiment améliorée."
+  }
+ },
+ "order-of-magnitude-fermi": {
+  "en": {
+   "why": "A back-of-envelope estimate gives the rough size of an answer before you compute it. When the real result is off by 10x or more from the estimate, something is wrong, in the estimate or in the code. It is also quick: bytes, seconds or money to the nearest power of ten.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "data = list(read_all_rows())   # 10 million rows, fine, probably",
+    "after": "rows = 10_000_000\nbytes_per_row = 200\nprint(rows * bytes_per_row / 1e9, \"GB raw\")   # 2.0 GB\n# Python objects cost several times the raw size: expect roughly 6 to 10 GB\n# on an 8 GB machine, so stream the rows instead of building a list\nfor row in read_all_rows():    # generator\n    handle(row)"
+   },
+   "pitfall": "Estimating once, then trusting the estimate over the measurement when the two disagree."
+  },
+  "fr": {
+   "why": "Une estimation à la louche donne la taille approximative d'une réponse avant de la calculer. Quand le vrai résultat s'écarte d'un facteur 10 ou plus de l'estimation, quelque chose cloche, dans l'estimation ou dans le code. C'est aussi rapide : octets, secondes ou euros à la puissance de dix près.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "data = list(read_all_rows())   # 10 millions de lignes, ça passe, sûrement",
+    "after": "rows = 10_000_000\nbytes_per_row = 200\nprint(rows * bytes_per_row / 1e9, \"Go brut\")   # 2.0 Go\n# les objets Python coûtent plusieurs fois la taille brute : compter 6 à 10 Go\n# environ sur une machine de 8 Go, donc lire en flux au lieu de bâtir une liste\nfor row in read_all_rows():    # générateur\n    handle(row)"
+   },
+   "pitfall": "Estimer une fois, puis croire l'estimation plutôt que la mesure quand les deux divergent."
+  }
+ },
+ "adr-recorded-decision": {
+  "en": {
+   "why": "An Architecture Decision Record is a short dated note with the context, the choice and the options you rejected. Months later it answers \"why did we do it this way?\" without anyone having to remember. Five lines are enough, and it lives next to the code.",
+   "example": {
+    "kind": "code",
+    "lang": "text",
+    "before": "git commit -m \"switch to postgres\"\n# nobody will know why in six months",
+    "after": "2026-11-17  ADR 7: Use Postgres, not SQLite\nContext:   two app servers will now write the same data.\nDecision:  Postgres 16 on the managed instance.\nRejected:  SQLite (one writer, local file), MySQL (no team experience).\nCost:      backups and a connection pool to run and monitor."
+   },
+   "pitfall": "Recording the decision but not the rejected options, so the same debate restarts the next time someone doubts it."
+  },
+  "fr": {
+   "why": "Un ADR (Architecture Decision Record) est une courte note datée avec le contexte, le choix et les options écartées. Des mois plus tard, elle répond à \"pourquoi avait-on fait comme ça ?\" sans que personne ait à s'en souvenir. Cinq lignes suffisent, et elle vit à côté du code.",
+   "example": {
+    "kind": "code",
+    "lang": "text",
+    "before": "git commit -m \"switch to postgres\"\n# personne ne saura pourquoi dans six mois",
+    "after": "2026-11-17  ADR 7 : Postgres, pas SQLite\nContexte :  deux serveurs d'appli vont maintenant écrire les mêmes données.\nDécision :  Postgres 16 sur l'instance managée.\nÉcartées :  SQLite (un seul écrivain, fichier local), MySQL (pas d'expérience dans l'équipe).\nCoût :      sauvegardes et pool de connexions à faire tourner et surveiller."
+   },
+   "pitfall": "Consigner la décision sans les options écartées : le même débat redémarre à la première personne qui doute."
+  }
+ },
+ "counterexample": {
+  "en": {
+   "why": "A rule claims to hold for every case, so one case where it fails is enough to refute it. Looking for that case before you state the rule is faster than defending the rule afterwards. It works well with a small brute-force check against a trusted reference.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# \"a year is a leap year if it is divisible by 4\"\ndef is_leap(y):\n    return y % 4 == 0",
+    "after": "import calendar\n\ndef is_leap(y):\n    return y % 4 == 0\n\n# look for a counterexample against the standard library\nbad = [y for y in range(1, 3000) if is_leap(y) != calendar.isleap(y)]\nprint(bad[:3])   # [100, 200, 300]: the rule is wrong\n# fix: divisible by 4, except centuries, unless divisible by 400"
+   },
+   "pitfall": "Testing only examples that agree with the rule, which can never refute it."
+  },
+  "fr": {
+   "why": "Une règle prétend valoir pour tous les cas, donc un seul cas où elle échoue suffit à la réfuter. Chercher ce cas avant d'énoncer la règle va plus vite que de la défendre ensuite. Ça marche bien avec une petite vérification par force brute contre une référence fiable.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# \"une année est bissextile si elle est divisible par 4\"\ndef is_leap(y):\n    return y % 4 == 0",
+    "after": "import calendar\n\ndef is_leap(y):\n    return y % 4 == 0\n\n# chercher un contre-exemple face à la bibliothèque standard\nbad = [y for y in range(1, 3000) if is_leap(y) != calendar.isleap(y)]\nprint(bad[:3])   # [100, 200, 300] : la règle est fausse\n# correctif : divisible par 4, sauf les siècles, sauf si divisible par 400"
+   },
+   "pitfall": "Ne tester que des exemples qui confirment la règle, ce qui ne pourra jamais la réfuter."
+  }
+ },
+ "reference-repo": {
+  "en": {
+   "why": "For most common problems, a mature open-source project has already solved it and met the edge cases. Reading a working implementation first tells you what the problem really involves. Then you can copy the design, or know exactly why you are choosing a different one.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Write a retry with backoff for my HTTP client from scratch.",
+    "after": "Before writing anything, read how urllib3 implements Retry (backoff_factor,\nstatus_forcelist, which methods it retries). List what it handles that a naive\nversion would miss. Then write my version and say what you kept, what you dropped."
+   },
+   "pitfall": "Copying code from the reference without understanding its assumptions, license or the cases it was built for."
+  },
+  "fr": {
+   "why": "Pour la plupart des problèmes courants, un projet open source mûr l'a déjà résolu et a rencontré les cas limites. Lire d'abord une implémentation qui marche montre ce que le problème implique vraiment. On peut ensuite copier le design, ou savoir exactement pourquoi on en choisit un autre.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Écris de zéro un retry avec backoff pour mon client HTTP.",
+    "after": "Avant d'écrire quoi que ce soit, lis comment urllib3 implémente Retry (backoff_factor,\nstatus_forcelist, quelles méthodes il rejoue). Liste ce qu'il gère et qu'une version\nnaïve raterait. Puis écris ma version et dis ce que tu as gardé, ce que tu as laissé."
+   },
+   "pitfall": "Copier le code de référence sans comprendre ses hypothèses, sa licence ni les cas pour lesquels il a été fait."
+  }
+ },
+ "decompose": {
+  "en": {
+   "why": "A large problem is hard to start and hard to know when it is finished. Splitting it into independent sub-problems, each with its own check, lets you progress and verify in small steps. If one step fails, you know exactly where.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Migrate the app from Flask to FastAPI.",
+    "after": "Split the migration into independent steps, each with its own check:\n1. inventory the routes (check: the list matches the output of `flask routes`),\n2. port the health route (check: it returns 200),\n3. port one read route with a test, 4. port the writes, 5. remove Flask.\nDo step 1 only and show its check."
+   },
+   "pitfall": "Splitting into steps that depend on each other and cannot be checked alone, so nothing is verified until the end."
+  },
+  "fr": {
+   "why": "Un gros problème est difficile à démarrer et difficile à savoir fini. Le découper en sous-problèmes indépendants, chacun avec son contrôle, permet d'avancer et de vérifier par petits pas. Si une étape échoue, on sait exactement où.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "Migre l'appli de Flask vers FastAPI.",
+    "after": "Découpe la migration en étapes indépendantes, chacune avec son contrôle :\n1. inventorier les routes (contrôle : la liste correspond à la sortie de `flask routes`),\n2. porter la route health (contrôle : elle renvoie 200),\n3. porter une route de lecture avec un test, 4. porter les écritures, 5. retirer Flask.\nFais seulement l'étape 1 et montre son contrôle."
+   },
+   "pitfall": "Découper en étapes qui dépendent les unes des autres et ne se contrôlent pas seules : rien n'est vérifié avant la fin."
+  }
+ },
+ "work-backwards": {
+  "en": {
+   "why": "Instead of starting with the first step, you start from the result you want and ask what must exist just before it. Writing the expected output first makes the goal exact, and the missing steps appear on the way back up. A test written first is the simplest way to do it.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# start coding: fetch the page...\n# then parse... then somehow produce the report",
+    "after": "# 1. write the expected result first\nEXPECTED = [{\"title\": \"A\", \"price\": 9.5}, {\"title\": \"B\", \"price\": 12.0}]\n\ndef test_scrape():\n    assert scrape(FIXTURE_HTML) == EXPECTED\n\n# 2. climb back: scrape() needs parse_items(html), which needs fetch(url)\n# 3. build each step from the end, the test stays red until all fit"
+   },
+   "pitfall": "Writing an expected result so loose (it should return something) that it cannot guide the steps."
+  },
+  "fr": {
+   "why": "Au lieu de commencer par la première étape, on part du résultat voulu et on demande ce qui doit exister juste avant. Écrire d'abord la sortie attendue rend l'objectif exact, et les étapes manquantes apparaissent en remontant. Un test écrit en premier est la façon la plus simple de le faire.",
+   "example": {
+    "kind": "code",
+    "lang": "python",
+    "before": "# on commence à coder : récupérer la page...\n# puis parser... puis produire le rapport d'une façon ou d'une autre",
+    "after": "# 1. écrire d'abord le résultat attendu\nEXPECTED = [{\"title\": \"A\", \"price\": 9.5}, {\"title\": \"B\", \"price\": 12.0}]\n\ndef test_scrape():\n    assert scrape(FIXTURE_HTML) == EXPECTED\n\n# 2. remonter : scrape() a besoin de parse_items(html), qui a besoin de fetch(url)\n# 3. construire chaque étape depuis la fin, le test reste rouge tant que tout ne colle pas"
+   },
+   "pitfall": "Écrire un résultat attendu si flou (ça doit renvoyer quelque chose) qu'il ne peut pas guider les étapes."
+  }
+ },
+ "checklist": {
+  "en": {
+   "why": "Under pressure or on the tenth repetition, people skip the step that seems obvious. A written list ticked one by one does not rely on memory or mood. It is worth the effort for any action that is repeated and costly when done wrong, like a release.",
+   "example": {
+    "kind": "code",
+    "lang": "markdown",
+    "before": "\"I know the release steps by heart\"",
+    "after": "Release checklist\n- [ ] tests green on main\n- [ ] version bumped in package.json\n- [ ] changelog updated\n- [ ] git tag v1.2.0 && git push origin v1.2.0\n- [ ] build published, install tested in a clean directory\n- [ ] rollback command written down"
+   },
+   "pitfall": "Keeping a long checklist that nobody updates after a miss, so it stops matching reality."
+  },
+  "fr": {
+   "why": "Sous pression, ou à la dixième répétition, on saute l'étape qui semble évidente. Une liste écrite, cochée une à une, ne dépend ni de la mémoire ni de l'humeur. Elle vaut l'effort pour tout geste répété et coûteux quand il est raté, comme une release.",
+   "example": {
+    "kind": "code",
+    "lang": "markdown",
+    "before": "\"je connais les étapes de release par cœur\"",
+    "after": "Checklist de release\n- [ ] tests verts sur main\n- [ ] version incrémentée dans package.json\n- [ ] changelog à jour\n- [ ] git tag v1.2.0 && git push origin v1.2.0\n- [ ] build publié, installation testée dans un dossier vierge\n- [ ] commande de rollback notée"
+   },
+   "pitfall": "Garder une longue checklist que personne ne met à jour après un oubli : elle cesse de refléter la réalité."
+  }
+ },
+ "open-question": {
+  "en": {
+   "why": "An open question is something you do not know yet, listed as such. Filling the gap with a plausible guess turns it into a hidden assumption that later breaks the work. Keeping the list visible tells everyone what is known, what is unknown and what to check next.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "The cause is probably the new proxy.",
+    "after": "Known: errors started at 14:02, the same minute as the deploy.\nOpen questions (not guessed):\n- do the proxy logs show 502s around 14:02? (to check)\n- does the previous version also fail on the same requests? (to test)\n- is the error rate the same on all servers? (to measure)\nNothing is changed until these are answered."
+   },
+   "pitfall": "Listing open questions and then acting as if they were answered anyway."
+  },
+  "fr": {
+   "why": "Une question ouverte est quelque chose qu'on ne sait pas encore, listé comme tel. Combler le trou par une supposition plausible en fait une hypothèse cachée qui casse le travail plus tard. Garder la liste visible dit à tous ce qui est su, ce qui est inconnu et quoi vérifier ensuite.",
+   "example": {
+    "kind": "prompt",
+    "lang": "text",
+    "before": "La cause, c'est probablement le nouveau proxy.",
+    "after": "Su : les erreurs ont démarré à 14:02, la même minute que le déploiement.\nQuestions ouvertes (non devinées) :\n- les logs du proxy montrent-ils des 502 vers 14:02 ? (à vérifier)\n- l'ancienne version échoue-t-elle aussi sur les mêmes requêtes ? (à tester)\n- le taux d'erreur est-il le même sur tous les serveurs ? (à mesurer)\nRien n'est changé tant qu'elles n'ont pas de réponse."
+   },
+   "pitfall": "Lister les questions ouvertes puis agir comme si elles avaient déjà une réponse."
+  }
+ }
+}

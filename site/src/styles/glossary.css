@@ -1,0 +1,57 @@
+/* Glossary page */
+.searchbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 40rem;
+}
+.searchbar__icon { position: absolute; left: var(--space-3); color: var(--color-text-muted); pointer-events: none; }
+.searchbar__input {
+  width: 100%;
+  min-height: calc(var(--control-md) + var(--space-2));
+  padding: 0 var(--space-10);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+.searchbar__input::placeholder { color: var(--color-text-muted); opacity: 1; }
+.searchbar__kbd {
+  position: absolute;
+  right: var(--space-3);
+  padding: 0 var(--space-2);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.count { color: var(--color-text-muted); }
+.count strong { color: var(--color-text); }
+
+.results { display: flex; flex-direction: column; gap: var(--space-10); }
+.result-group { display: flex; flex-direction: column; gap: var(--space-2); }
+.result-group__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-regular);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-hairline) solid var(--color-border-strong);
+}
+.result-group__title .muted { font-family: var(--font-sans); font-size: var(--text-sm); }
+
+.word-row {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-hairline) solid var(--color-border);
+}
+.word-row__word { font-weight: var(--weight-semibold); }
+.word-row__meaning { color: var(--color-text-muted); }
+.word-row__action { font-size: var(--text-sm); }
+
+@media (min-width: 52em) {
+  .word-row { grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 5fr); gap: var(--space-6); }
+  .word-row--combo { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+}

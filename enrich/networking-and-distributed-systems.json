@@ -1,0 +1,288 @@
+{
+  "the-network-lies": {
+    "en": {
+      "why": "Between two machines a call can be lost, delayed, delivered twice or overtaken by a later one, and the sender often cannot tell which happened. Code that assumes one clean request and one clean answer works on localhost and breaks in production. Give every call a timeout, a retry policy, and a way for the receiver to ignore a repeat.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r = requests.post(url, json=order)\norder_id = r.json()[\"id\"]",
+        "after": "for attempt in range(3):\n    try:\n        r = requests.post(url, json=order, timeout=5,\n                          headers={\"Idempotency-Key\": key})  # same key on every retry\n        r.raise_for_status()\n        break\n    except requests.RequestException:\n        time.sleep(2 ** attempt)\nelse:\n    raise RuntimeError(\"order not confirmed after 3 attempts\")"
+      },
+      "pitfall": "Retrying without a key the receiver can deduplicate: the first attempt had worked, only the answer was lost, and the order is now created twice."
+    },
+    "fr": {
+      "why": "Entre deux machines, un appel peut être perdu, retardé, livré deux fois ou dépassé par un appel plus récent, et l'émetteur ne sait souvent pas lequel des cas s'est produit. Un code qui suppose une requête propre et une réponse propre marche en local et casse en production. Donner à chaque appel un timeout, une politique de retry, et un moyen pour le récepteur d'ignorer une répétition.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r = requests.post(url, json=order)\norder_id = r.json()[\"id\"]",
+        "after": "for attempt in range(3):\n    try:\n        r = requests.post(url, json=order, timeout=5,\n                          headers={\"Idempotency-Key\": key})  # même clé à chaque retry\n        r.raise_for_status()\n        break\n    except requests.RequestException:\n        time.sleep(2 ** attempt)\nelse:\n    raise RuntimeError(\"commande non confirmée après 3 essais\")"
+      },
+      "pitfall": "Réessayer sans clé que le récepteur peut dédupliquer : la première tentative avait réussi, seule la réponse s'est perdue, et la commande est maintenant créée deux fois."
+    }
+  },
+  "latency-throughput": {
+    "en": {
+      "why": "Latency is how long one round trip takes; throughput is how much data moves per second. They limit different things: 10,000 tiny requests are bound by latency, one huge file is bound by throughput. Optimizing the wrong one changes nothing, so measure first.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Downloads are slow, make them faster.",
+        "after": "Fetching 10,000 small JSON files takes 40 minutes. Before changing anything, tell me whether we are limited by latency or throughput:\ntime one request (curl -s -o /dev/null -w '%{time_total}' URL), divide total bytes by total time and compare with the link capacity, and check how many run at once.\nIf latency dominates, propose batching or parallel requests; if throughput dominates, propose compression or a closer source. Show the numbers first."
+      },
+      "pitfall": "Adding parallel connections to a transfer that already fills the link: it helps with latency, not with a throughput ceiling."
+    },
+    "fr": {
+      "why": "La latence est la durée d'un aller-retour ; le débit est le volume de données par seconde. Ils limitent des choses différentes : 10 000 petites requêtes sont bornées par la latence, un énorme fichier par le débit. Optimiser le mauvais ne change rien, donc on mesure d'abord.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Les téléchargements sont lents, accélère-les.",
+        "after": "Récupérer 10 000 petits fichiers JSON prend 40 minutes. Avant de toucher à quoi que ce soit, dis-moi si on est limité par la latence ou par le débit :\nchronomètre une requête (curl -s -o /dev/null -w '%{time_total}' URL), divise le volume total par la durée totale et compare avec la capacité de la ligne, et regarde combien tournent en même temps.\nSi la latence domine, propose du batching ou des requêtes en parallèle ; si le débit domine, propose de la compression ou une source plus proche. Les chiffres d'abord."
+      },
+      "pitfall": "Ajouter des connexions en parallèle sur un transfert qui sature déjà la ligne : ça aide contre la latence, pas contre un plafond de débit."
+    }
+  },
+  "reconnect-with-resume": {
+    "en": {
+      "why": "A long-lived connection (websocket, stream, SSE) will drop sooner or later: Wi-Fi change, proxy timeout, server restart. If the client just dies, or reconnects and replays everything, data is lost or duplicated. Reconnect by itself, ask the server to continue from the last offset received, and wait longer between failed attempts.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def listen(url):\n    async with websockets.connect(url) as ws:\n        async for raw in ws:\n            handle(json.loads(raw))",
+        "after": "async def listen(url):\n    offset, delay = 0, 1\n    while True:\n        try:\n            async with websockets.connect(f\"{url}?from={offset}\") as ws:  # resume parameter defined by the server\n                delay = 1\n                async for raw in ws:\n                    m = json.loads(raw)\n                    handle(m)\n                    offset = m[\"offset\"] + 1\n        except (OSError, websockets.ConnectionClosed):\n            pass\n        await asyncio.sleep(delay + random.random())  # backoff with jitter, clean close included\n        delay = min(delay * 2, 30)"
+      },
+      "pitfall": "Reconnecting in a tight loop with no backoff: when the server is the one in trouble, every client hammers it and keeps it down."
+    },
+    "fr": {
+      "why": "Une connexion longue (websocket, flux, SSE) finira par tomber : changement de Wi-Fi, timeout d'un proxy, redémarrage du serveur. Si le client meurt, ou se reconnecte et rejoue tout, des données sont perdues ou dupliquées. Se reconnecter seul, demander au serveur de continuer au dernier offset reçu, et attendre de plus en plus entre deux échecs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def listen(url):\n    async with websockets.connect(url) as ws:\n        async for raw in ws:\n            handle(json.loads(raw))",
+        "after": "async def listen(url):\n    offset, delay = 0, 1\n    while True:\n        try:\n            async with websockets.connect(f\"{url}?from={offset}\") as ws:  # paramètre de reprise défini par le serveur\n                delay = 1\n                async for raw in ws:\n                    m = json.loads(raw)\n                    handle(m)\n                    offset = m[\"offset\"] + 1\n        except (OSError, websockets.ConnectionClosed):\n            pass\n        await asyncio.sleep(delay + random.random())  # backoff avec jitter, fermeture propre comprise\n        delay = min(delay * 2, 30)"
+      },
+      "pitfall": "Se reconnecter en boucle serrée sans backoff : quand c'est le serveur qui souffre, tous les clients le martèlent et l'empêchent de remonter."
+    }
+  },
+  "half-open-connection": {
+    "en": {
+      "why": "When a cable is pulled, a NAT entry expires or a peer crashes without closing, the other side gets no signal and still believes the socket is fine. A read then blocks forever and nothing looks wrong. Have the peer send an application-level ping on a schedule, put a timeout on reads, and treat silence as a dead connection: close it and open a new one.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "line = await reader.readline()  # blocks forever if the peer vanished",
+        "after": "try:\n    line = await asyncio.wait_for(reader.readline(), timeout=30)  # peer pings every 10 s\nexcept asyncio.TimeoutError:\n    writer.close()\n    reader, writer = await asyncio.open_connection(host, port)"
+      },
+      "pitfall": "Relying on TCP alone to notice a dead peer: without keepalive tuning it can take hours, so the application needs its own ping and deadline."
+    },
+    "fr": {
+      "why": "Quand un câble est arraché, qu'une entrée NAT expire ou qu'un pair plante sans fermer, l'autre côté ne reçoit aucun signal et croit encore le socket en bon état. Une lecture bloque alors indéfiniment et rien ne semble anormal. Faire envoyer un ping applicatif à intervalle régulier, mettre un délai sur les lectures, et traiter le silence comme une connexion morte : la fermer et en ouvrir une nouvelle.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "line = await reader.readline()  # bloque pour toujours si le pair a disparu",
+        "after": "try:\n    line = await asyncio.wait_for(reader.readline(), timeout=30)  # le pair envoie un ping toutes les 10 s\nexcept asyncio.TimeoutError:\n    writer.close()\n    reader, writer = await asyncio.open_connection(host, port)"
+      },
+      "pitfall": "Compter sur TCP seul pour détecter un pair mort : sans réglage du keepalive ça peut prendre des heures, l'application doit avoir son propre ping et son délai."
+    }
+  },
+  "local-public-bind": {
+    "en": {
+      "why": "The address a server listens on decides who can reach it. 127.0.0.1 accepts only the same machine; 0.0.0.0 accepts every network interface, including the public one. Some tools listen on all interfaces by default (python -m http.server, a port published with docker -p), which quietly exposes a debug port or an admin tool to the internet.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python -m http.server 8000   # listens on all interfaces by default",
+        "after": "python -m http.server 8000 --bind 127.0.0.1   # this machine only\nss -ltn | grep 8000                              # check the listening address"
+      },
+      "pitfall": "Opening 0.0.0.0 to make something work from another device, then forgetting it: it stays exposed with no authentication."
+    },
+    "fr": {
+      "why": "L'adresse sur laquelle un serveur écoute décide qui peut l'atteindre. 127.0.0.1 n'accepte que la machine elle-même ; 0.0.0.0 accepte toutes les interfaces réseau, la publique comprise. Certains outils écoutent partout par défaut (python -m http.server, un port publié avec docker -p), ce qui expose en silence un port de debug ou un outil d'admin sur internet.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python -m http.server 8000   # écoute sur toutes les interfaces par défaut",
+        "after": "python -m http.server 8000 --bind 127.0.0.1   # cette machine uniquement\nss -ltn | grep 8000                              # vérifier l'adresse d'écoute"
+      },
+      "pitfall": "Ouvrir 0.0.0.0 pour que ça marche depuis un autre appareil, puis l'oublier : ça reste exposé sans authentification."
+    }
+  },
+  "dns-and-ttl": {
+    "en": {
+      "why": "A DNS answer is cached for its TTL, so changing a record does not take effect everywhere at once. An IP hardcoded in the code skips DNS entirely and breaks the day the server moves. Use a name, lower the TTL well before a planned change, and expect old answers to linger until it runs out.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "API = \"http://203.0.113.10:8080\"   # breaks when the server moves",
+        "after": "API = \"https://api.example.com\"   # name resolved at call time\n# before a migration: lower the TTL a day ahead, then switch the record\n# check the remaining TTL (2nd column): dig +noall +answer api.example.com"
+      },
+      "pitfall": "Lowering the TTL at the moment of the change: resolvers already hold the old answer for the old TTL, so it must be lowered earlier."
+    },
+    "fr": {
+      "why": "Une réponse DNS est mise en cache pendant son TTL : changer un enregistrement ne prend donc pas effet partout d'un coup. Une IP écrite en dur dans le code contourne le DNS et casse le jour où le serveur déménage. Utiliser un nom, baisser le TTL bien avant un changement prévu, et s'attendre à ce que les anciennes réponses traînent jusqu'à expiration.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "API = \"http://203.0.113.10:8080\"   # casse quand le serveur déménage",
+        "after": "API = \"https://api.example.com\"   # nom résolu au moment de l'appel\n# avant une migration : baisser le TTL la veille, puis changer l'enregistrement\n# voir le TTL restant (2e colonne) : dig +noall +answer api.example.com"
+      },
+      "pitfall": "Baisser le TTL au moment du changement : les résolveurs gardent déjà l'ancienne réponse pour l'ancien TTL, il faut le baisser plus tôt."
+    }
+  },
+  "ipv4-ipv6": {
+    "en": {
+      "why": "A hostname can resolve to both an IPv4 and an IPv6 address, and the two routes may differ: one can be blocked, rate-limited or just broken while the other works. A client that picks one silently can look like it is failing for no reason. Test both explicitly, and force the one that is accepted when the other is refused.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "curl https://example.com   # fails, so \"the site is down\"",
+        "after": "curl -4 -sS -o /dev/null -w '%{http_code}' https://example.com   # IPv4 only\ncurl -6 -sS -o /dev/null -w '%{http_code}' https://example.com   # IPv6 only\n# one works, one fails: force the working family in the client"
+      },
+      "pitfall": "Concluding the service is down from one failed request, when only one address family is blocked."
+    },
+    "fr": {
+      "why": "Un nom d'hôte peut se résoudre en une adresse IPv4 et une IPv6, et les deux routes peuvent différer : l'une peut être bloquée, limitée ou simplement cassée pendant que l'autre marche. Un client qui choisit en silence semble échouer sans raison. Tester les deux explicitement, et forcer celle qui est acceptée quand l'autre est refusée.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "curl https://example.com   # échoue, donc \"le site est en panne\"",
+        "after": "curl -4 -sS -o /dev/null -w '%{http_code}' https://example.com   # IPv4 seulement\ncurl -6 -sS -o /dev/null -w '%{http_code}' https://example.com   # IPv6 seulement\n# l'un marche, l'autre échoue : forcer la famille qui marche dans le client"
+      },
+      "pitfall": "Conclure que le service est en panne après une seule requête ratée, alors qu'une seule famille d'adresses est bloquée."
+    }
+  },
+  "nat-reverse-tunnel": {
+    "en": {
+      "why": "A machine behind a home router or corporate NAT has no public address, so nobody can open a connection to it. But it can open one outward. A reverse tunnel uses that: the hidden machine connects to a reachable server and asks it to forward a port back through the same connection.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "ssh pi@my-home-ip   # times out: the router drops inbound connections",
+        "after": "# on the machine behind the NAT, it dials out:\nssh -N -o ServerAliveInterval=30 -R 2222:localhost:22 user@vps.example.com\n# then, on the vps:\nssh -p 2222 pi@localhost"
+      },
+      "pitfall": "Forgetting that the tunnel dies with the connection: run it under a supervisor (systemd, autossh) so it comes back after a drop."
+    },
+    "fr": {
+      "why": "Une machine derrière une box ou un NAT d'entreprise n'a pas d'adresse publique, personne ne peut donc ouvrir une connexion vers elle. Mais elle peut en ouvrir une vers l'extérieur. Le tunnel inverse s'en sert : la machine cachée se connecte à un serveur joignable et lui demande de rediriger un port à travers cette même connexion.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "ssh pi@my-home-ip   # timeout : la box ignore les connexions entrantes",
+        "after": "# sur la machine derrière le NAT, elle appelle vers l'extérieur :\nssh -N -o ServerAliveInterval=30 -R 2222:localhost:22 user@vps.example.com\n# puis, sur le vps :\nssh -p 2222 pi@localhost"
+      },
+      "pitfall": "Oublier que le tunnel meurt avec la connexion : le faire tourner sous un superviseur (systemd, autossh) pour qu'il revienne après une coupure."
+    }
+  },
+  "reverse-proxy": {
+    "en": {
+      "why": "A reverse proxy is the single door in front of your services: clients talk to it, and it forwards to the right backend. TLS certificates, routing, body size limits and logging live in one place instead of being redone in every service. Backends can then listen on localhost only.",
+      "example": {
+        "kind": "code",
+        "lang": "nginx",
+        "before": "# no proxy: clients hit :3000 and :8000 directly,\n# each service handles its own TLS, limits and exposure",
+        "after": "server {\n    listen 443 ssl;\n    server_name app.example.com;\n    ssl_certificate     /etc/ssl/app.crt;\n    ssl_certificate_key /etc/ssl/app.key;\n    client_max_body_size 5m;\n    location /api/ { proxy_pass http://127.0.0.1:8000; }\n    location /     { proxy_pass http://127.0.0.1:3000; }\n}"
+      },
+      "pitfall": "Leaving the backends listening on a public address too: the proxy's limits can then be bypassed by calling the service directly."
+    },
+    "fr": {
+      "why": "Un proxy inverse est la porte unique devant les services : les clients lui parlent, il redirige vers le bon backend. Certificats TLS, routage, limites de taille et logs sont réglés une fois à cet endroit au lieu d'être refaits dans chaque service. Les backends peuvent alors n'écouter qu'en local.",
+      "example": {
+        "kind": "code",
+        "lang": "nginx",
+        "before": "# sans proxy : les clients tapent :3000 et :8000 directement,\n# chaque service gère son TLS, ses limites et son exposition",
+        "after": "server {\n    listen 443 ssl;\n    server_name app.example.com;\n    ssl_certificate     /etc/ssl/app.crt;\n    ssl_certificate_key /etc/ssl/app.key;\n    client_max_body_size 5m;\n    location /api/ { proxy_pass http://127.0.0.1:8000; }\n    location /     { proxy_pass http://127.0.0.1:3000; }\n}"
+      },
+      "pitfall": "Laisser aussi les backends sur une adresse publique : les limites du proxy se contournent alors en appelant le service directement."
+    }
+  },
+  "partition-cap": {
+    "en": {
+      "why": "A partition is when the network splits and two groups of machines cannot talk to each other. While it lasts you cannot have both consistency and availability: either you refuse writes that cannot be confirmed, or you accept them and reconcile diverging copies later. Choose which one your data needs before it happens, not during the incident.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for r in replicas:\n    try:\n        r.put(key, value, timeout=1)\n    except TimeoutError:\n        pass   # silently diverges",
+        "after": "acks = 0\nfor r in replicas:\n    try:\n        r.put(key, value, timeout=1)\n        acks += 1\n    except TimeoutError:\n        pass\nif acks < len(replicas) // 2 + 1:\n    raise Unavailable(\"no quorum: write refused\")   # consistency over availability"
+      },
+      "pitfall": "Treating the choice as global: some data (a balance) must refuse writes, other data (a like counter) can diverge and merge."
+    },
+    "fr": {
+      "why": "Une partition, c'est quand le réseau se coupe et que deux groupes de machines ne se parlent plus. Tant qu'elle dure, on ne peut avoir à la fois la cohérence et la disponibilité : soit on refuse les écritures qu'on ne peut pas confirmer, soit on les accepte et on réconcilie plus tard des copies qui ont divergé. Choisir ce que ses données exigent avant que ça arrive, pas pendant l'incident.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for r in replicas:\n    try:\n        r.put(key, value, timeout=1)\n    except TimeoutError:\n        pass   # diverge en silence",
+        "after": "acks = 0\nfor r in replicas:\n    try:\n        r.put(key, value, timeout=1)\n        acks += 1\n    except TimeoutError:\n        pass\nif acks < len(replicas) // 2 + 1:\n    raise Unavailable(\"pas de quorum : écriture refusée\")   # cohérence avant disponibilité"
+      },
+      "pitfall": "Traiter le choix comme global : certaines données (un solde) doivent refuser d'écrire, d'autres (un compteur de likes) peuvent diverger puis fusionner."
+    }
+  },
+  "split-brain": {
+    "en": {
+      "why": "Split-brain happens when a link fails and each node concludes the other is dead, so both promote themselves to leader and both accept writes. The data then diverges and is hard to merge back. Leadership must be granted by something both sides agree on: an external arbiter or a majority vote, so that at most one writer exists.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if peer_silent(10):\n    become_leader()   # both sides may do this at once",
+        "after": "# r is a Redis client: SET NX succeeds for only one node\nif peer_silent(10) and r.set(\"leader\", me, nx=True, ex=10):\n    become_leader()   # renew only while the key still holds me, step down if renewal fails"
+      },
+      "pitfall": "Trusting a lease alone: a leader paused past its expiry can still write, so writes should also carry a fencing token the storage checks."
+    },
+    "fr": {
+      "why": "Le split-brain arrive quand un lien tombe et que chaque nœud conclut que l'autre est mort : les deux se proclament chef et les deux acceptent des écritures. Les données divergent ensuite et sont difficiles à réconcilier. Le rôle de chef doit être accordé par quelque chose que les deux côtés reconnaissent : un arbitre externe ou un vote à la majorité, pour qu'il n'y ait jamais plus d'un écrivain.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if peer_silent(10):\n    become_leader()   # les deux côtés peuvent le faire en même temps",
+        "after": "# r est un client Redis : SET NX ne réussit que pour un seul nœud\nif peer_silent(10) and r.set(\"leader\", me, nx=True, ex=10):\n    become_leader()   # renouveler seulement si la clé vaut encore me, abandonner si ça échoue"
+      },
+      "pitfall": "Se fier à un simple bail : un chef gelé au-delà de son expiration peut encore écrire, les écritures doivent aussi porter un jeton de fencing que le stockage vérifie."
+    }
+  },
+  "message-ordering": {
+    "en": {
+      "why": "Messages sent in order can arrive in another order, especially across retries, several connections or several workers. If the receiver applies each one as it comes, an old update can overwrite a newer one. Number each message per entity and ignore any whose number is not above the last one applied.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def on_message(msg):\n    state[msg[\"id\"]] = msg[\"value\"]   # an old message overwrites a new one",
+        "after": "last_seq = {}\n\ndef on_message(msg):\n    if msg[\"seq\"] <= last_seq.get(msg[\"id\"], -1):\n        return   # stale or duplicate, ignore\n    last_seq[msg[\"id\"]] = msg[\"seq\"]\n    state[msg[\"id\"]] = msg[\"value\"]"
+      },
+      "pitfall": "Using the receive time or the sender's wall clock as the order: clocks drift and arrival order is exactly what you cannot trust, so use a sequence number assigned at the source."
+    },
+    "fr": {
+      "why": "Des messages envoyés dans l'ordre peuvent arriver dans un autre ordre, surtout avec des retries, plusieurs connexions ou plusieurs workers. Si le récepteur applique chacun à son arrivée, une vieille mise à jour peut écraser une plus récente. Numéroter chaque message par entité et ignorer ceux dont le numéro n'est pas supérieur au dernier appliqué.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def on_message(msg):\n    state[msg[\"id\"]] = msg[\"value\"]   # un vieux message écrase un nouveau",
+        "after": "last_seq = {}\n\ndef on_message(msg):\n    if msg[\"seq\"] <= last_seq.get(msg[\"id\"], -1):\n        return   # périmé ou doublon, on ignore\n    last_seq[msg[\"id\"]] = msg[\"seq\"]\n    state[msg[\"id\"]] = msg[\"value\"]"
+      },
+      "pitfall": "Prendre l'heure de réception ou l'horloge de l'émetteur comme ordre : les horloges dérivent et l'ordre d'arrivée est justement ce à quoi on ne peut pas se fier, il faut un numéro de séquence attribué à la source."
+    }
+  },
+  "propagated-deadline": {
+    "en": {
+      "why": "When service A calls B which calls C, each with its own 10 second timeout, nothing ties them together: A gives up at 10 seconds while B still waits on C and C still works for an answer nobody will read. A propagated deadline fixes one point in time for the whole request and passes the remaining time down, so each hop knows how long it may take. gRPC does this natively; with plain HTTP you pass it yourself.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    return requests.get(DOWNSTREAM, timeout=10)   # each hop restarts its own 10 s",
+        "after": "def handle(req):\n    remaining = req.deadline - time.monotonic()\n    if remaining <= 0:\n        raise TimeoutError(\"deadline already passed\")\n    return requests.get(DOWNSTREAM, timeout=remaining,  # per connect/read, not a total\n                        headers={\"X-Deadline-Ms\": str(int(remaining * 1000))})   # custom header"
+      },
+      "pitfall": "Sending an absolute timestamp between machines: their clocks differ, so pass the remaining duration and rebuild the deadline on arrival."
+    },
+    "fr": {
+      "why": "Quand le service A appelle B qui appelle C, chacun avec son timeout de 10 secondes, rien ne les relie : A abandonne à 10 secondes pendant que B attend encore C et que C travaille pour une réponse que personne ne lira. Une échéance propagée fixe un instant pour toute la requête et transmet le temps restant, chaque saut sait donc combien il peut prendre. gRPC le fait nativement ; en HTTP simple, on le transmet soi-même.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    return requests.get(DOWNSTREAM, timeout=10)   # chaque saut repart sur ses 10 s",
+        "after": "def handle(req):\n    remaining = req.deadline - time.monotonic()\n    if remaining <= 0:\n        raise TimeoutError(\"échéance déjà dépassée\")\n    return requests.get(DOWNSTREAM, timeout=remaining,  # par connexion/lecture, pas au total\n                        headers={\"X-Deadline-Ms\": str(int(remaining * 1000))})   # en-tête maison"
+      },
+      "pitfall": "Envoyer un horodatage absolu entre machines : leurs horloges diffèrent, il faut transmettre la durée restante et reconstruire l'échéance à l'arrivée."
+    }
+  }
+}

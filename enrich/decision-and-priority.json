@@ -1,0 +1,266 @@
+{
+  "pareto-80-20": {
+    "en": {
+      "why": "In most backlogs, a handful of items cause most of the pain: a few bugs produce most of the crashes, a few slow queries most of the latency. Sorting by impact first stops you from spending a day on cosmetic work while the big problem stays open. It matters whenever the list is longer than the time you have.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fix all the bugs in the tracker.",
+        "after": "List the open bugs with the number of crashes each one caused this month, sorted from most to least. Fix from the top until the fixed bugs account for about 80% of the crashes. Then list what you leave untouched and why."
+      },
+      "pitfall": "Treating 80/20 as a law of nature instead of measuring: sort by a real number (crashes, users, minutes lost), and always say what is left out."
+    },
+    "fr": {
+      "why": "Dans la plupart des backlogs, une poignée d'éléments cause l'essentiel des problèmes : quelques bugs font la majorité des crashs, quelques requêtes lentes la majorité de la latence. Trier par impact d'abord évite de passer une journée sur du cosmétique pendant que le gros problème reste ouvert. Ça compte dès que la liste est plus longue que le temps disponible.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Corrige tous les bugs du tracker.",
+        "after": "Liste les bugs ouverts avec le nombre de crashs causés par chacun ce mois-ci, du plus au moins fréquent. Corrige en partant du haut jusqu'à ce que les bugs corrigés représentent environ 80 % des crashs. Puis liste ce que tu laisses de côté et pourquoi."
+      },
+      "pitfall": "Prendre le 80/20 pour une loi au lieu de mesurer : tri sur un vrai chiffre (crashs, utilisateurs, minutes perdues), et toujours dire ce qu'on laisse de côté."
+    }
+  },
+  "risk-first": {
+    "en": {
+      "why": "Some parts of a project can fail in a way that makes everything else worthless: an API that does not allow what you need, a library that is too slow. If you find out at the end, you have built the rest for nothing. Testing that unknown first costs little and either confirms the plan or kills it early.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Plan: 1) build the UI, 2) build the backend, 3) connect the payment provider.",
+        "after": "Plan: 1) send one real request to the payment provider sandbox and confirm it supports what we need (refunds, webhooks), 2) only then build the backend, 3) then the UI."
+      },
+      "pitfall": "Starting with what is easy or fun and calling it progress, while the one unknown that could invalidate the plan is still untested."
+    },
+    "fr": {
+      "why": "Certaines parties d'un projet peuvent échouer d'une façon qui rend tout le reste inutile : une API qui n'autorise pas ce qu'il faut, une bibliothèque trop lente. Si on le découvre à la fin, on a construit le reste pour rien. Tester cette inconnue en premier coûte peu et confirme le plan ou le tue tôt.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Plan : 1) faire l'UI, 2) faire le backend, 3) brancher le prestataire de paiement.",
+        "after": "Plan : 1) envoyer une vraie requête à l'environnement de test (sandbox) du prestataire et confirmer qu'il gère ce qu'il nous faut (remboursements, webhooks), 2) seulement ensuite le backend, 3) puis l'UI."
+      },
+      "pitfall": "Commencer par ce qui est facile ou agréable et appeler ça de l'avancement, alors que l'inconnue qui peut tout invalider n'est toujours pas testée."
+    }
+  },
+  "critical-path": {
+    "en": {
+      "why": "In any task with dependencies, one chain of steps decides the earliest possible finish: if any step on it slips, the whole delivery slips. Work off that chain can run in parallel without changing the date. Knowing the chain tells you where waiting is expensive and where it is free.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Do the migration, then the tests, then the docs, then the release notes, then deploy.",
+        "after": "The critical path is migration, tests, deploy. The docs and release notes are not on it: start them in parallel with separate agents. Never let the migration wait on them."
+      },
+      "pitfall": "Parallelizing everything evenly instead of protecting the critical path, so the step that sets the deadline waits for a queue or a slow reviewer."
+    },
+    "fr": {
+      "why": "Dans toute tâche avec des dépendances, une seule suite d'étapes fixe la fin au plus tôt : si une étape de cette suite prend du retard, toute la livraison est retardée. Ce qui est hors de la suite peut tourner en parallèle sans changer la date. Connaître cette suite d'étapes dit où attendre coûte cher et où c'est gratuit.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fais la migration, puis les tests, puis la doc, puis les notes de version, puis déploie.",
+        "after": "Le chemin critique est migration, tests, déploiement. La doc et les notes de version n'en font pas partie : lance-les en parallèle avec d'autres agents. Ne laisse jamais la migration les attendre."
+      },
+      "pitfall": "Tout paralléliser au même rang au lieu de protéger le chemin critique, si bien que l'étape qui fixe le délai attend son tour dans une file ou attend un relecteur lent."
+    }
+  },
+  "sunk-cost": {
+    "en": {
+      "why": "Time and money already spent are gone whatever you decide next, so they should not weigh in the choice. People keep going with a bad route just because they invested in it. The only fair comparison is what remains to do on each route from today.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "We already spent 3 days on our custom parser, so let's keep going.",
+        "after": "Ignore the 3 days spent. Remaining work: about 2 days to finish the custom parser, or 2 hours to switch to the library already in the repo. Compare only what remains and tell me which route is shorter."
+      },
+      "pitfall": "Confusing sunk cost with real switching cost: the work you must redo or migrate counts, the work already done does not."
+    },
+    "fr": {
+      "why": "Le temps et l'argent déjà dépensés sont perdus quoi qu'on décide ensuite, donc ils ne doivent pas peser dans le choix. On s'obstine souvent sur une mauvaise voie juste parce qu'on y a investi. La seule comparaison honnête porte sur ce qui reste à faire sur chaque voie, à partir d'aujourd'hui.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "On a déjà passé 3 jours sur notre parser maison, on continue.",
+        "after": "Ignore les 3 jours déjà passés. Reste à faire : environ 2 jours pour finir le parser maison, ou 2 heures pour passer à la bibliothèque déjà dans le dépôt. Compare seulement ce qui reste et dis-moi quelle voie est la plus courte."
+      },
+      "pitfall": "Confondre coût irrécupérable et vrai coût de changement : le travail à refaire ou à migrer compte, le travail déjà fait non."
+    }
+  },
+  "opportunity-cost": {
+    "en": {
+      "why": "Time is limited, so every yes is a no to something else. A plan that lists only what will be done hides the price. Writing down what is dropped lets the person deciding accept it knowingly.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Let's add dark mode and rewrite the settings page this week.",
+        "after": "We have capacity for one of them this week. Doing the settings rewrite means dark mode and the CSV export wait. List what will not be done before I approve."
+      },
+      "pitfall": "Naming the cost only in time and forgetting the other thing you could have done with that time, so the trade-off stays invisible."
+    },
+    "fr": {
+      "why": "Le temps est limité, donc chaque oui est un non à autre chose. Un plan qui ne liste que ce qui sera fait cache le prix. Écrire ce qui est abandonné permet à celui qui décide de l'accepter en connaissance de cause.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ajoutons le mode sombre et refaisons la page de réglages cette semaine.",
+        "after": "On a la capacité pour un seul des deux cette semaine. Refaire la page de réglages signifie que le mode sombre et l'export CSV attendent. Liste ce qui ne sera pas fait avant que j'approuve."
+      },
+      "pitfall": "Chiffrer le coût seulement en temps et oublier l'autre chose qu'on aurait pu faire avec ce temps, si bien que l'arbitrage reste invisible."
+    }
+  },
+  "reuse-before-writing": {
+    "en": {
+      "why": "New code is a liability: it has to be tested, read and maintained. The repo, the standard library or an already installed dependency often has a tested version of what you are about to write. Searching takes a minute, writing and maintaining takes much longer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def read_text(path):\n    f = open(path)\n    data = f.read()\n    f.close()\n    return data",
+        "after": "from pathlib import Path\n\ndata = Path(path).read_text(encoding=\"utf-8\")"
+      },
+      "pitfall": "Searching only by the name you have in mind: the helper may exist under another name, so search by behavior (grep for the operation, read the module list) before concluding it is missing."
+    },
+    "fr": {
+      "why": "Le code neuf est une charge : il faut le tester, le relire, le maintenir. Le dépôt, la bibliothèque standard ou une dépendance déjà installée a souvent une version testée de ce qu'on s'apprête à écrire. Chercher prend une minute, écrire et maintenir prend bien plus.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def read_text(path):\n    f = open(path)\n    data = f.read()\n    f.close()\n    return data",
+        "after": "from pathlib import Path\n\ndata = Path(path).read_text(encoding=\"utf-8\")"
+      },
+      "pitfall": "Chercher seulement par le nom qu'on a en tête : l'utilitaire existe peut-être sous un autre nom, donc chercher par comportement (grep de l'opération, liste des modules) avant de conclure qu'il manque."
+    }
+  },
+  "mvp": {
+    "en": {
+      "why": "A big first version delays the moment you learn whether anyone needs it. The minimum viable product is the smallest thing that does the core job end to end, so you can use it and get feedback. Everything else goes on a list and waits.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Build a full dashboard with login, charts, CSV export and email alerts.",
+        "after": "Build one page that shows today's error count read from the log file. That is the MVP. List login, charts, CSV export and alerts as not done, without starting them."
+      },
+      "pitfall": "Shrinking so far that it no longer does the core job end to end, or letting the 'not done' list quietly turn back into work."
+    },
+    "fr": {
+      "why": "Une grosse première version retarde le moment où on apprend si quelqu'un en a besoin. Le produit minimum viable est la plus petite chose qui fait le travail de base de bout en bout, pour qu'on puisse l'utiliser et avoir un retour. Tout le reste va sur une liste et attend.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fais un dashboard complet avec login, graphiques, export CSV et alertes par mail.",
+        "after": "Fais une seule page qui affiche le nombre d'erreurs du jour lu dans le fichier de log. C'est le MVP. Liste login, graphiques, export CSV et alertes comme non faits, sans les commencer."
+      },
+      "pitfall": "Réduire au point que ça ne fait plus le travail de base de bout en bout, ou laisser la liste du non fait redevenir du travail en douce."
+    }
+  },
+  "scope-creep": {
+    "en": {
+      "why": "Small additions made along the way (a refactor, a rename, a nice extra) each look harmless, but together they make the change bigger, slower to review and riskier. The original task then drags on. Flagging each addition lets the owner decide instead of discovering it in the diff.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "While fixing the login bug I also refactored the session module and renamed 12 files.",
+        "after": "Fixed the login bug (1 file changed). Noticed the session module needs a refactor: not done, not touched. Tell me if you want it as a separate task."
+      },
+      "pitfall": "Calling an addition 'necessary' without checking: if the task still works without it, it is scope creep, so cut it or ask."
+    },
+    "fr": {
+      "why": "Les petits ajouts faits en route (un refactor, un renommage, un bonus sympa) semblent anodins, mais ensemble ils rendent le changement plus gros, plus long à relire et plus risqué. La tâche d'origine traîne alors. Signaler chaque ajout laisse le propriétaire décider au lieu de le découvrir dans le diff.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "En corrigeant le bug de login j'ai aussi refactoré le module de session et renommé 12 fichiers.",
+        "after": "Bug de login corrigé (1 fichier modifié). J'ai vu que le module de session demande un refactor : non fait, non touché. Dis-moi si tu le veux comme tâche séparée."
+      },
+      "pitfall": "Dire qu'un ajout est 'nécessaire' sans vérifier : si la tâche marche sans lui, c'est de la dérive, donc on le sort ou on demande."
+    }
+  },
+  "impact-x-probability": {
+    "en": {
+      "why": "You cannot handle every risk, so you need an order. A risk with a huge impact but almost no chance, and a likely one with a tiny impact, both rank below something severe and likely. Scoring each risk on the two axes and multiplying gives a simple ranking that people can debate.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "List the risks of this release.",
+        "after": "List the risks of this release. Give each an impact from 1 to 3 and a probability from 1 to 3, sort by impact times probability, and propose a mitigation for the top three only."
+      },
+      "pitfall": "Scoring by gut once and never revisiting: probabilities change as you learn, and a 'rare' risk with irreversible impact (data loss) deserves more than its product says."
+    },
+    "fr": {
+      "why": "On ne peut pas traiter tous les risques, il faut donc un ordre. Un risque énorme mais presque impossible, et un risque probable mais minuscule, passent tous deux après un risque grave et probable. Noter chaque risque sur les deux axes et multiplier donne un classement simple, facile à débattre.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Liste les risques de cette release.",
+        "after": "Liste les risques de cette release. Donne à chacun un impact de 1 à 3 et une probabilité de 1 à 3, trie par impact fois probabilité, et propose une parade pour les trois premiers seulement."
+      },
+      "pitfall": "Noter à l'instinct une fois et ne jamais revoir : les probabilités bougent quand on apprend, et un risque 'rare' à impact irréversible (perte de données) mérite plus que ce que dit son produit."
+    }
+  },
+  "hofstadter-s-law": {
+    "en": {
+      "why": "Estimates are almost always too short, even when you already know about this effect and add margin. Unknowns, interruptions and rework appear late. Splitting the work into steps and giving a range is more honest and easier to correct than one confident number.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "How long will the database migration take? (answer: 2 days)",
+        "after": "Estimate the migration step by step: schema, data copy, code changes, tests, rollout. For each give a best case and a worst case in hours, then a total range, not a single number."
+      },
+      "pitfall": "Giving a range so wide it says nothing, or so tight it is a single number in disguise: each step needs its own best and worst case, and the total comes from them."
+    },
+    "fr": {
+      "why": "Les estimations sont presque toujours trop courtes, même quand on connaît déjà cet effet et qu'on ajoute de la marge. Les inconnues, les interruptions et les reprises arrivent tard. Découper en étapes et donner une fourchette est plus honnête et plus facile à corriger qu'un chiffre unique annoncé avec assurance.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Combien de temps pour la migration de la base ? (réponse : 2 jours)",
+        "after": "Estime la migration étape par étape : schéma, copie des données, changements de code, tests, mise en prod. Pour chacune donne un meilleur cas et un pire cas en heures, puis une fourchette totale, pas un seul chiffre."
+      },
+      "pitfall": "Donner une fourchette si large qu'elle ne dit rien, ou si serrée que c'est un chiffre unique déguisé : chaque étape a son meilleur et son pire cas, et le total en découle."
+    }
+  },
+  "good-fast-cheap": {
+    "en": {
+      "why": "Quality, speed and low cost pull against each other: gaining on two usually costs the third. Asking for all three just hides the real choice and the quality or the budget quietly pays. Saying out loud which one is sacrificed makes the trade-off a decision.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "I want it perfect, by tomorrow, and with no extra budget.",
+        "after": "We have one day and no budget, so quality is what we sacrifice. Ship the happy path with tests only on the payment flow, and list exactly what is left untested."
+      },
+      "pitfall": "Sacrificing one silently: if quality is the one you give up, write down where, otherwise it comes back later as bugs nobody planned for."
+    },
+    "fr": {
+      "why": "Qualité, vitesse et faible coût tirent dans des sens opposés : en gagner deux coûte en général le troisième. Demander les trois cache le vrai choix et c'est la qualité ou le budget qui paie en silence. Dire à voix haute lequel on sacrifie transforme l'arbitrage en décision.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Je le veux parfait, pour demain, et sans budget en plus.",
+        "after": "On a un jour et pas de budget, donc on sacrifie la qualité. Livre le chemin nominal avec des tests seulement sur le flux de paiement, et liste exactement ce qui reste non testé."
+      },
+      "pitfall": "Sacrifier l'un en silence : si c'est la qualité qu'on lâche, écrire où, sinon ça revient plus tard en bugs que personne n'avait prévus."
+    }
+  },
+  "good-enough": {
+    "en": {
+      "why": "Polishing has diminishing returns: past a certain point each extra hour improves nothing the user or the reviewer cares about. Acceptance criteria written in advance tell you when the work is done. Stopping there frees the time for the next real priority.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Keep improving the function until it is perfect.",
+        "after": "Stop when the 3 acceptance criteria pass: it handles empty input, it returns a sorted result, the tests are green. Do not refactor or optimize beyond that."
+      },
+      "pitfall": "Using 'good enough' as an excuse to skip the criteria: write them first, otherwise there is nothing to stop at and the phrase just means 'sloppy'."
+    },
+    "fr": {
+      "why": "Peaufiner rapporte de moins en moins : passé un certain point, chaque heure en plus n'améliore rien de ce qui compte pour l'utilisateur ou le relecteur. Des critères d'acceptation écrits à l'avance disent quand le travail est fini. S'arrêter là libère du temps pour la vraie priorité suivante.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Continue à améliorer la fonction jusqu'à ce qu'elle soit parfaite.",
+        "after": "Arrête-toi quand les 3 critères d'acceptation passent : elle gère l'entrée vide, elle renvoie un résultat trié, les tests sont verts. Ne refactore pas et n'optimise pas au-delà."
+      },
+      "pitfall": "Se servir de 'assez bon' pour sauter les critères : les écrire d'abord, sinon il n'y a rien sur quoi s'arrêter et la formule veut juste dire 'bâclé'."
+    }
+  }
+}

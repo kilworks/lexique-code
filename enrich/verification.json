@@ -1,0 +1,926 @@
+{
+  "invariant": {
+    "en": {
+      "why": "An invariant is a fact that must hold before, during and after an operation, like \"total money is conserved\". Writing it down as a check turns a silent corruption into an immediate, located failure. It matters most in code that moves state around: balances, queues, counters, caches.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def transfer(a, b, amt):\n    a.balance -= amt\n    b.balance += amt",
+        "after": "def transfer(a, b, amt):\n    total = a.balance + b.balance\n    a.balance -= amt\n    b.balance += amt\n    assert a.balance >= 0\n    # invariant: money is neither created nor lost\n    assert a.balance + b.balance == total"
+      },
+      "pitfall": "People state the invariant in a comment only, so nothing enforces it and it rots."
+    },
+    "fr": {
+      "why": "Un invariant est un fait qui doit rester vrai avant, pendant et après une opération, par exemple \"l'argent total est conservé\". L'écrire sous forme de contrôle transforme une corruption silencieuse en échec immédiat et localisé. C'est surtout utile dans le code qui déplace de l'état : soldes, files, compteurs, caches.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def transfer(a, b, amt):\n    a.balance -= amt\n    b.balance += amt",
+        "after": "def transfer(a, b, amt):\n    total = a.balance + b.balance\n    a.balance -= amt\n    b.balance += amt\n    assert a.balance >= 0\n    # invariant : l'argent n'est ni créé ni perdu\n    assert a.balance + b.balance == total"
+      },
+      "pitfall": "On pose l'invariant en commentaire seulement, donc rien ne l'impose et il pourrit."
+    }
+  },
+  "pre-postcondition": {
+    "en": {
+      "why": "A precondition is what the caller must guarantee before a function runs, a postcondition is what the function guarantees when it returns. Checking both at the boundary makes a bug point at the guilty side: bad input or bad output. It is cheap documentation that also fails loudly.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def top3(scores):\n    return sorted(scores, reverse=True)[:3]",
+        "after": "def top3(scores):\n    assert len(scores) >= 3, \"pre: need at least 3 scores\"\n    result = sorted(scores, reverse=True)[:3]\n    assert len(result) == 3 and all(x in scores for x in result), \"post\"\n    return result"
+      },
+      "pitfall": "People check the input and trust the output, so a wrong result flows on unnoticed."
+    },
+    "fr": {
+      "why": "Une précondition est ce que l'appelant doit garantir avant l'appel, une postcondition est ce que la fonction garantit au retour. Vérifier les deux à la frontière fait pointer le bug vers le bon coupable : mauvaise entrée ou mauvaise sortie. C'est de la documentation peu chère qui échoue bruyamment.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def top3(scores):\n    return sorted(scores, reverse=True)[:3]",
+        "after": "def top3(scores):\n    assert len(scores) >= 3, \"pré : il faut au moins 3 scores\"\n    result = sorted(scores, reverse=True)[:3]\n    assert len(result) == 3 and all(x in scores for x in result), \"post\"\n    return result"
+      },
+      "pitfall": "On vérifie l'entrée mais on fait confiance à la sortie, et un résultat faux circule sans bruit."
+    }
+  },
+  "dry-run": {
+    "en": {
+      "why": "A dry-run runs the whole logic but only prints what it would do. It lets you read the plan before anything is deleted, sent or overwritten. It matters for every script that changes something you cannot easily undo.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for f in old_files():\n    os.remove(f)",
+        "after": "apply = \"--apply\" in sys.argv\nfor f in old_files():\n    print(\"delete\", f)\n    if apply:\n        os.remove(f)"
+      },
+      "pitfall": "The dry-run path drifts from the real path (a separate code branch), so the plan shown is not what actually runs."
+    },
+    "fr": {
+      "why": "Un dry-run exécute toute la logique mais affiche seulement ce qu'il ferait. On lit le plan avant que quoi que ce soit soit supprimé, envoyé ou écrasé. C'est vital pour tout script qui change quelque chose d'irréversible.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for f in old_files():\n    os.remove(f)",
+        "after": "apply = \"--apply\" in sys.argv\nfor f in old_files():\n    print(\"supprimer\", f)\n    if apply:\n        os.remove(f)"
+      },
+      "pitfall": "Le chemin dry-run diverge du chemin réel (une branche de code à part), donc le plan affiché n'est pas ce qui s'exécute vraiment."
+    }
+  },
+  "control-test": {
+    "en": {
+      "why": "A control test is a check you have seen fail. If you never watched it go red, you cannot know it is able to detect the bug it is meant to catch. Run the negative case first, then the positive one.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Add a test for the email validator and tell me when it passes.",
+        "after": "Add a test for the email validator. First run it against the unfixed code (or with the check removed) and show me it fails, then show it passes with the fix. A test I have not seen fail proves nothing."
+      },
+      "pitfall": "Writing a test after the fix and only seeing it green, which proves nothing about its power to detect the bug."
+    },
+    "fr": {
+      "why": "Un test témoin est un contrôle qu'on a vu rougir. Si on ne l'a jamais vu échouer, on ne sait pas s'il est capable de détecter le bug qu'il est censé attraper. On lance d'abord le cas négatif, puis le cas positif.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ajoute un test pour le validateur d'email et dis-moi quand il passe.",
+        "after": "Ajoute un test pour le validateur d'email. Lance-le d'abord sur le code non corrigé (ou avec le contrôle retiré) et montre-moi qu'il échoue, puis qu'il passe avec le correctif. Un test que je n'ai pas vu rougir ne prouve rien."
+      },
+      "pitfall": "Écrire le test après le correctif et ne le voir que vert, ce qui ne prouve rien sur sa capacité à détecter le bug."
+    }
+  },
+  "mutation-testing": {
+    "en": {
+      "why": "Mutation testing changes your code on purpose (a > becomes >=, a return value is dropped) and reruns the tests. If every test stays green, the tests do not really check that line. It measures how good the tests are, not how many lines they touch.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pytest\n# 42 passed, so the tests are good",
+        "after": "mutmut run\nmutmut results\n# survivors = code changes that no test noticed"
+      },
+      "pitfall": "Chasing a 100 percent mutation score on trivial code instead of reading the few surviving mutants that matter."
+    },
+    "fr": {
+      "why": "Le test de mutation modifie le code exprès (un > devient >=, une valeur de retour disparaît) et relance les tests. Si tout reste vert, les tests ne vérifient pas vraiment cette ligne. Il mesure la qualité des tests, pas le nombre de lignes touchées.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pytest\n# 42 passed, donc les tests sont bons",
+        "after": "mutmut run\nmutmut results\n# survivants = changements de code qu'aucun test n'a vus"
+      },
+      "pitfall": "Courir après 100 % de mutants tués sur du code trivial au lieu de lire les rares survivants qui comptent."
+    }
+  },
+  "regression-test": {
+    "en": {
+      "why": "A regression test replays the exact input that triggered a bug you just fixed. It keeps that bug from coming back after a refactor or a merge. Write it before the fix and watch it fail.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# bug #214 fixed, no test added\ndef avg(xs):\n    return sum(xs) / len(xs) if xs else 0.0",
+        "after": "def avg(xs):\n    return sum(xs) / len(xs) if xs else 0.0\n\ndef test_avg_empty_list():  # bug #214: ZeroDivisionError\n    assert avg([]) == 0.0"
+      },
+      "pitfall": "Testing a similar case instead of the exact input that broke in production."
+    },
+    "fr": {
+      "why": "Un test de non-régression rejoue l'entrée exacte qui a déclenché un bug qu'on vient de corriger. Il empêche le bug de revenir après un refactor ou un merge. On l'écrit avant le correctif et on le regarde échouer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# bug #214 corrigé, aucun test ajouté\ndef avg(xs):\n    return sum(xs) / len(xs) if xs else 0.0",
+        "after": "def avg(xs):\n    return sum(xs) / len(xs) if xs else 0.0\n\ndef test_avg_liste_vide():  # bug #214 : ZeroDivisionError\n    assert avg([]) == 0.0"
+      },
+      "pitfall": "Tester un cas voisin au lieu de l'entrée exacte qui a cassé en production."
+    }
+  },
+  "characterization-test": {
+    "en": {
+      "why": "A characterization test records what the code does today, good or bad, before you touch it. You capture the current output, refactor, then compare. It gives you a safety net for legacy code that has no tests.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# refactor render_invoice() right away",
+        "after": "from pathlib import Path\n\ndef test_render_invoice_current_behavior():\n    out = render_invoice(SAMPLE_ORDER)\n    # first run: save the current output, even if ugly\n    assert out == Path(\"tests/snapshots/invoice.txt\").read_text()\n# now refactor: the test must stay green"
+      },
+      "pitfall": "Fixing the odd behavior you spot while characterizing, which mixes a refactor with a behavior change."
+    },
+    "fr": {
+      "why": "Un test de caractérisation enregistre ce que le code fait aujourd'hui, en bien ou en mal, avant d'y toucher. On capture la sortie actuelle, on refactore, puis on compare. C'est un filet de sécurité pour du code legacy sans tests.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# refactorer render_invoice() tout de suite",
+        "after": "from pathlib import Path\n\ndef test_render_invoice_comportement_actuel():\n    out = render_invoice(SAMPLE_ORDER)\n    # premier lancement : sauver la sortie actuelle, même moche\n    assert out == Path(\"tests/snapshots/invoice.txt\").read_text()\n# maintenant refactorer : le test doit rester vert"
+      },
+      "pitfall": "Corriger le comportement bizarre repéré pendant la caractérisation, ce qui mélange refactor et changement de comportement."
+    }
+  },
+  "property-based": {
+    "en": {
+      "why": "Instead of a few hand-picked examples, a property-based test states a rule that must hold for every input and lets a library generate hundreds of them. It finds the empty list, the huge number or the odd unicode you did not think of. When it fails, the library shrinks the input to a minimal case.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_reverse():\n    assert reverse([1, 2, 3]) == [3, 2, 1]",
+        "after": "from hypothesis import given, strategies as st\n\n@given(st.lists(st.integers()))\ndef test_reverse_twice_is_identity(xs):\n    assert reverse(reverse(xs)) == xs"
+      },
+      "pitfall": "Writing a property that just re-implements the function, so it can never disagree with it."
+    },
+    "fr": {
+      "why": "Au lieu de quelques exemples choisis à la main, un test property-based énonce une règle vraie pour toute entrée et laisse une bibliothèque en générer des centaines. Il trouve la liste vide, le nombre énorme ou l'unicode bizarre auxquels on n'a pas pensé. En cas d'échec, la bibliothèque réduit l'entrée à un cas minimal.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_reverse():\n    assert reverse([1, 2, 3]) == [3, 2, 1]",
+        "after": "from hypothesis import given, strategies as st\n\n@given(st.lists(st.integers()))\ndef test_reverse_twice_is_identity(xs):\n    assert reverse(reverse(xs)) == xs"
+      },
+      "pitfall": "Écrire une propriété qui ré-implémente la fonction, et qui ne peut donc jamais la contredire."
+    }
+  },
+  "fuzzing": {
+    "en": {
+      "why": "Fuzzing feeds a program huge amounts of random or deliberately malformed input to make it crash, hang or misbehave. Parsers and decoders that read data from outside are where it finds the most. Modern toolchains (Go, Rust, Python with Atheris) make it a few lines.",
+      "example": {
+        "kind": "code",
+        "lang": "go",
+        "before": "func TestParse(t *testing.T) {\n    for _, s := range []string{`{\"a\":1}`, `[]`, `{}`} {\n        Parse([]byte(s))\n    }\n}",
+        "after": "func FuzzParse(f *testing.F) {\n    f.Add([]byte(`{\"a\":1}`))\n    f.Fuzz(func(t *testing.T, data []byte) {\n        Parse(data) // must never panic\n    })\n}\n// go test -fuzz=FuzzParse -fuzztime=60s"
+      },
+      "pitfall": "Fuzzing for ten seconds once and calling the parser safe, instead of keeping the corpus and running it regularly."
+    },
+    "fr": {
+      "why": "Le fuzzing envoie à un programme des quantités énormes d'entrées aléatoires ou volontairement malformées pour le faire planter, bloquer ou dérailler. Les parseurs et décodeurs qui lisent des données extérieures sont ses terrains favoris. Les chaînes d'outils modernes (Go, Rust, Python avec Atheris) le réduisent à quelques lignes.",
+      "example": {
+        "kind": "code",
+        "lang": "go",
+        "before": "func TestParse(t *testing.T) {\n    for _, s := range []string{`{\"a\":1}`, `[]`, `{}`} {\n        Parse([]byte(s))\n    }\n}",
+        "after": "func FuzzParse(f *testing.F) {\n    f.Add([]byte(`{\"a\":1}`))\n    f.Fuzz(func(t *testing.T, data []byte) {\n        Parse(data) // ne doit jamais paniquer\n    })\n}\n// go test -fuzz=FuzzParse -fuzztime=60s"
+      },
+      "pitfall": "Fuzzer dix secondes une fois et déclarer le parseur sûr, au lieu de garder le corpus et de relancer régulièrement."
+    }
+  },
+  "test-oracle": {
+    "en": {
+      "why": "A test oracle is an independent way to know the expected value: a hand-computed number, a slower trusted implementation, the standard library. If the test recomputes the answer with the same formula as the code, both are wrong together and the test is green. The oracle must not share the code's mistakes.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_total():\n    assert total(ITEMS) == sum(i.price * i.qty for i in ITEMS)  # same formula",
+        "after": "def test_total():\n    assert total(ITEMS) == 35  # by hand: 10*3 + 5*1\n\ndef test_my_sort():\n    assert my_sort(XS) == sorted(XS)  # the stdlib is the oracle"
+      },
+      "pitfall": "Copying the production formula into the assertion, so the test can only ever agree with the code."
+    },
+    "fr": {
+      "why": "Un oracle de test est une façon indépendante de connaître la valeur attendue : un nombre calculé à la main, une implémentation lente et fiable, la bibliothèque standard. Si le test recalcule la réponse avec la même formule que le code, les deux se trompent ensemble et le test est vert. L'oracle ne doit pas partager les erreurs du code.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_total():\n    assert total(ITEMS) == sum(i.price * i.qty for i in ITEMS)  # même formule",
+        "after": "def test_total():\n    assert total(ITEMS) == 35  # à la main : 10*3 + 5*1\n\ndef test_my_sort():\n    assert my_sort(XS) == sorted(XS)  # la stdlib sert d'oracle"
+      },
+      "pitfall": "Recopier la formule de production dans l'assertion, si bien que le test ne peut qu'être d'accord avec le code."
+    }
+  },
+  "hermetic": {
+    "en": {
+      "why": "A hermetic test depends on nothing outside itself: no network, no real clock, no unseeded randomness, no shared files. You pass the time, the randomness and the services in as parameters. It then gives the same result on any machine at any hour.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def is_expired(token):\n    return time.time() > token.expires_at",
+        "after": "def is_expired(token, now):\n    return now > token.expires_at\n\ndef test_expired():\n    assert is_expired(Token(expires_at=100), now=101)"
+      },
+      "pitfall": "Calling time.time() or a real API inside the code under test and then wondering why CI fails at midnight."
+    },
+    "fr": {
+      "why": "Un test hermétique ne dépend de rien d'extérieur : ni réseau, ni horloge réelle, ni aléa sans graine fixée, ni fichiers partagés. On injecte le temps, l'aléa et les services en paramètres. Il donne alors le même résultat sur n'importe quelle machine à n'importe quelle heure.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def is_expired(token):\n    return time.time() > token.expires_at",
+        "after": "def is_expired(token, now):\n    return now > token.expires_at\n\ndef test_expired():\n    assert is_expired(Token(expires_at=100), now=101)"
+      },
+      "pitfall": "Appeler time.time() ou une vraie API dans le code testé, puis s'étonner que la CI casse à minuit."
+    }
+  },
+  "flaky": {
+    "en": {
+      "why": "A flaky test passes or fails at random without any code change. It teaches the team to ignore red, so real failures get ignored too. Each one has a cause (test order, shared state, timing, network) that you can find by running it many times.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "gh run rerun 123456 --failed",
+        "after": "for i in $(seq 50); do\n  pytest tests/test_sync.py -x -q || break\ndone\n# fails after N runs: now look at order, clock, shared state, network"
+      },
+      "pitfall": "Adding retries or a rerun button, which hides the race condition instead of fixing it."
+    },
+    "fr": {
+      "why": "Un test flaky passe ou casse au hasard sans changement de code. Il apprend à l'équipe à ignorer le rouge, donc les vrais échecs aussi. Chacun a une cause (ordre des tests, état partagé, timing, réseau) qu'on trouve en le lançant de nombreuses fois.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "gh run rerun 123456 --failed",
+        "after": "for i in $(seq 50); do\n  pytest tests/test_sync.py -x -q || break\ndone\n# casse au bout de N lancements : regarder ordre, horloge, état partagé, réseau"
+      },
+      "pitfall": "Ajouter des retries ou un bouton de relance, ce qui cache la race condition au lieu de la corriger."
+    }
+  },
+  "fake-mock": {
+    "en": {
+      "why": "A fake is a real but simplified implementation (an in-memory repository, a fake clock). A mock is a stand-in that records calls and checks them, so the test often just repeats the code under test. A fake lets you assert on results and survives refactors.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "repo = Mock()\nrepo.get.return_value = User(\"a\")\nService(repo).greet(\"a\")\nrepo.get.assert_called_once_with(\"a\")  # recites the code",
+        "after": "class FakeRepo:\n    def __init__(self):\n        self.users = {}\n    def add(self, u):\n        self.users[u.id] = u\n    def get(self, id):\n        return self.users.get(id)\n\nrepo = FakeRepo()\nrepo.add(User(\"a\"))\nassert Service(repo).greet(\"a\") == \"Hello a\""
+      },
+      "pitfall": "Asserting that a mock was called with exact arguments, which locks the implementation instead of the behavior."
+    },
+    "fr": {
+      "why": "Un fake est une vraie implémentation simplifiée (un dépôt en mémoire, une fausse horloge). Un mock est un faux qui enregistre les appels et les vérifie, si bien que le test répète souvent le code testé. Un fake permet d'asserter sur des résultats et survit aux refactors.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "repo = Mock()\nrepo.get.return_value = User(\"a\")\nService(repo).greet(\"a\")\nrepo.get.assert_called_once_with(\"a\")  # récite le code",
+        "after": "class FakeRepo:\n    def __init__(self):\n        self.users = {}\n    def add(self, u):\n        self.users[u.id] = u\n    def get(self, id):\n        return self.users.get(id)\n\nrepo = FakeRepo()\nrepo.add(User(\"a\"))\nassert Service(repo).greet(\"a\") == \"Hello a\""
+      },
+      "pitfall": "Asserter qu'un mock a été appelé avec des arguments exacts, ce qui fige l'implémentation au lieu du comportement."
+    }
+  },
+  "smoke-test": {
+    "en": {
+      "why": "A smoke test is the smallest check that proves the thing starts and answers: launch it, send one request, expect exit code 0. It runs in seconds and catches the dumbest breakages (missing file, bad config, crash on boot) before any deeper test.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npm run build\n# compiles, ship it",
+        "after": "python app.py &\nsleep 2\ncurl -fsS http://localhost:8000/health\necho \"exit=$?\"\nkill %1"
+      },
+      "pitfall": "Treating a passing build as a smoke test when nothing was actually launched."
+    },
+    "fr": {
+      "why": "Un smoke test est le plus petit contrôle qui prouve que la chose démarre et répond : on la lance, on envoie une requête, on attend le code 0. Il tourne en quelques secondes et attrape les casses les plus bêtes (fichier manquant, mauvaise config, crash au boot) avant tout test plus poussé.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npm run build\n# ça compile, on livre",
+        "after": "python app.py &\nsleep 2\ncurl -fsS http://localhost:8000/health\necho \"exit=$?\"\nkill %1"
+      },
+      "pitfall": "Prendre un build qui passe pour un smoke test alors que rien n'a été lancé."
+    }
+  },
+  "end-to-end": {
+    "en": {
+      "why": "An end-to-end test drives the real chain from the user's input to the observed effect: browser, server, database. It is the only test that proves the pieces are wired together. Keep few of them and make them cover the journeys that matter.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "test(\"signup handler\", () => {\n  expect(handleSignup({ email: \"a@b.c\" }).ok).toBe(true);\n});",
+        "after": "import { test, expect } from \"@playwright/test\";\n\ntest(\"signup shows the welcome screen\", async ({ page }) => {\n  await page.goto(\"http://localhost:3000/signup\");\n  await page.fill(\"#email\", \"a@b.c\");\n  await page.click(\"text=Sign up\");\n  await expect(page.locator(\".welcome\")).toBeVisible();\n});"
+      },
+      "pitfall": "Writing dozens of slow end-to-end tests for logic that a unit test would check faster."
+    },
+    "fr": {
+      "why": "Un test de bout en bout pilote la vraie chaîne, de l'entrée de l'utilisateur à l'effet observé : navigateur, serveur, base. C'est le seul test qui prouve que les pièces sont bien branchées ensemble. On en garde peu, sur les parcours qui comptent.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "test(\"signup handler\", () => {\n  expect(handleSignup({ email: \"a@b.c\" }).ok).toBe(true);\n});",
+        "after": "import { test, expect } from \"@playwright/test\";\n\ntest(\"l'inscription affiche l'écran de bienvenue\", async ({ page }) => {\n  await page.goto(\"http://localhost:3000/signup\");\n  await page.fill(\"#email\", \"a@b.c\");\n  await page.click(\"text=Sign up\");\n  await expect(page.locator(\".welcome\")).toBeVisible();\n});"
+      },
+      "pitfall": "Écrire des dizaines de tests bout en bout lents pour une logique qu'un test unitaire vérifierait plus vite."
+    }
+  },
+  "golden-file": {
+    "en": {
+      "why": "A golden file is a stored reference output that you validated by eye once. The test regenerates the output and compares it to the file, which is ideal for large results like reports, HTML or generated code. A diff shows exactly what changed.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_report():\n    expected = \"Report ... Total: 35 ... (200 lines inline)\"\n    assert render_report(SAMPLE) == expected",
+        "after": "from pathlib import Path\n\ndef test_report_matches_golden():\n    got = render_report(SAMPLE)\n    golden = Path(\"tests/golden/report.txt\")\n    assert got == golden.read_text()"
+      },
+      "pitfall": "Regenerating the golden file whenever the test fails, without reading the diff."
+    },
+    "fr": {
+      "why": "Un golden file est une sortie de référence stockée que vous avez validée à l'œil une fois. Le test régénère la sortie et la compare au fichier, ce qui convient aux gros résultats : rapports, HTML, code généré. Le diff montre exactement ce qui a changé.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_report():\n    expected = \"Report ... Total: 35 ... (200 lignes recopiées ici)\"\n    assert render_report(SAMPLE) == expected",
+        "after": "from pathlib import Path\n\ndef test_report_matches_golden():\n    got = render_report(SAMPLE)\n    golden = Path(\"tests/golden/report.txt\")\n    assert got == golden.read_text()"
+      },
+      "pitfall": "Régénérer le golden file dès que le test échoue, sans lire le diff."
+    }
+  },
+  "observability": {
+    "en": {
+      "why": "Observability means you can tell from outside what a system is doing, without attaching a debugger. You get it from dated log lines that state the cause, counters you can graph, and a heartbeat that shows it is alive. Without it, a silent failure looks exactly like success.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "try:\n    push(batch)\nexcept OSError:\n    print(\"error\")",
+        "after": "logging.basicConfig(level=logging.INFO, format=\"%(asctime)s %(levelname)s %(message)s\")\nlog = logging.getLogger(\"sync\")\n\ntry:\n    push(batch)\n    log.info(\"heartbeat ok queue=%d\", len(queue))\nexcept OSError as e:\n    log.error(\"push failed batch=%s cause=%s\", batch.id, e)\n    errors_total += 1"
+      },
+      "pitfall": "Logging the fact (\"error\") without the cause or a timestamp, so the line is useless at 3 a.m."
+    },
+    "fr": {
+      "why": "L'observabilité, c'est pouvoir dire de l'extérieur ce que fait un système, sans attacher de débogueur. Elle vient de lignes de log datées qui donnent la cause, de compteurs qu'on peut tracer et d'un battement de cœur qui prouve qu'il est vivant. Sans elle, un échec silencieux ressemble exactement à un succès.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "try:\n    push(batch)\nexcept OSError:\n    print(\"error\")",
+        "after": "logging.basicConfig(level=logging.INFO, format=\"%(asctime)s %(levelname)s %(message)s\")\nlog = logging.getLogger(\"sync\")\n\ntry:\n    push(batch)\n    log.info(\"battement ok queue=%d\", len(queue))\nexcept OSError as e:\n    log.error(\"envoi échoué batch=%s cause=%s\", batch.id, e)\n    errors_total += 1"
+      },
+      "pitfall": "Logger le fait (\"erreur\") sans la cause ni l'heure, donc une ligne inutile à 3 h du matin."
+    }
+  },
+  "structured-logs-correlation-id": {
+    "en": {
+      "why": "A structured log line is a set of fields (JSON or key=value) a machine can filter, instead of a sentence to grep. A correlation id is a value generated at the entry of a request and attached to every line it produces. Together they let you pull the full story of one request out of millions of lines.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "print(\"payment failed\")",
+        "after": "def log(event, **fields):\n    print(json.dumps({\"ts\": time.time(), \"event\": event, **fields}))\n\nrid = str(uuid.uuid4())\nlog(\"payment_start\", request_id=rid, amount=42)\nlog(\"payment_failed\", request_id=rid, reason=\"card_declined\")"
+      },
+      "pitfall": "Generating a new id in each service instead of passing the incoming one along."
+    },
+    "fr": {
+      "why": "Une ligne de log structurée est un ensemble de champs (JSON ou clé=valeur) qu'une machine sait filtrer, au lieu d'une phrase à grepper. Un id de corrélation est une valeur générée à l'entrée d'une requête et attachée à chaque ligne qu'elle produit. Ensemble, ils permettent d'extraire toute l'histoire d'une requête parmi des millions de lignes.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "print(\"payment failed\")",
+        "after": "def log(event, **fields):\n    print(json.dumps({\"ts\": time.time(), \"event\": event, **fields}))\n\nrid = str(uuid.uuid4())\nlog(\"payment_start\", request_id=rid, amount=42)\nlog(\"payment_failed\", request_id=rid, reason=\"card_declined\")"
+      },
+      "pitfall": "Générer un nouvel id dans chaque service au lieu de transmettre celui reçu."
+    }
+  },
+  "measure-before-claiming": {
+    "en": {
+      "why": "Measure before claiming means you back every statement of success with a number from a command you ran, not a feeling. \"It feels faster\" is not a result; a timing before and after is. It protects you from declaring a bug fixed when you only changed something nearby.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fix the slow query.",
+        "after": "Fix the slow query. Before touching it, run EXPLAIN ANALYZE and paste the execution time. After the fix, run it again and show both numbers. Do not write \"fixed\" without them."
+      },
+      "pitfall": "Measuring once, on a warm cache or a different input, and comparing it with a cold one."
+    },
+    "fr": {
+      "why": "Mesurer avant d'affirmer, c'est appuyer toute annonce de succès sur un chiffre issu d'une commande lancée, pas sur une impression. \"Ça a l'air plus rapide\" n'est pas un résultat ; un chrono avant et après en est un. Ça évite de déclarer un bug corrigé alors qu'on a seulement touché à côté.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Corrige la requête lente.",
+        "after": "Corrige la requête lente. Avant d'y toucher, lance EXPLAIN ANALYZE et colle le temps d'exécution. Après le correctif, relance-le et montre les deux chiffres. N'écris pas \"corrigé\" sans eux."
+      },
+      "pitfall": "Mesurer une fois, sur un cache chaud ou une autre entrée, et comparer avec une mesure à froid."
+    }
+  },
+  "contract-test": {
+    "en": {
+      "why": "A contract test checks that the two sides of an interface agree on its shape, using the same example on both sides. The provider proves it produces the example, the consumer proves it can read it. It catches the break when one team renames a field and the other does not know.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# provider test\nassert api_get_user(1) == {\"id\": 1, \"name\": \"Ana\"}\n# consumer test (own copy of the dict)\nassert parse_user({\"id\": 1, \"name\": \"Ana\"}).name == \"Ana\"",
+        "after": "EXAMPLE = json.load(open(\"contracts/user.json\"))\n\n# provider side\ndef test_api_returns_contract():\n    assert api_get_user(1) == EXAMPLE\n\n# consumer side\ndef test_client_parses_contract():\n    assert parse_user(EXAMPLE).name == \"Ana\""
+      },
+      "pitfall": "Each side keeps its own hand-written copy of the example, so they drift apart and both stay green."
+    },
+    "fr": {
+      "why": "Un test de contrat vérifie que les deux côtés d'une interface s'accordent sur sa forme, avec le même exemple de chaque côté. Le fournisseur prouve qu'il produit l'exemple, le consommateur prouve qu'il sait le lire. Il attrape la casse quand une équipe renomme un champ sans que l'autre le sache.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# test du fournisseur\nassert api_get_user(1) == {\"id\": 1, \"name\": \"Ana\"}\n# test du consommateur (sa propre copie du dict)\nassert parse_user({\"id\": 1, \"name\": \"Ana\"}).name == \"Ana\"",
+        "after": "EXAMPLE = json.load(open(\"contracts/user.json\"))\n\n# côté fournisseur\ndef test_api_returns_contract():\n    assert api_get_user(1) == EXAMPLE\n\n# côté consommateur\ndef test_client_parses_contract():\n    assert parse_user(EXAMPLE).name == \"Ana\""
+      },
+      "pitfall": "Chaque côté garde sa propre copie écrite à la main de l'exemple : elles divergent et les deux tests restent verts."
+    }
+  },
+  "error-path": {
+    "en": {
+      "why": "Most tests cover the happy path, but production is mostly failures: bad input, a dropped connection, a full disk. An error-path test makes each expected failure happen and checks the code reacts correctly (clear error, no corrupted state). That is where the nasty bugs live.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_pay():\n    assert pay(5).ok",
+        "after": "def test_pay():\n    assert pay(5).ok\n\ndef test_pay_bad_input():\n    with pytest.raises(ValueError):\n        pay(-5)\n\ndef test_pay_network_down():\n    with pytest.raises(ConnectionError):\n        pay(5, client=DownClient())\n    assert ledger.balance() == 0  # nothing half-written"
+      },
+      "pitfall": "Testing that an exception is raised but not what state the system is left in afterwards."
+    },
+    "fr": {
+      "why": "La plupart des tests couvrent le chemin heureux, mais la production est surtout faite d'échecs : entrée fausse, connexion coupée, disque plein. Un test de chemin d'erreur provoque chaque échec prévu et vérifie que le code réagit bien (erreur claire, pas d'état corrompu). C'est là que vivent les sales bugs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_pay():\n    assert pay(5).ok",
+        "after": "def test_pay():\n    assert pay(5).ok\n\ndef test_pay_entree_fausse():\n    with pytest.raises(ValueError):\n        pay(-5)\n\ndef test_pay_reseau_coupe():\n    with pytest.raises(ConnectionError):\n        pay(5, client=DownClient())\n    assert ledger.balance() == 0  # rien d'écrit à moitié"
+      },
+      "pitfall": "Tester qu'une exception est levée mais pas l'état dans lequel le système est laissé ensuite."
+    }
+  },
+  "fault-injection-chaos": {
+    "en": {
+      "why": "Fault injection means you cause the failure on purpose (kill the process, cut the network, fill the disk) and check the system recovers. You learn whether your retry, resume and cleanup code really works before a real outage tests it for you.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python import_job.py\n# ran to the end, so it works",
+        "after": "python import_job.py &\nsleep 3\nkill -9 $!\npython import_job.py   # rerun: must resume\nsqlite3 app.db \"SELECT COUNT(*), COUNT(DISTINCT id) FROM rows\"\n# both numbers must match: no duplicates"
+      },
+      "pitfall": "Injecting the fault but only checking that the program did not crash, not that its data is still correct."
+    },
+    "fr": {
+      "why": "L'injection de panne, c'est provoquer l'échec exprès (tuer le processus, couper le réseau, remplir le disque) et vérifier que le système se rétablit. On apprend si le code de retry, de reprise et de nettoyage marche vraiment avant qu'une vraie panne le teste à notre place.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python import_job.py\n# c'est allé jusqu'au bout, donc ça marche",
+        "after": "python import_job.py &\nsleep 3\nkill -9 $!\npython import_job.py   # relancer : doit reprendre\nsqlite3 app.db \"SELECT COUNT(*), COUNT(DISTINCT id) FROM rows\"\n# les deux nombres doivent être égaux : pas de doublons"
+      },
+      "pitfall": "Injecter la panne mais vérifier seulement que le programme n'a pas planté, pas que ses données sont encore justes."
+    }
+  },
+  "endurance-test-soak": {
+    "en": {
+      "why": "A soak test runs the system for hours under normal load to expose slow leaks: memory that grows, file descriptors that pile up, a disk that fills, a log that never rotates. A one-minute run will never show any of them. You watch the resource curves, not just whether it stays up.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python worker.py\n# ran for a minute, fine",
+        "after": "python worker.py &\nPID=$!\nwhile kill -0 $PID 2>/dev/null; do\n  echo \"$(date +%T) rss=$(ps -o rss= -p $PID) fds=$(ls /proc/$PID/fd | wc -l)\" >> soak.log\n  df -h /data | tail -1 >> soak.log\n  sleep 60\ndone\n# let it run 12 h: rss, fds and disk must stay flat"
+      },
+      "pitfall": "Stopping after an hour and only checking that the process is alive, without comparing the early and late numbers."
+    },
+    "fr": {
+      "why": "Un test d'endurance (soak) fait tourner le système des heures sous charge normale pour révéler les fuites lentes : mémoire qui grandit, descripteurs qui s'accumulent, disque qui se remplit, log qui ne tourne jamais. Une minute de test n'en montrera aucune. On surveille les courbes de ressources, pas seulement que ça tienne.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "python worker.py\n# ça a tourné une minute, ça va",
+        "after": "python worker.py &\nPID=$!\nwhile kill -0 $PID 2>/dev/null; do\n  echo \"$(date +%T) rss=$(ps -o rss= -p $PID) fds=$(ls /proc/$PID/fd | wc -l)\" >> soak.log\n  df -h /data | tail -1 >> soak.log\n  sleep 60\ndone\n# laisser tourner 12 h : rss, fds et disque doivent rester plats"
+      },
+      "pitfall": "S'arrêter après une heure et vérifier seulement que le processus est vivant, sans comparer les chiffres du début et de la fin."
+    }
+  },
+  "load-test": {
+    "en": {
+      "why": "A load test sends more and more traffic to find where the system starts to slow down or fail. You get a number (requests per second at an acceptable latency) instead of a guess. It tells you how much headroom you have and which resource gives out first.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "curl http://localhost:8000/api\n# it answered, so it holds",
+        "after": "for c in 10 50 100 200 400; do\n  echo \"connections=$c\"\n  wrk -t4 -c$c -d30s http://localhost:8000/api\ndone\n# note the c where p99 latency or errors jump: that is the threshold"
+      },
+      "pitfall": "Running the load generator on the same machine as the server, so you measure the generator's limits too."
+    },
+    "fr": {
+      "why": "Un test de charge envoie de plus en plus de trafic pour trouver où le système ralentit ou casse. On obtient un chiffre (requêtes par seconde à une latence acceptable) au lieu d'une intuition. Il dit quelle marge on a et quelle ressource lâche en premier.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "curl http://localhost:8000/api\n# ça a répondu, donc ça tient",
+        "after": "for c in 10 50 100 200 400; do\n  echo \"connexions=$c\"\n  wrk -t4 -c$c -d30s http://localhost:8000/api\ndone\n# noter le c où la latence p99 ou les erreurs sautent : c'est le seuil"
+      },
+      "pitfall": "Lancer le générateur de charge sur la même machine que le serveur, donc mesurer aussi les limites du générateur."
+    }
+  },
+  "coverage-proof": {
+    "en": {
+      "why": "Coverage tells you a line was executed during the tests, not that anything checked its result. A test with no assertion can reach 100 percent. What matters is whether each branch is asserted with a value that would change if the code were wrong.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_discount():\n    discount(100, \"VIP\")   # lines executed, nothing asserted",
+        "after": "def test_discount():\n    assert discount(100, \"VIP\") == 80\n    assert discount(100, \"\") == 100   # the other branch"
+      },
+      "pitfall": "Setting a coverage percentage as the goal, which pushes people to write assertion-free tests to hit it."
+    },
+    "fr": {
+      "why": "La couverture dit qu'une ligne a été exécutée pendant les tests, pas que quelque chose a vérifié son résultat. Un test sans assertion peut atteindre 100 %. Ce qui compte, c'est que chaque branche soit assertée avec une valeur qui changerait si le code était faux.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_discount():\n    discount(100, \"VIP\")   # lignes exécutées, rien de vérifié",
+        "after": "def test_discount():\n    assert discount(100, \"VIP\") == 80\n    assert discount(100, \"\") == 100   # l'autre branche"
+      },
+      "pitfall": "Fixer un pourcentage de couverture comme objectif, ce qui pousse à écrire des tests sans assertion pour l'atteindre."
+    }
+  },
+  "arrange-act-assert": {
+    "en": {
+      "why": "Arrange, act, assert gives each test three blocks: set up the state, do the one thing under test, check the result. When a test fails you know which phase to read. One act and one reason to fail keeps tests small and the failure message obvious.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_cart():\n    cart = Cart()\n    cart.add(PEN, 3)\n    assert cart.total == 6\n    cart.remove(PEN)\n    assert cart.total == 0",
+        "after": "def test_add_item_updates_total():\n    # arrange\n    cart = Cart()\n    # act\n    cart.add(PEN, 3)\n    # assert\n    assert cart.total == 6"
+      },
+      "pitfall": "Putting several acts and assertions in one test, so a failure does not say which behavior broke."
+    },
+    "fr": {
+      "why": "Arrange, act, assert donne trois blocs à chaque test : préparer l'état, faire la seule chose testée, vérifier le résultat. Quand un test échoue, on sait quelle phase relire. Un seul act et une seule raison d'échouer gardent les tests petits et le message d'échec évident.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_cart():\n    cart = Cart()\n    cart.add(PEN, 3)\n    assert cart.total == 6\n    cart.remove(PEN)\n    assert cart.total == 0",
+        "after": "def test_add_item_updates_total():\n    # arrange (préparer)\n    cart = Cart()\n    # act (agir)\n    cart.add(PEN, 3)\n    # assert (vérifier)\n    assert cart.total == 6"
+      },
+      "pitfall": "Mettre plusieurs actions et assertions dans un test, si bien qu'un échec ne dit pas quel comportement a cassé."
+    }
+  },
+  "static-analysis": {
+    "en": {
+      "why": "Static analysis inspects code without running it: a linter finds suspicious patterns, a type checker finds mismatched types. It catches typos, wrong arguments and unreachable code in seconds, before a single test runs. It is the cheapest layer of verification.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pytest\n# fails at runtime on a typo in a variable name",
+        "after": "ruff check .\nmypy .\npytest\n# for TypeScript: tsc --noEmit first"
+      },
+      "pitfall": "Silencing warnings with blanket ignore comments instead of fixing them, until the tool says nothing useful."
+    },
+    "fr": {
+      "why": "L'analyse statique inspecte le code sans l'exécuter : un linter trouve les motifs suspects, un vérificateur de types trouve les types incompatibles. Elle attrape fautes de frappe, mauvais arguments et code mort en quelques secondes, avant qu'un seul test tourne. C'est la couche de vérification la moins chère.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pytest\n# échoue à l'exécution sur une faute de frappe dans un nom de variable",
+        "after": "ruff check .\nmypy .\npytest\n# pour TypeScript : tsc --noEmit d'abord"
+      },
+      "pitfall": "Faire taire les avertissements par des ignore généralisés au lieu de les corriger, jusqu'à ce que l'outil ne dise plus rien d'utile."
+    }
+  },
+  "independent-verifier": {
+    "en": {
+      "why": "A test you wrote checks your own understanding of the problem, so a wrong assumption passes both the code and the test. An independent verifier looks at the result through a different path: another tool, the real target, a human's eyes. It is how you catch the mistake you cannot see.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Write the CSV parser and its tests, then tell me it works.",
+        "after": "Write the CSV parser. Then verify it by a path other than your own tests: run it on the real file data/export.csv and compare the row count with `wc -l data/export.csv`. Show both numbers and explain any gap (header line, quoted line breaks)."
+      },
+      "pitfall": "Asking the same model or author to double-check with the same reasoning, which repeats the same blind spot."
+    },
+    "fr": {
+      "why": "Un test qu'on a écrit soi-même vérifie sa propre compréhension du problème : une hypothèse fausse passe à la fois dans le code et dans le test. Un vérificateur indépendant regarde le résultat par un autre chemin : un autre outil, la vraie cible, l'œil d'un humain. C'est ainsi qu'on attrape l'erreur qu'on ne voit pas.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Écris le parseur CSV et ses tests, puis dis-moi que ça marche.",
+        "after": "Écris le parseur CSV. Puis vérifie-le par un autre chemin que tes propres tests : lance-le sur le vrai fichier data/export.csv et compare le nombre de lignes avec `wc -l data/export.csv`. Montre les deux nombres et explique tout écart (ligne d'en-tête, retours à la ligne entre guillemets)."
+      },
+      "pitfall": "Redemander au même modèle ou au même auteur de revérifier avec le même raisonnement, ce qui répète le même angle mort."
+    }
+  },
+  "silent-probe": {
+    "en": {
+      "why": "A probe that prints nothing could mean there is nothing to find, or that the probe is blind (wrong path, wrong pattern, no permission). You only trust an empty result once the same probe has found a known planted case. Otherwise you are measuring your tool, not the system.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "grep -rn \"password=\" logs/\n# nothing printed: no leak",
+        "after": "mkdir -p /tmp/probe\necho \"password=CANARY\" > /tmp/probe/canary.log\ngrep -rn \"password=\" /tmp/probe/   # must print the canary, else the probe is blind\ngrep -rn \"password=\" logs/; echo \"exit=$?\"   # exit 1 = really nothing"
+      },
+      "pitfall": "Concluding \"no match, so it is clean\" from a grep whose pattern or path was never tested on a known hit."
+    },
+    "fr": {
+      "why": "Une sonde qui n'affiche rien peut vouloir dire qu'il n'y a rien à trouver, ou que la sonde est aveugle (mauvais chemin, mauvais motif, pas de droits). On ne croit un résultat vide qu'après que la même sonde a trouvé un cas connu qu'on a planté. Sinon on mesure son outil, pas le système.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "grep -rn \"password=\" logs/\n# rien affiché : pas de fuite",
+        "after": "mkdir -p /tmp/probe\necho \"password=CANARY\" > /tmp/probe/canary.log\ngrep -rn \"password=\" /tmp/probe/   # doit afficher le canari, sinon la sonde est aveugle\ngrep -rn \"password=\" logs/; echo \"exit=$?\"   # exit 1 = vraiment rien"
+      },
+      "pitfall": "Conclure \"pas de résultat, donc c'est propre\" avec un grep dont le motif ou le chemin n'a jamais été testé sur un cas connu."
+    }
+  },
+  "four-golden-signals": {
+    "en": {
+      "why": "The four golden signals are the minimum to watch on anything that serves requests: latency (how long), traffic (how much), errors (how many fail), saturation (how full). Between them they reveal most outages. If you can only add four metrics, add these.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    return process(req)",
+        "after": "from prometheus_client import Counter, Gauge, Histogram\n\nTRAFFIC = Counter(\"requests_total\", \"Traffic\")\nERRORS = Counter(\"request_errors_total\", \"Errors\")\nLATENCY = Histogram(\"request_seconds\", \"Latency\")\nINFLIGHT = Gauge(\"requests_in_flight\", \"Saturation\")\ndef handle(req):\n    TRAFFIC.inc()\n    with INFLIGHT.track_inprogress(), LATENCY.time():\n        try:\n            return process(req)\n        except Exception:\n            ERRORS.inc()\n            raise"
+      },
+      "pitfall": "Averaging latency, which hides the slow tail; track percentiles (p95, p99) instead."
+    },
+    "fr": {
+      "why": "Les quatre signaux d'or sont le minimum à surveiller sur tout ce qui sert des requêtes : latence (combien de temps), trafic (combien), erreurs (combien échouent), saturation (à quel point c'est plein). À eux quatre, ils révèlent la plupart des pannes. Si on ne peut ajouter que quatre métriques, ce sont celles-là.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    return process(req)",
+        "after": "from prometheus_client import Counter, Gauge, Histogram\n\nTRAFFIC = Counter(\"requests_total\", \"Trafic\")\nERRORS = Counter(\"request_errors_total\", \"Erreurs\")\nLATENCY = Histogram(\"request_seconds\", \"Latence\")\nINFLIGHT = Gauge(\"requests_in_flight\", \"Saturation\")\ndef handle(req):\n    TRAFFIC.inc()\n    with INFLIGHT.track_inprogress(), LATENCY.time():\n        try:\n            return process(req)\n        except Exception:\n            ERRORS.inc()\n            raise"
+      },
+      "pitfall": "Moyenner la latence, ce qui cache la queue lente ; suivre plutôt les percentiles (p95, p99)."
+    }
+  },
+  "actionable-alert": {
+    "en": {
+      "why": "An actionable alert tells whoever receives it what is wrong for the user and what to do about it. An alert that fires with no clear action trains people to ignore alerts. Alert on the symptom a user would feel, and put the first command or runbook link in the message.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "ALERT: CPU 82% on web-3",
+        "after": "ALERT: checkout fails for 4% of users for 5 min (5xx rate > 2%)\nAction: find the host serving 5xx on dashboard/checkout, run `sudo systemctl restart checkout` on it.\nRunbook: wiki/checkout-5xx"
+      },
+      "pitfall": "Alerting on causes like \"CPU 80 percent\" that may be harmless, instead of on user-visible symptoms."
+    },
+    "fr": {
+      "why": "Une alerte actionnable dit à celui qui la reçoit ce qui ne va pas pour l'utilisateur et quoi faire. Une alerte qui sonne sans geste clair apprend à ignorer les alertes. On alerte sur le symptôme que l'utilisateur ressentirait, et on met la première commande ou le lien du runbook dans le message.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "ALERT: CPU 82% on web-3",
+        "after": "ALERTE : le paiement échoue pour 4 % des utilisateurs depuis 5 min (taux de 5xx > 2 %)\nGeste : repérer l'hôte qui renvoie des 5xx sur dashboard/checkout, y lancer `sudo systemctl restart checkout`.\nRunbook : wiki/checkout-5xx"
+      },
+      "pitfall": "Alerter sur des causes comme \"CPU 80 %\" qui peuvent être inoffensives, au lieu de symptômes visibles par l'utilisateur."
+    }
+  },
+  "red-green-refactor": {
+    "en": {
+      "why": "Red, green, refactor is a three-step loop: write a test and watch it fail, write the least code that makes it pass, then clean up with the tests as a safety net. Seeing red first proves the test can detect the behavior. Small steps keep you from building more than needed.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def slugify(s):\n    return s.lower().replace(\" \", \"-\")",
+        "after": "# 1. RED: test first, run it, see it fail\ndef test_slugify():\n    assert slugify(\"Hello World\") == \"hello-world\"\n\n# 2. GREEN: the least code that passes\ndef slugify(s):\n    return s.lower().replace(\" \", \"-\")\n\n# 3. REFACTOR: clean up, the test stays green"
+      },
+      "pitfall": "Skipping the red step, so you never learn whether the test could fail at all."
+    },
+    "fr": {
+      "why": "Rouge, vert, refactor est une boucle en trois temps : écrire un test et le voir échouer, écrire le moins de code qui le fait passer, puis nettoyer avec les tests comme filet. Voir le rouge d'abord prouve que le test sait détecter le comportement. Les petits pas évitent de construire plus que nécessaire.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def slugify(s):\n    return s.lower().replace(\" \", \"-\")",
+        "after": "# 1. ROUGE : le test d'abord, le lancer, le voir échouer\ndef test_slugify():\n    assert slugify(\"Hello World\") == \"hello-world\"\n\n# 2. VERT : le moins de code qui passe\ndef slugify(s):\n    return s.lower().replace(\" \", \"-\")\n\n# 3. REFACTOR : nettoyer, le test reste vert"
+      },
+      "pitfall": "Sauter l'étape rouge, si bien qu'on ne sait jamais si le test pouvait échouer."
+    }
+  },
+  "parameterized-test": {
+    "en": {
+      "why": "A parameterized test runs the same body over a table of inputs and expected results. Adding a case becomes adding one row instead of copying a function. Each row is reported separately, so you see exactly which case failed.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_clean_a():\n    assert clean(\"  a \") == \"a\"\n\ndef test_clean_empty():\n    assert clean(\"\") == \"\"\n\ndef test_clean_inner():\n    assert clean(\"A  B\") == \"A B\"",
+        "after": "@pytest.mark.parametrize(\"raw, expected\", [\n    (\"  a \", \"a\"),\n    (\"\", \"\"),\n    (\"A  B\", \"A B\"),\n])\ndef test_clean(raw, expected):\n    assert clean(raw) == expected"
+      },
+      "pitfall": "Packing unrelated behaviors into one table, so the shared test body gets full of if statements."
+    },
+    "fr": {
+      "why": "Un test paramétré exécute le même corps sur une table d'entrées et de résultats attendus. Ajouter un cas devient ajouter une ligne au lieu de copier une fonction. Chaque ligne est rapportée séparément, donc on voit exactement quel cas a échoué.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_clean_a():\n    assert clean(\"  a \") == \"a\"\n\ndef test_clean_empty():\n    assert clean(\"\") == \"\"\n\ndef test_clean_inner():\n    assert clean(\"A  B\") == \"A B\"",
+        "after": "@pytest.mark.parametrize(\"raw, expected\", [\n    (\"  a \", \"a\"),\n    (\"\", \"\"),\n    (\"A  B\", \"A B\"),\n])\ndef test_clean(raw, expected):\n    assert clean(raw) == expected"
+      },
+      "pitfall": "Entasser des comportements sans rapport dans une même table, si bien que le corps partagé se remplit de if."
+    }
+  },
+  "unit-integration": {
+    "en": {
+      "why": "A unit test checks one piece alone and runs in milliseconds; an integration test checks that real pieces work together (code and database, two services). Units tell you where it broke, integration tests tell you the wiring works. Many fast units plus a few integration tests on the joints is the usual balance.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_save_order():\n    con = Mock()\n    save_order(con, Order(id=1, total=120))\n    con.execute.assert_called_once()",
+        "after": "def test_price_with_tax():           # unit: fast, no database\n    assert price_with_tax(100, 0.2) == 120\n\ndef test_order_roundtrip():           # integration: real SQL\n    con = sqlite3.connect(\":memory:\")\n    init_schema(con)\n    save_order(con, Order(id=1, total=120))\n    assert load_order(con, 1).total == 120"
+      },
+      "pitfall": "Mocking everything in unit tests and never testing the joints, so each piece passes and the assembly fails."
+    },
+    "fr": {
+      "why": "Un test unitaire vérifie une pièce seule et tourne en millisecondes ; un test d'intégration vérifie que de vraies pièces fonctionnent ensemble (code et base, deux services). Les unitaires disent où ça casse, les tests d'intégration disent que le câblage marche. Beaucoup d'unitaires rapides et quelques intégrations sur les jointures, c'est l'équilibre habituel.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_save_order():\n    con = Mock()\n    save_order(con, Order(id=1, total=120))\n    con.execute.assert_called_once()",
+        "after": "def test_price_with_tax():           # unitaire : rapide, sans base\n    assert price_with_tax(100, 0.2) == 120\n\ndef test_order_roundtrip():           # intégration : vrai SQL\n    con = sqlite3.connect(\":memory:\")\n    init_schema(con)\n    save_order(con, Order(id=1, total=120))\n    assert load_order(con, 1).total == 120"
+      },
+      "pitfall": "Tout mocker dans les tests unitaires et ne jamais tester les jointures : chaque pièce passe, l'assemblage échoue."
+    }
+  },
+  "test-behavior": {
+    "en": {
+      "why": "Test behavior means asserting on what the code does for its users (outputs, visible effects), not on how it does it internally. A test tied to private fields or call order breaks every time you refactor, even when nothing changed for the caller. Behavior tests are what make refactoring safe.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cart.add(PEN, 3)\nassert cart._items == [(\"pen\", 3)]\nassert cart._recalc.called",
+        "after": "cart.add(PEN, 3)\nassert cart.total == 6\nassert cart.count(\"pen\") == 3"
+      },
+      "pitfall": "Asserting on private attributes or internal call counts because they are easy to reach."
+    },
+    "fr": {
+      "why": "Tester le comportement, c'est asserter sur ce que le code fait pour ses utilisateurs (sorties, effets visibles), pas sur la façon dont il le fait en interne. Un test lié aux champs privés ou à l'ordre des appels casse à chaque refactor, même quand rien n'a changé pour l'appelant. Ce sont les tests de comportement qui rendent le refactor sûr.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "cart.add(PEN, 3)\nassert cart._items == [(\"pen\", 3)]\nassert cart._recalc.called",
+        "after": "cart.add(PEN, 3)\nassert cart.total == 6\nassert cart.count(\"pen\") == 3"
+      },
+      "pitfall": "Asserter sur des attributs privés ou des compteurs d'appels internes parce qu'ils sont faciles d'accès."
+    }
+  },
+  "short-feedback-loop": {
+    "en": {
+      "why": "A short feedback loop means you learn within seconds that something is broken. Run the fastest checks first (types, lint, unit tests) and the slow ones (end to end, load) last, so a mistake costs you seconds, not a twenty-minute CI wait. The faster the loop, the more often you actually run it.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npx playwright test\n# 15 minutes later: a typo in a type",
+        "after": "npx tsc --noEmit          # seconds\nnpx vitest run src/lib    # fast unit tests\nnpx playwright test       # slow, last"
+      },
+      "pitfall": "Running the full slow suite on every change, so people stop running it locally."
+    },
+    "fr": {
+      "why": "Une boucle de retour courte, c'est savoir en quelques secondes que quelque chose est cassé. On lance d'abord les contrôles les plus rapides (types, lint, tests unitaires) et les lents (bout en bout, charge) à la fin, pour qu'une erreur coûte des secondes et non vingt minutes de CI. Plus la boucle est rapide, plus on la lance souvent.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npx playwright test\n# 15 minutes plus tard : une faute de frappe dans un type",
+        "after": "npx tsc --noEmit          # secondes\nnpx vitest run src/lib    # tests unitaires rapides\nnpx playwright test       # lent, en dernier"
+      },
+      "pitfall": "Lancer toute la suite lente à chaque changement, si bien que les gens arrêtent de la lancer en local."
+    }
+  },
+  "readable-failure": {
+    "en": {
+      "why": "A readable failure is a red test whose message tells you what went wrong without opening the code: what was expected, what was obtained, and on which input. It turns a five-minute investigation into a five-second one. Write the message for the person who sees it at 2 a.m. in CI.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "assert is_valid(order)",
+        "after": "errors = validate(order)\nassert errors == [], f\"order {order.id} rejected: {errors}\""
+      },
+      "pitfall": "Using a bare assert on a boolean, so the failure only says the check was false, not which field or why."
+    },
+    "fr": {
+      "why": "Un échec lisible est un test rouge dont le message dit ce qui ne va pas sans ouvrir le code : ce qui était attendu, ce qui a été obtenu, et sur quelle entrée. Il transforme cinq minutes d'enquête en cinq secondes. On écrit le message pour celui qui le voit à 2 h du matin dans la CI.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "assert is_valid(order)",
+        "after": "errors = validate(order)\nassert errors == [], f\"commande {order.id} rejetée : {errors}\""
+      },
+      "pitfall": "Utiliser un assert nu sur un booléen, si bien que l'échec dit seulement que c'est faux, sans dire quel champ ni pourquoi."
+    }
+  },
+  "independent-tests": {
+    "en": {
+      "why": "Independent tests do not rely on running in a given order or on what another test left behind. Each one builds the state it needs and cleans up after itself. This lets you run a single test, run them in parallel or in random order, and trust the result.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "users = []\n\ndef test_add():\n    users.append(\"a\")\n    assert len(users) == 1\n\ndef test_count():\n    assert len(users) == 1  # only passes after test_add",
+        "after": "@pytest.fixture\ndef users():\n    return []\n\ndef test_add(users):\n    users.append(\"a\")\n    assert users == [\"a\"]\n\ndef test_starts_empty(users):\n    assert users == []"
+      },
+      "pitfall": "Sharing a module-level list or database row between tests, so one failure cascades into many."
+    },
+    "fr": {
+      "why": "Des tests indépendants ne reposent ni sur un ordre d'exécution ni sur ce qu'un autre test a laissé. Chacun construit l'état dont il a besoin et nettoie derrière lui. On peut ainsi lancer un seul test, les lancer en parallèle ou dans un ordre aléatoire, et se fier au résultat.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "users = []\n\ndef test_add():\n    users.append(\"a\")\n    assert len(users) == 1\n\ndef test_count():\n    assert len(users) == 1  # ne passe qu'après test_add",
+        "after": "@pytest.fixture\ndef users():\n    return []\n\ndef test_add(users):\n    users.append(\"a\")\n    assert users == [\"a\"]\n\ndef test_commence_vide(users):\n    assert users == []"
+      },
+      "pitfall": "Partager une liste de module ou une ligne de base entre tests, si bien qu'un échec en provoque beaucoup d'autres."
+    }
+  },
+  "realistic-data": {
+    "en": {
+      "why": "Real data is dirty: odd characters, empty fields, very long strings, duplicates, surprising formats. Tests that only use three clean values pass while production breaks on the first messy input. Use a sample drawn from real data, with personal details removed.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_parse_name():\n    assert parse_name(\"John Smith\")",
+        "after": "@pytest.mark.parametrize(\"raw\", [  # anonymized rows from a prod export\n    \"  O'Brien,  Mary-Ann \",\n    \"Zoë\",\n    \"van der Berg, Jan\",\n    \"A\",\n    \"\",\n    \"x\" * 300,\n])\ndef test_parse_name_survives_real_input(raw):\n    parse_name(raw)  # must not raise"
+      },
+      "pitfall": "Using real data without anonymizing it, and leaking personal information into the repository."
+    },
+    "fr": {
+      "why": "Les vraies données sont sales : caractères bizarres, champs vides, chaînes très longues, doublons, formats surprenants. Des tests qui n'utilisent que trois valeurs propres passent pendant que la production casse sur la première entrée sale. On prend un échantillon tiré de données réelles, débarrassé des informations personnelles.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def test_parse_name():\n    assert parse_name(\"John Smith\")",
+        "after": "@pytest.mark.parametrize(\"raw\", [  # lignes anonymisées d'un export de prod\n    \"  O'Brien,  Mary-Ann \",\n    \"Zoë\",\n    \"van der Berg, Jan\",\n    \"A\",\n    \"\",\n    \"x\" * 300,\n])\ndef test_parse_name_survives_real_input(raw):\n    parse_name(raw)  # ne doit pas lever d'exception"
+      },
+      "pitfall": "Utiliser des données réelles sans les anonymiser et faire fuiter des informations personnelles dans le dépôt."
+    }
+  },
+  "visual-regression": {
+    "en": {
+      "why": "A visual regression test takes a screenshot of a page or component and compares it with a stored reference image, per state and per theme. It catches the layout shift or color change that no functional test notices. A failing diff image shows exactly what moved.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "test(\"home\", async ({ page }) => {\n  await page.goto(\"/\");\n  await expect(page.locator(\"h1\")).toBeVisible();  // \"looks fine\"\n});",
+        "after": "test(\"home matches reference\", async ({ page }) => {\n  await page.goto(\"/\");\n  await expect(page).toHaveScreenshot(\"home-light.png\");\n  await page.emulateMedia({ colorScheme: \"dark\" });\n  await expect(page).toHaveScreenshot(\"home-dark.png\");\n});\n// intended change: npx playwright test --update-snapshots, then read the diff"
+      },
+      "pitfall": "Updating the reference screenshots in bulk without looking at what changed."
+    },
+    "fr": {
+      "why": "Un test de régression visuelle prend une capture d'une page ou d'un composant et la compare à une image de référence stockée, par état et par thème. Il attrape le décalage de mise en page ou le changement de couleur qu'aucun test fonctionnel ne voit. L'image de diff montre exactement ce qui a bougé.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "test(\"home\", async ({ page }) => {\n  await page.goto(\"/\");\n  await expect(page.locator(\"h1\")).toBeVisible();  // \"ça a l'air bon\"\n});",
+        "after": "test(\"home correspond à la référence\", async ({ page }) => {\n  await page.goto(\"/\");\n  await expect(page).toHaveScreenshot(\"home-light.png\");\n  await page.emulateMedia({ colorScheme: \"dark\" });\n  await expect(page).toHaveScreenshot(\"home-dark.png\");\n});\n// changement voulu : npx playwright test --update-snapshots, puis lire le diff"
+      },
+      "pitfall": "Mettre à jour les captures de référence en bloc sans regarder ce qui a changé."
+    }
+  },
+  "verify-for-real": {
+    "en": {
+      "why": "A green CI only proves that the tests ran in the CI environment, not that the feature works where users use it. Before you push, run the thing in the real target: the actual browser, machine or account. Many bugs only appear in the real runtime (permissions, bundling, real data).",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npm test    # green\ngit push",
+        "after": "npm test\nnpm run build\n# load dist/ in the browser (chrome://extensions, \"Load unpacked\"),\n# open the real site, click the feature, read the console\ngit push"
+      },
+      "pitfall": "Trusting a green pipeline for something the CI never actually executes, like a browser extension."
+    },
+    "fr": {
+      "why": "Une CI verte prouve seulement que les tests ont tourné dans l'environnement de CI, pas que la fonction marche là où les utilisateurs s'en servent. Avant de pousser, on lance la chose dans la vraie cible : le vrai navigateur, la vraie machine ou le vrai compte. Beaucoup de bugs n'apparaissent que dans le runtime réel (permissions, bundling, vraies données).",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "npm test    # vert\ngit push",
+        "after": "npm test\nnpm run build\n# charger dist/ dans le navigateur (chrome://extensions, \"Charger l'extension non empaquetée\"),\n# ouvrir le vrai site, cliquer sur la fonction, lire la console\ngit push"
+      },
+      "pitfall": "Se fier à un pipeline vert pour quelque chose que la CI n'exécute jamais, comme une extension de navigateur."
+    }
+  },
+  "exit-code-apart": {
+    "en": {
+      "why": "A command in a pipe reports the exit code of the last command, so `pytest | tail` always looks successful even when pytest failed. Run the check on its own, read its exit code, then filter the output separately. Otherwise a red check can be reported as green.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pytest | tail -5\necho \"exit=$?\"   # 0, even if pytest failed (tail's code)",
+        "after": "pytest -q > out.txt\necho \"exit=$?\"   # pytest's own code\ntail -5 out.txt"
+      },
+      "pitfall": "Writing `cmd | tail` or `cmd | grep` in a script and trusting the result as if it were cmd's own status."
+    },
+    "fr": {
+      "why": "Une commande dans un pipe renvoie le code de sortie de la dernière commande, donc `pytest | tail` a l'air de réussir même quand pytest a échoué. On lance le contrôle seul, on lit son code, puis on filtre la sortie à part. Sinon un contrôle rouge peut être rapporté comme vert.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pytest | tail -5\necho \"exit=$?\"   # 0, même si pytest a échoué (code de tail)",
+        "after": "pytest -q > out.txt\necho \"exit=$?\"   # le code de pytest lui-même\ntail -5 out.txt"
+      },
+      "pitfall": "Écrire `cmd | tail` ou `cmd | grep` dans un script et prendre le résultat pour le statut de cmd."
+    }
+  }
+}

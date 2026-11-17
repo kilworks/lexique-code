@@ -1,0 +1,816 @@
+{
+  "backward-compatible": {
+    "en": {
+      "why": "Other code, scripts and people already call your function or read your file. If you change its shape, they all break at once, and you find out in production. Adding something optional keeps every existing caller working while the new feature arrives.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def send(to, body, retries):   # every old call send(to, body) now crashes\n    ...",
+        "after": "def send(to, body, retries=0):  # old calls keep working, 0 = old behavior\n    ..."
+      },
+      "pitfall": "Removing or renaming a parameter or field \"because nobody uses it\" without checking the callers, or changing what the default does."
+    },
+    "fr": {
+      "why": "Du code, des scripts et des personnes appellent déjà ta fonction ou lisent ton fichier. Si tu changes sa forme, tout casse d'un coup, et tu l'apprends en production. Ajouter quelque chose d'optionnel garde les appelants existants en vie pendant que la nouveauté arrive.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def send(to, body, retries):   # chaque ancien appel send(to, body) plante\n    ...",
+        "after": "def send(to, body, retries=0):  # les anciens appels marchent, 0 = ancien comportement\n    ..."
+      },
+      "pitfall": "Retirer ou renommer un paramètre ou un champ \"parce que personne ne s'en sert\" sans vérifier les appelants, ou changer ce que fait la valeur par défaut."
+    }
+  },
+  "reversible-migration": {
+    "en": {
+      "why": "A migration that edits data or config in place can leave you with no way back if it turns out wrong. Keeping a dated copy and writing the reverse step first turns a scary change into an undoable one. It matters most for data you cannot regenerate.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "sed -i 's/old_key/new_key/' config.json",
+        "after": "cp config.json \"config.json.avant-$(date +%F)\"\nsed -i 's/old_key/new_key/' config.json\n# reverse step, written now:\n# mv config.json.avant-2026-11-17 config.json"
+      },
+      "pitfall": "Keeping the copy but never checking that the reverse step actually restores a working state, or keeping the copy on the same disk that fails."
+    },
+    "fr": {
+      "why": "Une migration qui modifie des données ou une config sur place peut ne laisser aucun chemin de retour si elle tourne mal. Garder une copie datée et écrire l'étape inverse d'avance transforme un changement angoissant en changement annulable. C'est surtout vital pour ce qu'on ne peut pas régénérer.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "sed -i 's/old_key/new_key/' config.json",
+        "after": "cp config.json \"config.json.avant-$(date +%F)\"\nsed -i 's/old_key/new_key/' config.json\n# étape inverse, écrite maintenant :\n# mv config.json.avant-2026-11-17 config.json"
+      },
+      "pitfall": "Garder la copie sans jamais vérifier que l'étape inverse redonne bien un état qui marche, ou la garder sur le disque même qui lâche."
+    }
+  },
+  "rollback": {
+    "en": {
+      "why": "Every deployment can fail, and when it does you are stressed and have no time to design the way back. Write the return path before you deploy, so going back is a copy-paste instead of an improvisation.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./deploy.sh v42\n# if it breaks, we'll see",
+        "after": "PREV=$(cat current_version)        # saved BEFORE deploying\n./deploy.sh v42 && curl -fsS localhost:8080/health \\\n  || ./deploy.sh \"$PREV\"           # the way back, already written"
+      },
+      "pitfall": "A rollback that was never run: it breaks on a database change the old version cannot read, or on an artifact that was already deleted."
+    },
+    "fr": {
+      "why": "Tout déploiement peut échouer, et à ce moment-là tu es stressé et sans temps pour inventer le retour. Écris le chemin de retour avant de déployer : revenir devient un copier-coller au lieu d'une improvisation.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./deploy.sh v42\n# si ça casse, on verra",
+        "after": "PREV=$(cat current_version)        # noté AVANT de déployer\n./deploy.sh v42 && curl -fsS localhost:8080/health \\\n  || ./deploy.sh \"$PREV\"           # le retour, déjà écrit"
+      },
+      "pitfall": "Un rollback jamais joué : il casse sur un changement de base que l'ancienne version ne sait pas lire, ou sur un artefact déjà supprimé."
+    }
+  },
+  "blast-radius": {
+    "en": {
+      "why": "Every change can go wrong, so the useful question is how much it can damage when it does. Shrinking the scope (one file, one service, one channel at a time) turns a disaster into an annoying but small incident.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "sed -i 's/oldName/newName/g' $(git ls-files)",
+        "after": "sed -i 's/oldName/newName/g' src/billing/invoice.py\ngit diff --stat      # check the damage before touching the next file"
+      },
+      "pitfall": "Reducing the radius for the change but not for the tooling: the script still has credentials that can reach everything."
+    },
+    "fr": {
+      "why": "Tout changement peut mal tourner, donc la bonne question est de savoir combien il peut casser quand ça arrive. Réduire le périmètre (un fichier, un service, une chaîne à la fois) transforme un désastre en petit incident pénible.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "sed -i 's/oldName/newName/g' $(git ls-files)",
+        "after": "sed -i 's/oldName/newName/g' src/billing/invoice.py\ngit diff --stat      # vérifier les dégâts avant de toucher le fichier suivant"
+      },
+      "pitfall": "Réduire le rayon du changement mais pas celui de l'outil : le script garde des identifiants qui atteignent tout."
+    }
+  },
+  "canary-progressive-rollout": {
+    "en": {
+      "why": "A bug that reaches all your users at once is a full outage. Sending the new version to a small share first lets real traffic reveal the problem while most users are still safe.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "for h in web1 web2 web3 web4; do deploy \"$h\" v2; done",
+        "after": "deploy web1 v2          # the canary: one instance\nsleep 600               # observe: errors, latency, logs\n# healthy? then the rest\nfor h in web2 web3 web4; do deploy \"$h\" v2; done"
+      },
+      "pitfall": "A canary that gets no representative traffic, or a rollout where nobody actually looks at the metrics before widening it."
+    },
+    "fr": {
+      "why": "Un bug qui touche tous les utilisateurs d'un coup est une panne totale. Envoyer d'abord la nouvelle version à une petite part laisse le vrai trafic révéler le problème pendant que la plupart des gens sont encore à l'abri.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "for h in web1 web2 web3 web4; do deploy \"$h\" v2; done",
+        "after": "deploy web1 v2          # le canary : une instance\nsleep 600               # observer : erreurs, latence, logs\n# tout va bien ? alors le reste\nfor h in web2 web3 web4; do deploy \"$h\" v2; done"
+      },
+      "pitfall": "Un canary qui ne reçoit aucun trafic représentatif, ou un déploiement où personne ne regarde vraiment les métriques avant d'élargir."
+    }
+  },
+  "kill-switch": {
+    "en": {
+      "why": "A running program you cannot stop quickly is a liability when it misbehaves. A file or flag checked on every loop gives you a stop that needs no deploy and no process hunting.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    work()",
+        "after": "from pathlib import Path\nimport time\n\nwhile not Path(\"STOP\").exists():   # touch STOP = clean stop\n    work()\n    time.sleep(1)"
+      },
+      "pitfall": "A kill switch only checked at startup, or one that nobody has tested, so it does nothing the day you need it."
+    },
+    "fr": {
+      "why": "Un programme qui tourne et qu'on ne peut pas arrêter vite devient un risque quand il déraille. Un fichier ou un drapeau lu à chaque tour donne un arrêt sans déploiement et sans chasse au process.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    work()",
+        "after": "from pathlib import Path\nimport time\n\nwhile not Path(\"STOP\").exists():   # touch STOP = arrêt propre\n    work()\n    time.sleep(1)"
+      },
+      "pitfall": "Un kill switch lu seulement au démarrage, ou jamais testé, qui ne fait rien le jour où on en a besoin."
+    }
+  },
+  "feature-flag": {
+    "en": {
+      "why": "Deploying code and turning it on are two different decisions. A flag lets you ship the new path switched off, enable it when ready, and turn it off again without a redeploy.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def checkout(cart):\n    return new_checkout(cart)    # live for everyone, no way back but a deploy",
+        "after": "import os\n\ndef checkout(cart):\n    if os.environ.get(\"NEW_CHECKOUT\") == \"1\":   # off by default\n        return new_checkout(cart)\n    return old_checkout(cart)"
+      },
+      "pitfall": "Flags that are never removed: months later nobody knows which combinations are live, and dead branches pile up."
+    },
+    "fr": {
+      "why": "Déployer le code et l'activer sont deux décisions différentes. Un flag permet de livrer le nouveau chemin éteint, de l'activer quand on est prêt, et de le couper de nouveau sans redéployer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def checkout(cart):\n    return new_checkout(cart)    # actif pour tous, retour impossible sans déploiement",
+        "after": "import os\n\ndef checkout(cart):\n    if os.environ.get(\"NEW_CHECKOUT\") == \"1\":   # éteint par défaut\n        return new_checkout(cart)\n    return old_checkout(cart)"
+      },
+      "pitfall": "Des flags jamais retirés : des mois plus tard personne ne sait quelles combinaisons sont actives, et les branches mortes s'accumulent."
+    }
+  },
+  "config-in-env": {
+    "en": {
+      "why": "Values like URLs, ports and passwords change between machines and must not live in code that gets committed. Reading them from the environment lets the same code run anywhere and keeps secrets out of git.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "DB_URL = \"postgres://admin:hunter2@10.0.0.5/app\"",
+        "after": "import os\n\nDB_URL = os.environ[\"DATABASE_URL\"]   # set by the environment or a .env loader"
+      },
+      "pitfall": "Committing the `.env` file itself, which just moves the hardcoded secret into another file in git."
+    },
+    "fr": {
+      "why": "Les URL, ports et mots de passe changent d'une machine à l'autre et ne doivent pas vivre dans du code commité. Les lire dans l'environnement permet au même code de tourner partout et garde les secrets hors de git.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "DB_URL = \"postgres://admin:hunter2@10.0.0.5/app\"",
+        "after": "import os\n\nDB_URL = os.environ[\"DATABASE_URL\"]   # fournie par l'environnement ou un chargeur .env"
+      },
+      "pitfall": "Commiter le fichier `.env` lui-même, ce qui déplace juste le secret en dur dans un autre fichier de git."
+    }
+  },
+  "config-validated-at-startup": {
+    "en": {
+      "why": "A missing or malformed setting that only fails when some request finally reaches it can break production hours after the start. Checking everything once at startup makes the program crash immediately, with a message you can act on.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "PORT = int(os.environ.get(\"PORT\", 0))   # silently 0, fails later somewhere else",
+        "after": "import os, sys\n\nREQUIRED = [\"DATABASE_URL\", \"API_KEY\", \"PORT\"]\nmissing = [k for k in REQUIRED if not os.environ.get(k)]\nif missing:\n    sys.exit(f\"missing config: {', '.join(missing)}\")\nPORT = int(os.environ[\"PORT\"])"
+      },
+      "pitfall": "Checking that a key exists but not that its value makes sense: a URL with a typo or a port out of range still gets through."
+    },
+    "fr": {
+      "why": "Un réglage manquant ou mal formé qui n'échoue que quand une requête l'atteint peut casser la production des heures après le démarrage. Tout vérifier une fois au démarrage fait planter le programme tout de suite, avec un message exploitable.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "PORT = int(os.environ.get(\"PORT\", 0))   # 0 en silence, échoue plus tard ailleurs",
+        "after": "import os, sys\n\nREQUIRED = [\"DATABASE_URL\", \"API_KEY\", \"PORT\"]\nmissing = [k for k in REQUIRED if not os.environ.get(k)]\nif missing:\n    sys.exit(f\"config manquante : {', '.join(missing)}\")\nPORT = int(os.environ[\"PORT\"])"
+      },
+      "pitfall": "Vérifier qu'une clé existe sans vérifier que sa valeur a du sens : une URL avec une faute de frappe ou un port hors plage passent quand même."
+    }
+  },
+  "liveness-readiness": {
+    "en": {
+      "why": "A process can be running yet unable to serve, for example while it loads data or when its database is down. Liveness asks whether it should be restarted, readiness asks whether it should receive traffic, and they are different questions.",
+      "example": {
+        "kind": "code",
+        "lang": "yaml",
+        "before": "livenessProbe:\n  httpGet: { path: /healthz, port: 8080 }",
+        "after": "livenessProbe:            # stuck? then restart it\n  httpGet: { path: /healthz, port: 8080 }\nreadinessProbe:           # able to serve? then send traffic\n  httpGet: { path: /ready, port: 8080 }"
+      },
+      "pitfall": "Putting the database check in the liveness probe: a database outage then restarts every instance in a loop instead of just pausing traffic."
+    },
+    "fr": {
+      "why": "Un process peut tourner sans pouvoir servir, par exemple pendant qu'il charge des données ou quand sa base est tombée. Liveness demande s'il faut le redémarrer, readiness demande s'il doit recevoir du trafic, ce sont deux questions différentes.",
+      "example": {
+        "kind": "code",
+        "lang": "yaml",
+        "before": "livenessProbe:\n  httpGet: { path: /healthz, port: 8080 }",
+        "after": "livenessProbe:            # bloqué ? alors on le redémarre\n  httpGet: { path: /healthz, port: 8080 }\nreadinessProbe:           # capable de servir ? alors on envoie du trafic\n  httpGet: { path: /ready, port: 8080 }"
+      },
+      "pitfall": "Mettre le test de la base dans la sonde liveness : une panne de base redémarre alors toutes les instances en boucle au lieu de simplement couper le trafic."
+    }
+  },
+  "heartbeat-dead-man-s-switch": {
+    "en": {
+      "why": "A job that dies silently produces no error, so waiting for an error alert never works. Having it leave a dated sign of life on success, and alerting when that sign gets too old, catches silent failure.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "0 3 * * * /usr/local/bin/backup.sh     # cron: if it stops, nobody knows",
+        "after": "# end of backup.sh, only reached on success:\ndate +%s > /var/run/backup.ok\n\n# separate checker, every hour: nothing newer than 25 h = silence\ntest -n \"$(find /var/run/backup.ok -mmin -1500)\" || alert \"backup silent\""
+      },
+      "pitfall": "Writing the heartbeat from a thread that keeps beating while the real work is hung, so the sign of life stays fresh on a dead job."
+    },
+    "fr": {
+      "why": "Un job qui meurt en silence ne produit aucune erreur, donc attendre une alerte d'erreur ne marche jamais. Lui faire laisser un signe de vie daté en cas de succès, et alerter quand ce signe devient trop vieux, détecte la panne silencieuse.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "0 3 * * * /usr/local/bin/backup.sh     # cron : s'il s'arrête, personne ne le sait",
+        "after": "# fin de backup.sh, atteinte seulement en cas de succès :\ndate +%s > /var/run/backup.ok\n\n# vérificateur séparé, toutes les heures : rien de plus récent que 25 h = silence\ntest -n \"$(find /var/run/backup.ok -mmin -1500)\" || alert \"backup muet\""
+      },
+      "pitfall": "Écrire le heartbeat depuis un thread qui continue de battre pendant que le vrai travail est bloqué : le signe de vie reste frais sur un job mort."
+    }
+  },
+  "synthetic-probe": {
+    "en": {
+      "why": "\"The service is running\" does not mean a user can actually do anything. A synthetic probe plays a real user journey on a schedule and compares the result, so you find broken flows before customers do.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "systemctl is-active shop      # says \"active\" while checkout is broken",
+        "after": "curl -fsS -X POST https://example.com/api/cart \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"sku\":\"TEST-1\",\"qty\":2}' \\\n  | jq -e '.total == 20' > /dev/null || alert \"cart probe failed\""
+      },
+      "pitfall": "A probe that hits a cached or static page and passes while the real path is broken, or one that leaves test data behind in production."
+    },
+    "fr": {
+      "why": "\"Le service tourne\" ne veut pas dire qu'un utilisateur peut faire quoi que ce soit. Une sonde synthétique joue un vrai parcours à intervalle régulier et compare le résultat, pour trouver les parcours cassés avant les clients.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "systemctl is-active shop      # dit \"active\" pendant que le paiement est cassé",
+        "after": "curl -fsS -X POST https://example.com/api/cart \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"sku\":\"TEST-1\",\"qty\":2}' \\\n  | jq -e '.total == 20' > /dev/null || alert \"sonde panier en échec\""
+      },
+      "pitfall": "Une sonde qui tape une page en cache ou statique et passe pendant que le vrai chemin est cassé, ou qui laisse des données de test en production."
+    }
+  },
+  "slo-error-budget": {
+    "en": {
+      "why": "\"It feels flaky\" starts arguments, a number ends them. An SLO sets the reliability you promise, and the error budget is the failure you are allowed to spend: while there is budget left you ship, when it is gone you fix reliability first.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "The site feels flaky lately, maybe we should stop deploying?",
+        "after": "SLO: 99.9% of requests succeed over 30 days.\nBudget: 0.1% of 43200 min = 43.2 min of failure.\nSpent so far: 31 min (72%). Remaining: 12 min.\nDecision: ship only small, reversible changes. At 100% we freeze features."
+      },
+      "pitfall": "Setting the target at 100%, or at a level nobody measures, so it never drives a decision."
+    },
+    "fr": {
+      "why": "\"Ça a l'air instable\" lance des débats, un chiffre les ferme. Le SLO fixe la fiabilité promise, et le budget d'erreur est l'échec qu'on peut se permettre : tant qu'il reste du budget on livre, quand il est épuisé on répare la fiabilité d'abord.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Le site a l'air instable ces temps-ci, on devrait peut-être arrêter de déployer ?",
+        "after": "SLO : 99,9 % des requêtes réussissent sur 30 jours.\nBudget : 0,1 % de 43200 min = 43,2 min d'échec.\nConsommé : 31 min (72 %). Reste : 12 min.\nDécision : seulement des changements petits et réversibles. À 100 % on gèle les nouvelles fonctionnalités."
+      },
+      "pitfall": "Fixer la cible à 100 %, ou à un niveau que personne ne mesure, si bien qu'elle ne pilote aucune décision."
+    }
+  },
+  "runbook": {
+    "en": {
+      "why": "At 3 a.m. nobody thinks clearly, and the person on call may not be the one who built the system. A runbook turns an incident into a short procedure: what you see, what you run, how to read the output, what to do.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# bot is down?\n# ask whoever remembers how to restart it",
+        "after": "# RUNBOOK: bot sends nothing for 10 min\n# 1. command:\nsystemctl status bot; journalctl -u bot -n 50\n# 2. read: \"active\" but last log older than 10 min = hung\n#          \"failed\" = read the last error line\n# 3. action: hung -> systemctl restart bot\n#            error 401 -> renew the token (see token page)"
+      },
+      "pitfall": "A runbook written once and never run: the commands drift out of date and the first real incident is the first test."
+    },
+    "fr": {
+      "why": "À 3 h du matin personne ne réfléchit bien, et l'astreinte n'est pas forcément celui qui a construit le système. Un runbook transforme l'incident en courte procédure : ce qu'on voit, ce qu'on lance, comment lire le résultat, quoi faire.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# le bot est tombé ?\n# demander à celui qui se souvient comment le relancer",
+        "after": "# RUNBOOK : le bot n'envoie rien depuis 10 min\n# 1. commande :\nsystemctl status bot; journalctl -u bot -n 50\n# 2. lecture : \"active\" mais dernier log vieux de 10 min = bloqué\n#              \"failed\" = lire la dernière ligne d'erreur\n# 3. geste : bloqué -> systemctl restart bot\n#            erreur 401 -> renouveler le jeton (voir la page jeton)"
+      },
+      "pitfall": "Un runbook écrit une fois et jamais rejoué : les commandes vieillissent et le premier vrai incident devient le premier test."
+    }
+  },
+  "blameless-postmortem": {
+    "en": {
+      "why": "After an incident the goal is to make the system safer, not to find someone to blame. Describing what the system allowed to happen keeps people honest about what they saw, and produces fixes that last.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Write the incident report. Say who ran the bad command.",
+        "after": "Write the postmortem for the 14:05 outage. Four parts:\n1. cause\n2. proof (the log line)\n3. fix applied\n4. the check that will catch this next time\nDescribe what the system allowed, not who typed the command."
+      },
+      "pitfall": "Stopping at \"human error\" as the cause: that is a symptom, and the real question is what let one mistake reach production."
+    },
+    "fr": {
+      "why": "Après un incident le but est de rendre le système plus sûr, pas de trouver un coupable. Décrire ce que le système a laissé arriver garde les gens honnêtes sur ce qu'ils ont vu et produit des correctifs qui tiennent.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Écris le rapport d'incident. Dis qui a lancé la mauvaise commande.",
+        "after": "Écris le postmortem de la panne de 14h05. Quatre parties :\n1. cause\n2. preuve (la ligne de log)\n3. correctif appliqué\n4. le contrôle qui l'attrapera la prochaine fois\nDécris ce que le système a permis, pas qui a tapé la commande."
+      },
+      "pitfall": "S'arrêter à \"erreur humaine\" comme cause : c'est un symptôme, la vraie question est ce qui a laissé une erreur arriver jusqu'en production."
+    }
+  },
+  "toil": {
+    "en": {
+      "why": "Toil is manual, repetitive work with no lasting value that a machine could do. It eats time that should go to making things better, and it grows with the size of the system.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# every Monday, by hand:\nssh srv 'du -sh /var/log'\nssh srv 'df -h /'\nssh srv 'systemctl --failed'",
+        "after": "# weekly-report.sh runs the three checks and mails the output\n# crontab:\n0 8 * * 1 /home/me/bin/weekly-report.sh"
+      },
+      "pitfall": "Calling every manual task toil, including one-off judgment work, or automating a task done twice a year that took longer to automate than to do."
+    },
+    "fr": {
+      "why": "Le toil est du travail manuel, répétitif, sans valeur durable, qu'une machine pourrait faire. Il mange le temps qui devrait servir à améliorer les choses, et il grossit avec la taille du système.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# chaque lundi, à la main :\nssh srv 'du -sh /var/log'\nssh srv 'df -h /'\nssh srv 'systemctl --failed'",
+        "after": "# weekly-report.sh lance les trois contrôles et envoie le résultat par mail\n# crontab :\n0 8 * * 1 /home/me/bin/weekly-report.sh"
+      },
+      "pitfall": "Appeler toil toute tâche manuelle, y compris le travail de jugement ponctuel, ou automatiser une tâche faite deux fois par an qui a pris plus de temps à automatiser qu'à faire."
+    }
+  },
+  "engine-tokens": {
+    "en": {
+      "why": "Asking an assistant to redo the same task by hand burns time and tokens every single time. From the second occurrence, have it write a script once and then just run the script.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "List the failed jobs from the logs.\n(the same request, every morning)",
+        "after": "This is the 2nd time I ask. Write check_failed.py that prints the failed\njobs from the logs, and test it on yesterday's logs.\nFrom now on I just run the script."
+      },
+      "pitfall": "Building the engine but not testing it on the case it replaces, then trusting its silence as \"no failures\"."
+    },
+    "fr": {
+      "why": "Demander à un assistant de refaire la même tâche à la main coûte du temps et des tokens à chaque fois. Dès la deuxième occurrence, fais-lui écrire un script une fois, puis lance simplement le script.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Liste les jobs en échec dans les logs.\n(la même demande, chaque matin)",
+        "after": "C'est la 2e fois que je demande. Écris check_failed.py qui affiche les jobs\nen échec des logs, et teste-le sur les logs d'hier.\nDésormais je lance juste le script."
+      },
+      "pitfall": "Construire le moteur sans le tester sur le cas qu'il remplace, puis prendre son silence pour \"aucun échec\"."
+    }
+  },
+  "blue-green": {
+    "en": {
+      "why": "Restarting a service in place means downtime and no easy way back. With two versions side by side you start the new one next to the live one, switch traffic at once, and keep the old one ready for an instant return.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "systemctl restart app     # downtime, and the old version is gone",
+        "after": "# blue is live on 8001; start green next to it on 8002\n./app --port 8002 &\ncurl -fsS localhost:8002/health\n# point the nginx upstream to 8002, then:\nnginx -s reload\n# blue still runs on 8001: going back = same edit + reload"
+      },
+      "pitfall": "A database change that the old version cannot read, so the \"instant return\" to blue fails on the new data."
+    },
+    "fr": {
+      "why": "Redémarrer un service sur place veut dire coupure et retour difficile. Avec deux versions côte à côte, on démarre la nouvelle à côté de la live, on bascule le trafic d'un coup, et l'ancienne reste prête pour un retour immédiat.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "systemctl restart app     # coupure, et l'ancienne version a disparu",
+        "after": "# blue est live sur 8001 ; on démarre green à côté sur 8002\n./app --port 8002 &\ncurl -fsS localhost:8002/health\n# pointer l'upstream nginx vers 8002, puis :\nnginx -s reload\n# blue tourne toujours sur 8001 : retour = même édition + reload"
+      },
+      "pitfall": "Un changement de base que l'ancienne version ne sait pas lire : le \"retour immédiat\" vers blue échoue sur les nouvelles données."
+    }
+  },
+  "shadow-dark-launch": {
+    "en": {
+      "why": "You cannot know how new code behaves on real inputs until it sees them. Running it in the shadow, on the same inputs but returning the old result, lets you compare the outputs with zero risk for users.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def price(order):\n    return new_pricing(order)    # replaces the old one blind",
+        "after": "def price(order):\n    old = old_pricing(order)\n    try:\n        new = new_pricing(order)\n        if new != old:\n            log.warning(\"shadow diff %s: old=%s new=%s\", order.id, old, new)\n    except Exception:\n        log.exception(\"shadow failed\")\n    return old                   # users still get the old result"
+      },
+      "pitfall": "Shadow code with side effects (writes, emails, charges) that stops being invisible and acts on real data."
+    },
+    "fr": {
+      "why": "On ne sait pas comment le nouveau code se comporte sur de vraies entrées tant qu'il ne les a pas vues. Le faire tourner dans l'ombre, sur les mêmes entrées mais en renvoyant l'ancien résultat, permet de comparer les sorties sans aucun risque pour les utilisateurs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def price(order):\n    return new_pricing(order)    # remplace l'ancien à l'aveugle",
+        "after": "def price(order):\n    old = old_pricing(order)\n    try:\n        new = new_pricing(order)\n        if new != old:\n            log.warning(\"écart shadow %s : old=%s new=%s\", order.id, old, new)\n    except Exception:\n        log.exception(\"shadow en échec\")\n    return old                   # les utilisateurs reçoivent toujours l'ancien résultat"
+      },
+      "pitfall": "Du code shadow avec des effets de bord (écritures, mails, paiements) qui cesse d'être invisible et agit sur de vraies données."
+    }
+  },
+  "drain": {
+    "en": {
+      "why": "Killing a worker mid-task loses or corrupts whatever it was doing. Draining means refusing new work, letting the current work finish, and only then stopping.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    handle(queue.get())     # a plain stop (SIGTERM) here and the job is half done",
+        "after": "import signal, threading\nfrom queue import Empty\n\nstop = threading.Event()\nsignal.signal(signal.SIGTERM, lambda *_: stop.set())\n\nwhile not stop.is_set():\n    try:\n        job = queue.get(timeout=1)\n    except Empty:\n        continue\n    handle(job)             # the current job always finishes before exit"
+      },
+      "pitfall": "No deadline on the drain: one stuck request keeps the stop waiting forever, so set a maximum wait and force the cut after it."
+    },
+    "fr": {
+      "why": "Tuer un worker en pleine tâche perd ou corrompt ce qu'il faisait. Drainer veut dire refuser le nouveau travail, laisser finir l'en-cours, et seulement ensuite s'arrêter.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    handle(queue.get())     # un simple arrêt (SIGTERM) ici et le job est à moitié fait",
+        "after": "import signal, threading\nfrom queue import Empty\n\nstop = threading.Event()\nsignal.signal(signal.SIGTERM, lambda *_: stop.set())\n\nwhile not stop.is_set():\n    try:\n        job = queue.get(timeout=1)\n    except Empty:\n        continue\n    handle(job)             # le job en cours finit toujours avant la sortie"
+      },
+      "pitfall": "Aucune limite de temps sur le drain : une requête bloquée fait attendre l'arrêt indéfiniment, il faut un délai maximum puis une coupure forcée."
+    }
+  },
+  "tested-backup": {
+    "en": {
+      "why": "A backup is only a hope until you have restored it. Archives silently turn out empty, corrupted or missing the one directory you needed, and you learn it during the disaster.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "tar czf backup.tgz data/\necho \"backed up\"",
+        "after": "tar czf backup.tgz data/\nmkdir -p /tmp/restore-test\ntar xzf backup.tgz -C /tmp/restore-test\ndiff -r data /tmp/restore-test/data \\\n  && echo \"restore OK $(date +%F)\" >> restore.log"
+      },
+      "pitfall": "Only listing the archive (`tar tzf`) proves it opens, not that the application actually starts on the restored data."
+    },
+    "fr": {
+      "why": "Une sauvegarde n'est qu'un espoir tant qu'on ne l'a pas restaurée. Les archives se révèlent vides, corrompues ou sans le dossier dont on avait besoin, et on l'apprend pendant le désastre.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "tar czf backup.tgz data/\necho \"sauvegardé\"",
+        "after": "tar czf backup.tgz data/\nmkdir -p /tmp/restore-test\ntar xzf backup.tgz -C /tmp/restore-test\ndiff -r data /tmp/restore-test/data \\\n  && echo \"restauration OK $(date +%F)\" >> restore.log"
+      },
+      "pitfall": "Lister l'archive (`tar tzf`) prouve qu'elle s'ouvre, pas que l'application démarre vraiment sur les données restaurées."
+    }
+  },
+  "3-2-1": {
+    "en": {
+      "why": "One copy on one disk disappears with that disk, a fire or a ransomware. Three copies on two different media with one far away survives each of these on its own.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp -r data /backup/data     # same machine, same fate\necho \"backed up\"",
+        "after": "rsync -a data/ /mnt/disk2/data/        # copy 2, another medium\nrclone sync data remote:backups/data   # copy 3, offsite\nrclone check data remote:backups/data  # verify it, do not assume"
+      },
+      "pitfall": "A synced mirror counts as a copy, but it also copies the deletion or the ransomware encryption: keep dated versions too."
+    },
+    "fr": {
+      "why": "Une copie sur un disque disparaît avec ce disque, un incendie ou un ransomware. Trois copies sur deux supports dont une loin survivent à chacun de ces cas séparément.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp -r data /backup/data     # même machine, même sort\necho \"sauvegardé\"",
+        "after": "rsync -a data/ /mnt/disk2/data/        # copie 2, autre support\nrclone sync data remote:backups/data   # copie 3, hors site\nrclone check data remote:backups/data  # vérifier, ne pas supposer"
+      },
+      "pitfall": "Un miroir synchronisé compte comme copie, mais il recopie aussi la suppression ou le chiffrement du ransomware : garder aussi des versions datées."
+    }
+  },
+  "rpo-rto": {
+    "en": {
+      "why": "When something breaks you need two answers ready: how much recent data you can afford to lose (RPO) and how long you can stay down (RTO). Deciding them before the incident drives the backup and recovery design instead of guessing under pressure.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Back up the orders database regularly.",
+        "after": "Design the backup for the orders database.\nRPO 15 min (losing 15 min of orders is acceptable).\nRTO 1 h (back in service within 1 h).\nTell me if a daily pg_dump meets this (it does not, up to 24 h lost)\nand propose what does."
+      },
+      "pitfall": "Stating an RTO but never timing a real restore, so the number is a wish and not a measurement."
+    },
+    "fr": {
+      "why": "Quand quelque chose casse, il faut deux réponses prêtes : combien de données récentes on peut perdre (RPO) et combien de temps on peut rester à l'arrêt (RTO). Les fixer avant l'incident pilote la conception des sauvegardes et de la reprise au lieu de deviner sous pression.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Sauvegarde la base des commandes régulièrement.",
+        "after": "Conçois la sauvegarde de la base des commandes.\nRPO 15 min (perdre 15 min de commandes est acceptable).\nRTO 1 h (remis en service en moins d'1 h).\nDis-moi si un pg_dump quotidien suffit (non, jusqu'à 24 h perdues)\net propose ce qui convient."
+      },
+      "pitfall": "Annoncer un RTO sans jamais chronométrer une vraie restauration : le chiffre est un souhait, pas une mesure."
+    }
+  },
+  "headroom": {
+    "en": {
+      "why": "A machine that looks fine can already be near its limit, and one more job tips it over. Measuring the reserve before adding load tells you whether it fits.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker compose up -d encoder     # \"should be fine\"",
+        "after": "vmstat 2 3       # look at id (idle CPU) and st (steal)\nfree -m          # look at the \"available\" column\ndf -h /          # free disk\n# add the load only if the numbers leave a margin you chose"
+      },
+      "pitfall": "Measuring at a quiet moment: take the reading at the peak, since an average hides the spikes that cause the outage."
+    },
+    "fr": {
+      "why": "Une machine qui a l'air correcte peut déjà être près de sa limite, et un job de plus la fait basculer. Mesurer la réserve avant d'ajouter de la charge dit si ça tient.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker compose up -d encoder     # \"ça devrait passer\"",
+        "after": "vmstat 2 3       # regarder id (CPU libre) et st (steal)\nfree -m          # regarder la colonne \"available\"\ndf -h /          # disque libre\n# ajouter la charge seulement si les chiffres laissent la marge choisie"
+      },
+      "pitfall": "Mesurer à un moment calme : il faut relever au pic, car une moyenne cache les pointes qui causent la panne."
+    }
+  },
+  "expiry-probe": {
+    "en": {
+      "why": "Certificates, tokens and keys all expire, and they fail on a date you could have known. A probe that alerts several days ahead turns a surprise outage into a calm renewal.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# renew when the browser shows an error",
+        "after": "echo | openssl s_client -connect example.com:443 -servername example.com 2>/dev/null \\\n  | openssl x509 -noout -checkend 1209600 \\\n  || alert \"cert expires in less than 14 days\""
+      },
+      "pitfall": "Alerting only a day ahead, or sending the alert to a channel nobody reads, and forgetting non-certificate expiries such as API tokens."
+    },
+    "fr": {
+      "why": "Les certificats, jetons et clés expirent tous, et ils lâchent à une date qu'on pouvait connaître. Une sonde qui alerte plusieurs jours avant transforme une panne surprise en renouvellement tranquille.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# renouveler quand le navigateur affiche une erreur",
+        "after": "echo | openssl s_client -connect example.com:443 -servername example.com 2>/dev/null \\\n  | openssl x509 -noout -checkend 1209600 \\\n  || alert \"le certificat expire dans moins de 14 jours\""
+      },
+      "pitfall": "Alerter seulement la veille, ou envoyer l'alerte dans un canal que personne ne lit, et oublier les expirations hors certificat comme les jetons d'API."
+    }
+  },
+  "alert-fatigue": {
+    "en": {
+      "why": "When alerts fire constantly, people stop reading them and the one that matters gets ignored. Every alert should call for an action; the rest is noise to remove or group.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Add an alert on every error log line.",
+        "after": "Review the last 30 days of alerts. For each rule, count how many led\nto an action. Propose to delete or group (one digest per hour) the ones\nthat led to none, and keep only those that call for a human action."
+      },
+      "pitfall": "Quieting a noisy alert by raising its threshold until it also misses the real incident."
+    },
+    "fr": {
+      "why": "Quand les alertes sonnent en permanence, on arrête de les lire et celle qui compte est ignorée. Chaque alerte doit appeler un geste ; le reste est du bruit à supprimer ou à regrouper.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ajoute une alerte sur chaque ligne d'erreur des logs.",
+        "after": "Passe en revue les alertes des 30 derniers jours. Pour chaque règle, compte\ncombien ont mené à une action. Propose de supprimer ou regrouper (un digest\npar heure) celles qui n'ont mené à rien, et garde seulement celles qui\nappellent un geste humain."
+      },
+      "pitfall": "Calmer une alerte bruyante en montant son seuil jusqu'à ce qu'elle rate aussi le vrai incident."
+    }
+  },
+  "mttr": {
+    "en": {
+      "why": "You cannot prevent every failure, but you can shorten the time until things work again. MTTR is the average time to restore, and it is usually cut faster by better detection and an easy way back than by trying to prevent everything.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Add 20 more checks so this never happens again.",
+        "after": "Last incident: 95 min to restore. 70 min to notice, 15 to find the previous\nversion, 10 to redeploy. Do not chase perfect prevention. Cut the two big\nparts: alert on the synthetic probe, and a one-command rollback."
+      },
+      "pitfall": "Counting the clock from the alert instead of from when users were first hit, which hides the detection delay."
+    },
+    "fr": {
+      "why": "On ne peut pas prévenir toutes les pannes, mais on peut raccourcir le temps avant que ça remarche. Le MTTR est le temps moyen pour rétablir, et on le réduit en général plus vite avec une meilleure détection et un retour facile qu'en essayant de tout prévenir.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Ajoute 20 contrôles de plus pour que ça n'arrive plus jamais.",
+        "after": "Dernier incident : 95 min pour rétablir. 70 min pour s'en apercevoir, 15 pour\nretrouver la version précédente, 10 pour redéployer. Ne cherche pas la\nprévention parfaite. Réduis les deux grosses parts : une alerte sur la sonde\nsynthétique, et un rollback en une commande."
+      },
+      "pitfall": "Compter le chrono depuis l'alerte et non depuis le moment où les utilisateurs ont été touchés, ce qui cache le délai de détection."
+    }
+  },
+  "freeze": {
+    "en": {
+      "why": "Some periods are too sensitive to risk a change: a live event, a big launch, a holiday with nobody on call. A freeze says in advance that only urgent fixes ship, so nobody has to argue it case by case.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Deploy the refactor now, I'm sure it's fine.\n(the live event starts in two hours)",
+        "after": "Live event tomorrow 20:00 to 23:00. Do not deploy the refactor. Postpone it,\nand post in the team channel: \"Freeze until 23:30. Refactor deploy planned\nThursday 10:00. Only security fixes go out before then.\""
+      },
+      "pitfall": "A freeze with no end date and no path for a real emergency fix, so people either bypass it or wait on a security patch."
+    },
+    "fr": {
+      "why": "Certaines périodes sont trop sensibles pour risquer un changement : un événement en direct, un gros lancement, des vacances sans astreinte. Un gel annonce d'avance que seuls les correctifs urgents partent, pour ne pas en débattre au cas par cas.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Déploie le refactor maintenant, je suis sûr que ça passe.\n(l'événement en direct commence dans deux heures)",
+        "after": "Événement en direct demain de 20h à 23h. Ne déploie pas le refactor. Reporte-le\net poste dans le canal de l'équipe : \"Gel jusqu'à 23h30. Déploiement du\nrefactor prévu jeudi 10h. Seuls les correctifs de sécurité partent avant.\""
+      },
+      "pitfall": "Un gel sans date de fin et sans voie pour un vrai correctif d'urgence : on le contourne ou on attend un patch de sécurité."
+    }
+  },
+  "control-plane-data-plane": {
+    "en": {
+      "why": "The control plane decides (routes, config, schedules) and the data plane carries the actual traffic. If the data plane depends on the control plane for every request, an orchestrator outage stops everything instead of only stopping new decisions.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def route(req):\n    return orchestrator.get_target(req)   # orchestrator down = all traffic stops",
+        "after": "cache = {}\n\ndef route(req):\n    try:\n        target = orchestrator.get_target(req)\n        cache[req.key] = target\n    except ConnectionError:\n        target = cache.get(req.key, DEFAULT_TARGET)   # keep carrying\n    return target"
+      },
+      "pitfall": "Serving the last cached decision forever with no expiry, so a stale route outlives the outage it was meant to ride out."
+    },
+    "fr": {
+      "why": "Le plan de contrôle décide (routes, config, planifications) et le plan de données transporte le vrai trafic. Si le plan de données dépend du plan de contrôle à chaque requête, une panne de l'orchestrateur arrête tout au lieu de seulement figer les nouvelles décisions.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def route(req):\n    return orchestrator.get_target(req)   # orchestrateur tombé = tout le trafic s'arrête",
+        "after": "cache = {}\n\ndef route(req):\n    try:\n        target = orchestrator.get_target(req)\n        cache[req.key] = target\n    except ConnectionError:\n        target = cache.get(req.key, DEFAULT_TARGET)   # on continue à transporter\n    return target"
+      },
+      "pitfall": "Servir la dernière décision en cache pour toujours, sans expiration : une route périmée survit à la panne qu'elle devait traverser."
+    }
+  },
+  "game-day": {
+    "en": {
+      "why": "A runbook you have only read is untested. A game day plays the outage on purpose, in controlled conditions, so you find the missing step, the wrong command and the unclear owner before a real incident does.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# read the runbook in a meeting, everyone nods",
+        "after": "# Thursday 14:00, staging copy, team warned\ndocker stop db            # the deliberate cut\n# start a timer, follow the runbook line by line, no improvising\n# note every wrong or missing step, fix the runbook, stop the timer"
+      },
+      "pitfall": "Running it under easy conditions (only the runbook's author plays, knowing the failure in advance) or on production with no limit on what can break."
+    },
+    "fr": {
+      "why": "Un runbook qu'on a seulement lu n'est pas testé. Un game day joue la panne exprès, en conditions contrôlées, pour trouver l'étape manquante, la mauvaise commande et le responsable flou avant qu'un vrai incident ne le fasse.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# lire le runbook en réunion, tout le monde hoche la tête",
+        "after": "# jeudi 14h, copie de staging, équipe prévenue\ndocker stop db            # la coupure provoquée\n# lancer un chrono, suivre le runbook ligne par ligne, sans improviser\n# noter chaque étape fausse ou manquante, corriger le runbook, arrêter le chrono"
+      },
+      "pitfall": "Le jouer en conditions faciles (seul l'auteur du runbook joue, en connaissant la panne d'avance) ou en production sans limite sur ce qui peut casser."
+    }
+  },
+  "infrastructure-as-code": {
+    "en": {
+      "why": "A server configured by hand is a snowflake: nobody remembers exactly what was done to it. Describing machine state in a repo makes the setup reviewable, repeatable and recoverable from the file alone.",
+      "example": {
+        "kind": "code",
+        "lang": "yaml",
+        "before": "# ssh srv\n# apt install nginx\n# vim /etc/nginx/conf.d/site.conf   (and hope I remember this)",
+        "after": "# site.yml, then: ansible-playbook -i hosts site.yml\n- hosts: web\n  become: true\n  tasks:\n    - name: nginx installed\n      ansible.builtin.apt: { name: nginx, state: present }\n    - name: site config\n      ansible.builtin.copy:\n        src: site.conf\n        dest: /etc/nginx/conf.d/site.conf"
+      },
+      "pitfall": "A \"quick fix\" by hand on the server: the machine drifts from the repo and the next apply erases it or nobody remembers why."
+    },
+    "fr": {
+      "why": "Un serveur configuré à la main est une pièce unique : personne ne se souvient exactement de ce qu'on lui a fait. Décrire l'état des machines dans un dépôt rend l'installation relisible, répétable et récupérable à partir du seul fichier.",
+      "example": {
+        "kind": "code",
+        "lang": "yaml",
+        "before": "# ssh srv\n# apt install nginx\n# vim /etc/nginx/conf.d/site.conf   (et j'espère m'en souvenir)",
+        "after": "# site.yml, puis : ansible-playbook -i hosts site.yml\n- hosts: web\n  become: true\n  tasks:\n    - name: nginx installé\n      ansible.builtin.apt: { name: nginx, state: present }\n    - name: config du site\n      ansible.builtin.copy:\n        src: site.conf\n        dest: /etc/nginx/conf.d/site.conf"
+      },
+      "pitfall": "Un \"petit correctif\" à la main sur le serveur : la machine dérive du dépôt et le prochain apply l'efface ou personne ne sait pourquoi."
+    }
+  },
+  "disposable-server": {
+    "en": {
+      "why": "A server you are afraid to touch because of years of manual tweaks is a risk. If you can rebuild it from a script at any time, repairing it is optional and replacing it is routine.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"never reboot it, it has 3 years of manual tweaks nobody wrote down\"",
+        "after": "#!/usr/bin/env bash\n# setup.sh: the complete install, tested on a fresh VM\nset -euo pipefail\napt-get update && apt-get install -y nginx\ninstall -m 644 conf/site.conf /etc/nginx/conf.d/site.conf\nsystemctl enable --now nginx"
+      },
+      "pitfall": "Keeping data or secrets only on the server: a rebuild then loses them, so state must live in backups or separate volumes."
+    },
+    "fr": {
+      "why": "Un serveur qu'on a peur de toucher à cause d'années de réglages à la main est un risque. Si on peut le reconstruire depuis un script à tout moment, le réparer devient optionnel et le remplacer devient routine.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"ne le redémarre jamais, il a 3 ans de réglages manuels que personne n'a notés\"",
+        "after": "#!/usr/bin/env bash\n# setup.sh : l'installation complète, testée sur une VM vierge\nset -euo pipefail\napt-get update && apt-get install -y nginx\ninstall -m 644 conf/site.conf /etc/nginx/conf.d/site.conf\nsystemctl enable --now nginx"
+      },
+      "pitfall": "Garder des données ou des secrets seulement sur le serveur : une reconstruction les perd, l'état doit vivre dans des sauvegardes ou des volumes séparés."
+    }
+  },
+  "one-role-per-machine": {
+    "en": {
+      "why": "When a machine that does one important job also takes extra work, the extra work can starve the main job, and the failure is hard to trace. One role per machine keeps loads from stepping on each other.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker compose up -d encoder     # on the machine that serves the stream",
+        "after": "vmstat 2 3                       # id low or st high = already crowded\n# the encoder belongs on the machine whose role is encoding:\nssh encoder-box 'docker compose up -d encoder'"
+      },
+      "pitfall": "Adding the extra job \"just temporarily\" on the serving machine: it quietly becomes permanent and the first sign is an outage."
+    },
+    "fr": {
+      "why": "Quand une machine qui fait un travail important prend aussi du travail en plus, ce supplément peut affamer le travail principal, et la panne est difficile à tracer. Un rôle par machine empêche les charges de s'empiéter.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "docker compose up -d encoder     # sur la machine qui diffuse le flux",
+        "after": "vmstat 2 3                       # id bas ou st haut = déjà chargé\n# l'encodeur va sur la machine dont le rôle est l'encodage :\nssh encoder-box 'docker compose up -d encoder'"
+      },
+      "pitfall": "Ajouter le job en plus \"juste temporairement\" sur la machine qui sert : il devient permanent sans bruit et le premier signe est une panne."
+    }
+  },
+  "post-deployment-check": {
+    "en": {
+      "why": "A deploy script finishing without error only proves it ran, not that the new version works. A real check right after, compared with the state before, catches a broken release in minutes.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./deploy.sh v43 && echo \"done\"",
+        "after": "./deploy.sh v43\ncurl -fsS https://example.com/version | grep -q '\"v43\"' || echo \"wrong version live\"\ncurl -fsS https://example.com/api/ping > /dev/null || echo \"ping failing, rollback\"\n# then compare error rate and latency with the 30 min before"
+      },
+      "pitfall": "Probing a health route that always answers 200 while the real path is broken, or checking before the new instance actually takes traffic."
+    },
+    "fr": {
+      "why": "Un script de déploiement qui finit sans erreur prouve seulement qu'il a tourné, pas que la nouvelle version marche. Un vrai contrôle juste après, comparé à l'état d'avant, détecte une release cassée en quelques minutes.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./deploy.sh v43 && echo \"terminé\"",
+        "after": "./deploy.sh v43\ncurl -fsS https://example.com/version | grep -q '\"v43\"' || echo \"mauvaise version en ligne\"\ncurl -fsS https://example.com/api/ping > /dev/null || echo \"ping en échec, rollback\"\n# puis comparer taux d'erreur et latence avec les 30 min d'avant"
+      },
+      "pitfall": "Sonder une route de santé qui répond toujours 200 alors que le vrai chemin est cassé, ou contrôler avant que la nouvelle instance reçoive vraiment du trafic."
+    }
+  },
+  "maintenance-window": {
+    "en": {
+      "why": "Some work cannot avoid disrupting users, but when you do it is up to you. A maintenance window picks the least harmful moment, warns people in advance, and fixes an end so the work cannot drag into the busy hours.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Migrate the database now.",
+        "after": "Plan the database migration for Sunday 03:00 to 04:00 (lowest traffic over\nthe last 4 weeks). Announce it on Friday, expected duration 20 min, hard stop\nat 04:00: if it is not done, roll back and reschedule."
+      },
+      "pitfall": "A window with no hard stop: the work overruns into peak hours because stopping feels like wasting what was already done."
+    },
+    "fr": {
+      "why": "Certains travaux ne peuvent pas éviter de gêner les utilisateurs, mais le moment se choisit. Une fenêtre de maintenance prend l'instant le moins nuisible, prévient d'avance, et fixe une fin pour que le travail ne déborde pas sur les heures chargées.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Migre la base de données maintenant.",
+        "after": "Planifie la migration de la base pour dimanche de 3h à 4h (trafic minimal\nsur les 4 dernières semaines). Annonce-la vendredi, durée prévue 20 min,\narrêt ferme à 4h : si ce n'est pas fini, rollback et on reprogramme."
+      },
+      "pitfall": "Une fenêtre sans arrêt ferme : le travail déborde sur les heures de pointe parce qu'arrêter donne l'impression de gâcher ce qui est déjà fait."
+    }
+  },
+  "inventory": {
+    "en": {
+      "why": "You cannot secure, update or back up what you do not know you have. An inventory records, for every machine, what runs, on which port, scheduled by what, using which secret, and why.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"I think something still listens on 8080 on web1?\"",
+        "after": "# on each machine, collect:\nss -tlnp                                           # open ports and their processes\ncrontab -l; ls /etc/cron.d; systemctl list-timers  # scheduled tasks\nsystemctl list-units --type=service --state=running\n# write the result in inventory.yml: service, port, cron, secrets, why"
+      },
+      "pitfall": "An inventory written once by hand and never refreshed: it drifts from reality, so generate it from the machine instead."
+    },
+    "fr": {
+      "why": "On ne peut pas sécuriser, mettre à jour ou sauvegarder ce qu'on ne sait pas posséder. Un inventaire note, pour chaque machine, ce qui tourne, sur quel port, lancé par quoi, avec quel secret, et pourquoi.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"je crois que quelque chose écoute encore sur 8080 sur web1 ?\"",
+        "after": "# sur chaque machine, relever :\nss -tlnp                                           # ports ouverts et leurs processus\ncrontab -l; ls /etc/cron.d; systemctl list-timers  # tâches planifiées\nsystemctl list-units --type=service --state=running\n# écrire le résultat dans inventory.yml : service, port, cron, secrets, pourquoi"
+      },
+      "pitfall": "Un inventaire écrit une fois à la main et jamais rafraîchi : il dérive de la réalité, donc mieux vaut le générer depuis la machine."
+    }
+  },
+  "one-action-deployment": {
+    "en": {
+      "why": "A deploy done from memory differs a little each time, and the step you forget is the one that breaks it. Putting the whole sequence in one script gives you the same result every time, for anyone.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# ssh web1, cd /srv/app, git pull, npm ci, npm run build,\n# systemctl restart app, ... was there a step after that?",
+        "after": "#!/usr/bin/env bash\n# deploy.sh: the only way to deploy\nset -euo pipefail\nssh web1 'cd /srv/app && git pull --ff-only && npm ci && npm run build && sudo systemctl restart app'\ncurl -fsS https://example.com/health"
+      },
+      "pitfall": "Letting the script and the manual routine diverge: someone still does one step by hand, so the script quietly lacks it."
+    },
+    "fr": {
+      "why": "Un déploiement fait de mémoire diffère un peu à chaque fois, et l'étape qu'on oublie est celle qui casse. Mettre toute la séquence dans un script donne le même résultat à chaque fois, pour n'importe qui.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# ssh web1, cd /srv/app, git pull, npm ci, npm run build,\n# systemctl restart app, ... y avait-il une étape après ?",
+        "after": "#!/usr/bin/env bash\n# deploy.sh : la seule façon de déployer\nset -euo pipefail\nssh web1 'cd /srv/app && git pull --ff-only && npm ci && npm run build && sudo systemctl restart app'\ncurl -fsS https://example.com/health"
+      },
+      "pitfall": "Laisser le script et la routine manuelle diverger : quelqu'un fait encore une étape à la main, donc le script ne l'a jamais."
+    }
+  }
+}

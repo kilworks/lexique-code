@@ -1,0 +1,838 @@
+{
+  "idempotent": {
+    "en": {
+      "why": "Scripts get rerun: after a crash, by a retrying scheduler, or by you at 2 a.m. An idempotent script reaches the same final state whether it runs once or five times. A rerun becomes a non-event instead of a duplicated line or a crash on 'already exists'.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "echo 'export PATH=\"$PATH:$HOME/bin\"' >> ~/.bashrc\nmkdir ~/bin",
+        "after": "line='export PATH=\"$PATH:$HOME/bin\"'\ngrep -qxF \"$line\" ~/.bashrc || echo \"$line\" >> ~/.bashrc\nmkdir -p ~/bin"
+      },
+      "pitfall": "A guard that matches loosely (grep without -x, a mere substring) finds a commented-out or longer line that merely contains yours, and the real line is never added."
+    },
+    "fr": {
+      "why": "Un script finit toujours par être relancé : après un plantage, par un scheduler qui retente, ou par toi à 2 h du matin. Un script idempotent arrive au même état final qu'il tourne une fois ou cinq fois. La relance devient un non-événement, au lieu d'une ligne en double ou d'un crash sur \"existe déjà\".",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "echo 'export PATH=\"$PATH:$HOME/bin\"' >> ~/.bashrc\nmkdir ~/bin",
+        "after": "line='export PATH=\"$PATH:$HOME/bin\"'\ngrep -qxF \"$line\" ~/.bashrc || echo \"$line\" >> ~/.bashrc\nmkdir -p ~/bin"
+      },
+      "pitfall": "Une garde qui compare trop large (grep sans -x, simple sous-chaîne) trouve une ligne commentée ou plus longue qui contient juste la tienne, et la vraie ligne n'est jamais ajoutée."
+    }
+  },
+  "atomic": {
+    "en": {
+      "why": "If a process dies while writing a file, the next reader finds a truncated one and the state is corrupt. Atomic means the change is visible all at once or not at all. For a file that is write-to-temp then rename; for data it is a transaction.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with open(\"state.json\", \"w\") as f:\n    json.dump(state, f)   # crash here: half a file",
+        "after": "tmp = \"state.json.tmp\"\nwith open(tmp, \"w\") as f:\n    json.dump(state, f)\nos.replace(tmp, \"state.json\")   # readers see old or new, never half"
+      },
+      "pitfall": "The temp file must live on the same filesystem as the target, otherwise the rename is a copy and is no longer atomic."
+    },
+    "fr": {
+      "why": "Si un process meurt pendant l'écriture d'un fichier, le lecteur suivant trouve un fichier tronqué et l'état est corrompu. Atomique veut dire que le changement apparaît d'un coup ou pas du tout. Pour un fichier, c'est écrire dans un temporaire puis renommer ; pour des données, c'est une transaction.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with open(\"state.json\", \"w\") as f:\n    json.dump(state, f)   # crash ici : demi-fichier",
+        "after": "tmp = \"state.json.tmp\"\nwith open(tmp, \"w\") as f:\n    json.dump(state, f)\nos.replace(tmp, \"state.json\")   # les lecteurs voient l'ancien ou le nouveau, jamais la moitié"
+      },
+      "pitfall": "Le fichier temporaire doit être sur le même système de fichiers que la cible, sinon le rename devient une copie et n'est plus atomique."
+    }
+  },
+  "reentrant": {
+    "en": {
+      "why": "Two copies of the same job will eventually run at once: a cron tick during a slow run, a double click, a retry. Reentrant code survives that, either by locking out the second copy or by sharing nothing between copies. Fixed temp file names are the usual way two runs trample each other.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "#!/bin/sh\n# cron fires every minute, a slow run overlaps the next one\n./sync.sh > /tmp/sync.tmp\nmv /tmp/sync.tmp /srv/data.csv",
+        "after": "#!/bin/sh\nexec 9>/var/lock/sync.lock\nflock -n 9 || exit 0          # another run is active: leave it alone\ntmp=\"/srv/data.csv.$$\"        # unique per process\n./sync.sh > \"$tmp\"\nmv \"$tmp\" /srv/data.csv"
+      },
+      "pitfall": "A lock file created with 'if absent, touch' is itself a race; use flock, which the kernel makes atomic and releases if the process dies."
+    },
+    "fr": {
+      "why": "Deux copies du même job finissent par tourner en même temps : un tick de cron pendant un run lent, un double clic, un retry. Un code réentrant tient le coup, soit en bloquant la seconde copie, soit en ne partageant rien entre copies. Les noms de fichiers temporaires fixes sont la façon classique de se marcher dessus.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "#!/bin/sh\n# cron tire chaque minute, un run lent chevauche le suivant\n./sync.sh > /tmp/sync.tmp\nmv /tmp/sync.tmp /srv/data.csv",
+        "after": "#!/bin/sh\nexec 9>/var/lock/sync.lock\nflock -n 9 || exit 0          # un autre run est actif : on le laisse\ntmp=\"/srv/data.csv.$$\"        # unique par process\n./sync.sh > \"$tmp\"\nmv \"$tmp\" /srv/data.csv"
+      },
+      "pitfall": "Un fichier de verrou créé avec \"si absent, touch\" est lui-même une course ; utilise flock, que le noyau rend atomique et libère si le process meurt."
+    }
+  },
+  "deterministic": {
+    "en": {
+      "why": "A deterministic function gives the same output for the same inputs, every time. Hidden inputs such as the clock, unordered directory listings or unseeded randomness make a bug impossible to replay and a test flaky. Make those inputs explicit and the behavior becomes testable.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "stamp = time.time()\nfiles = os.listdir(folder)\npick = random.choice(files)\nreport = f\"built at {stamp}: {pick}\"",
+        "after": "files = sorted(os.listdir(folder))\nrng = random.Random(42)\npick = rng.choice(files)\nreport = f\"built at {now}: {pick}\"   # now passed in by the caller"
+      },
+      "pitfall": "Iterating a set, or a dict built from a directory listing, can still be unordered input in some languages; sort before you depend on the order."
+    },
+    "fr": {
+      "why": "Une fonction déterministe donne la même sortie pour les mêmes entrées, à chaque fois. Les entrées cachées (horloge, listing de dossier non ordonné, aléatoire sans graine) rendent un bug impossible à rejouer et un test instable. Rends ces entrées explicites et le comportement devient testable.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "stamp = time.time()\nfiles = os.listdir(folder)\npick = random.choice(files)\nreport = f\"généré à {stamp}: {pick}\"",
+        "after": "files = sorted(os.listdir(folder))\nrng = random.Random(42)\npick = rng.choice(files)\nreport = f\"généré à {now}: {pick}\"   # now est passé par l'appelant"
+      },
+      "pitfall": "Parcourir un set, ou un dict construit depuis un listing de dossier, peut rester une entrée non ordonnée dans certains langages ; trie avant de dépendre de l'ordre."
+    }
+  },
+  "convergent-declarative": {
+    "en": {
+      "why": "Instead of listing the steps to run, you state the end state you want and let the tool work out the difference with what exists. Running it again when nothing has changed does nothing, and running it after drift pulls the system back. This is why a config file applied repeatedly beats a script of imperative steps.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "kubectl create -f deploy.yaml\n# second run: Error ... AlreadyExists",
+        "after": "kubectl apply -f deploy.yaml\n# run it ten times: the cluster is compared to the file, only the diff is applied"
+      },
+      "pitfall": "Declarative does not mean safe: a desired state with a typo or an empty list can make the tool converge on deleting things, so preview the diff (for example kubectl diff) first."
+    },
+    "fr": {
+      "why": "Au lieu de lister les étapes à exécuter, tu décris l'état final voulu et l'outil calcule l'écart avec l'existant. Relance sans changement : rien ne se passe ; relance après une dérive : le système est ramené. C'est pourquoi un fichier de config appliqué en boucle vaut mieux qu'un script d'étapes impératives.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "kubectl create -f deploy.yaml\n# 2e run : Error ... AlreadyExists",
+        "after": "kubectl apply -f deploy.yaml\n# dix fois de suite : le cluster est comparé au fichier, seul l'écart est appliqué"
+      },
+      "pitfall": "Déclaratif ne veut pas dire sûr : un état voulu avec une faute de frappe ou une liste vide peut faire converger l'outil vers la suppression, donc prévisualise le diff (par exemple kubectl diff) d'abord."
+    }
+  },
+  "fail-fast": {
+    "en": {
+      "why": "A program that hits a problem should stop at once, at the first place it is detectable, with a clear message and a non-zero exit code. Otherwise the error travels downstream, wrecks something unrelated and is far harder to trace. In the before version, an unset BUILD_DIR turns the script into an 'rm -rf' of whatever directory you were in.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "#!/bin/bash\ncd \"$BUILD_DIR\"\nrm -rf *",
+        "after": "#!/bin/bash\nset -euo pipefail\n[ -d \"${BUILD_DIR:-}\" ] || { echo \"BUILD_DIR missing\" >&2; exit 2; }\ncd \"$BUILD_DIR\"\nrm -rf ./*"
+      },
+      "pitfall": "Fail-fast belongs at the entry and around invariants; a blanket 'set -e' still ignores failures inside conditions and, without pipefail, inside pipelines."
+    },
+    "fr": {
+      "why": "Un programme qui rencontre un problème doit s'arrêter tout de suite, au premier endroit où c'est détectable, avec un message clair et un code de sortie non nul. Sinon l'erreur voyage en aval, casse autre chose et devient bien plus dure à retracer. Dans la version \"avant\", un BUILD_DIR non défini transforme le script en \"rm -rf\" du dossier où tu te trouves.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "#!/bin/bash\ncd \"$BUILD_DIR\"\nrm -rf *",
+        "after": "#!/bin/bash\nset -euo pipefail\n[ -d \"${BUILD_DIR:-}\" ] || { echo \"BUILD_DIR absent\" >&2; exit 2; }\ncd \"$BUILD_DIR\"\nrm -rf ./*"
+      },
+      "pitfall": "Le fail-fast se place à l'entrée et autour des invariants ; un \"set -e\" général ignore encore les échecs dans les conditions et, sans pipefail, dans les pipes."
+    }
+  },
+  "fail-closed-fail-open": {
+    "en": {
+      "why": "When a check cannot decide, you must pick a default: refuse (fail-closed) or let through (fail-open). Security and money checks fail closed, since letting a stranger in is worse than a false refusal. A live broadcast fails open, since a black screen is worse than a slightly wrong clip. Pick on purpose per component and write it down.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def may_access(user):\n    try:\n        return acl.check(user)\n    except Exception:\n        return True            # ACL service down: let everyone in\n\ndef next_clip():\n    return queue.pop()         # empty or broken queue: dead air",
+        "after": "def may_access(user):\n    try:\n        return acl.check(user)\n    except Exception:\n        return False           # fail-closed: refuse when unsure\n\ndef next_clip():\n    try:\n        return queue.pop()\n    except Exception:\n        return WAITING_CLIP    # fail-open: stay on air, and alert"
+      },
+      "pitfall": "Getting the default by accident, usually whatever the 'except' block happens to produce, is the real bug; each failure path needs a stated choice."
+    },
+    "fr": {
+      "why": "Quand un contrôle ne peut pas trancher, il faut choisir un défaut : refuser (fail-closed) ou laisser passer (fail-open). Les contrôles de sécurité et d'argent échouent fermé, car laisser entrer un inconnu est pire qu'un refus à tort. Une diffusion en direct échoue ouvert, car un écran noir est pire qu'un clip un peu faux. Choisis volontairement par composant et écris-le.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def may_access(user):\n    try:\n        return acl.check(user)\n    except Exception:\n        return True            # service ACL en panne : tout le monde entre\n\ndef next_clip():\n    return queue.pop()         # file vide ou cassée : écran noir",
+        "after": "def may_access(user):\n    try:\n        return acl.check(user)\n    except Exception:\n        return False           # fail-closed : on refuse dans le doute\n\ndef next_clip():\n    try:\n        return queue.pop()\n    except Exception:\n        return WAITING_CLIP    # fail-open : on reste à l'antenne, et on alerte"
+      },
+      "pitfall": "Le vrai bug, c'est de tomber sur le défaut par accident (celui que le bloc \"except\" produit au hasard) ; chaque chemin d'échec demande un choix explicite."
+    }
+  },
+  "graceful-degradation": {
+    "en": {
+      "why": "Real systems lose parts all the time: an API, a disk, a worker. Graceful degradation means the rest keeps working at reduced quality (an old value, a waiting clip, a simpler page) instead of everything failing together. It only counts if the fallback is explicit and someone is told it is active.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def homepage():\n    price = fetch_price()          # raises if the API is down\n    return render(price)",
+        "after": "def homepage():\n    try:\n        price = fetch_price()\n        cache.set(\"price\", price)\n    except Exception as e:\n        log.warning(\"price API down: %s\", e)\n        alert(\"price API down\")\n        price = cache.get(\"price\")  # last known value, may be stale\n    return render(price)"
+      },
+      "pitfall": "A silent fallback hides the outage: if nothing alerts, you run on the stale value for weeks without knowing."
+    },
+    "fr": {
+      "why": "Les vrais systèmes perdent des morceaux en permanence : une API, un disque, un worker. La dégradation gracieuse veut dire que le reste continue avec une qualité réduite (une ancienne valeur, un clip d'attente, une page plus simple) au lieu que tout tombe ensemble. Ça ne compte que si le repli est explicite et que quelqu'un est prévenu.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def homepage():\n    price = fetch_price()          # lève une exception si l'API est down\n    return render(price)",
+        "after": "def homepage():\n    try:\n        price = fetch_price()\n        cache.set(\"price\", price)\n    except Exception as e:\n        log.warning(\"API prix en panne : %s\", e)\n        alert(\"API prix en panne\")\n        price = cache.get(\"price\")  # dernière valeur connue, peut-être périmée\n    return render(price)"
+      },
+      "pitfall": "Un repli silencieux cache la panne : sans alerte, tu tournes sur la valeur périmée pendant des semaines sans le savoir."
+    }
+  },
+  "backoff-jitter": {
+    "en": {
+      "why": "Retrying at once, in a loop, is how a short outage becomes a long one: every client hammers the service as it tries to recover. Backoff waits longer after each failure, and jitter randomizes the wait so that clients do not all retry at the same instant. Cap both the delay and the number of attempts.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    try:\n        return call_api()\n    except Exception:\n        pass                       # hammer the API in a tight loop",
+        "after": "for attempt in range(5):\n    try:\n        return call_api()\n    except TransientError:\n        delay = min(30, 2 ** attempt)\n        time.sleep(random.uniform(0, delay))   # capped, jittered\nraise GiveUp(\"call_api failed after 5 attempts\")"
+      },
+      "pitfall": "Backoff without jitter makes a thundering herd retry in sync at 1, 2, 4, 8 seconds; the randomness is not decoration."
+    },
+    "fr": {
+      "why": "Réessayer tout de suite, en boucle, c'est comme ça qu'une courte panne devient longue : chaque client martèle le service pendant qu'il tente de repartir. Le backoff attend plus longtemps après chaque échec, et le jitter rend l'attente aléatoire pour que les clients ne réessaient pas tous au même instant. Plafonne le délai et le nombre de tentatives.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    try:\n        return call_api()\n    except Exception:\n        pass                       # on martèle l'API en boucle serrée",
+        "after": "for attempt in range(5):\n    try:\n        return call_api()\n    except TransientError:\n        delay = min(30, 2 ** attempt)\n        time.sleep(random.uniform(0, delay))   # plafonné, avec jitter\nraise GiveUp(\"call_api a échoué après 5 tentatives\")"
+      },
+      "pitfall": "Un backoff sans jitter fait réessayer tout le troupeau en synchro à 1, 2, 4, 8 secondes ; l'aléatoire n'est pas décoratif."
+    }
+  },
+  "timeout": {
+    "en": {
+      "why": "Many network libraries wait forever by default, so one silent server can freeze your whole program with no error to read. A timeout turns an unbounded wait into a failure you can handle: retry, skip, alert. Put one on every network call and every subprocess.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r = requests.get(url)                       # can wait forever\nsubprocess.run([\"ffmpeg\", \"-i\", src, dst])  # same",
+        "after": "r = requests.get(url, timeout=(3.05, 10))   # connect, read\ntry:\n    subprocess.run([\"ffmpeg\", \"-i\", src, dst], timeout=600)\nexcept subprocess.TimeoutExpired:\n    handle_stuck_job()"
+      },
+      "pitfall": "The timeout in requests applies to each connect and each read, not to the whole download, so a slow trickle can still run for hours; add an overall deadline for that."
+    },
+    "fr": {
+      "why": "Beaucoup de bibliothèques réseau attendent indéfiniment par défaut : un seul serveur muet peut figer tout ton programme sans aucune erreur à lire. Un timeout transforme une attente sans borne en un échec que tu peux traiter : retry, saut, alerte. Mets-en un sur chaque appel réseau et chaque sous-process.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r = requests.get(url)                       # peut attendre indéfiniment\nsubprocess.run([\"ffmpeg\", \"-i\", src, dst])  # pareil",
+        "after": "r = requests.get(url, timeout=(3.05, 10))   # connexion, lecture\ntry:\n    subprocess.run([\"ffmpeg\", \"-i\", src, dst], timeout=600)\nexcept subprocess.TimeoutExpired:\n    handle_stuck_job()"
+      },
+      "pitfall": "Le timeout de requests s'applique à chaque connexion et à chaque lecture, pas au téléchargement entier : un filet de données très lent peut durer des heures, ajoute un délai global pour ça."
+    }
+  },
+  "bounded": {
+    "en": {
+      "why": "Anything without a limit will eventually reach it by accident: a queue that eats the RAM, a log that fills the disk, a retry that never ends, a job that runs for days. Bounding queue size, attempts, memory, log size and duration makes the worst case something you chose. Decide too what happens at the limit: drop, block or fail.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "queue = []                                # grows until RAM is gone\nqueue.append(item)\nhandler = logging.FileHandler(\"app.log\")  # grows until the disk is full",
+        "after": "queue = collections.deque(maxlen=1000)   # chosen: oldest dropped past 1000\nqueue.append(item)\nhandler = logging.handlers.RotatingFileHandler(\n    \"app.log\", maxBytes=5_000_000, backupCount=3)"
+      },
+      "pitfall": "A bound with no decided behavior at the limit just moves the problem: a full queue that silently drops items loses data without telling you."
+    },
+    "fr": {
+      "why": "Tout ce qui n'a pas de limite finit par l'atteindre par accident : une file qui mange la RAM, un log qui remplit le disque, un retry sans fin, un job qui tourne des jours. Borner la taille des files, les tentatives, la mémoire, les logs et la durée fait du pire cas un choix. Décide aussi ce qui se passe à la limite : jeter, bloquer ou échouer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "queue = []                                # grossit jusqu'à la fin de la RAM\nqueue.append(item)\nhandler = logging.FileHandler(\"app.log\")  # grossit jusqu'au disque plein",
+        "after": "queue = collections.deque(maxlen=1000)   # choix assumé : les plus anciens sautent au-delà de 1000\nqueue.append(item)\nhandler = logging.handlers.RotatingFileHandler(\n    \"app.log\", maxBytes=5_000_000, backupCount=3)"
+      },
+      "pitfall": "Une borne sans comportement décidé à la limite déplace juste le problème : une file pleine qui jette en silence perd des données sans te le dire."
+    }
+  },
+  "resumable-checkpoint": {
+    "en": {
+      "why": "A long job that dies at 80 percent should restart at 80 percent, not at zero. A checkpoint records how far you got after each step, and the next run starts from that offset. It pays off most on slow, expensive or rate-limited work such as downloads, migrations and batch API calls.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for item in items:       # crash at item 8000: start over\n    process(item)",
+        "after": "done = int(Path(\"ckpt\").read_text()) if Path(\"ckpt\").exists() else 0\nfor i in range(done, len(items)):\n    process(items[i])\n    Path(\"ckpt.tmp\").write_text(str(i + 1))\n    os.replace(\"ckpt.tmp\", \"ckpt\")     # progress written after each step"
+      },
+      "pitfall": "Write the checkpoint after the step succeeds and make the step safe to repeat, since a crash between the work and the checkpoint will redo one item."
+    },
+    "fr": {
+      "why": "Un long job qui meurt à 80 % doit repartir à 80 %, pas de zéro. Un checkpoint note où tu en es après chaque étape, et le run suivant reprend à cet offset. Ça rapporte surtout sur le lent, le coûteux ou le limité en débit : téléchargements, migrations, appels d'API en lot.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for item in items:       # crash à l'élément 8000 : on repart de zéro\n    process(item)",
+        "after": "done = int(Path(\"ckpt\").read_text()) if Path(\"ckpt\").exists() else 0\nfor i in range(done, len(items)):\n    process(items[i])\n    Path(\"ckpt.tmp\").write_text(str(i + 1))\n    os.replace(\"ckpt.tmp\", \"ckpt\")     # progression écrite après chaque étape"
+      },
+      "pitfall": "Écris le checkpoint après le succès de l'étape et rends l'étape rejouable, car un crash entre le travail et le checkpoint refera un élément."
+    }
+  },
+  "crash-only": {
+    "en": {
+      "why": "A crash-only program has no special shutdown code: stopping it and crashing it are the same event, so the startup path is the only recovery path and gets exercised every time. This works only if the on-disk state is consistent at every instant. It beats a 'clean shutdown' flag, which is exactly what a kill -9 never sets.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def start():\n    if not Path(\"clean_shutdown\").exists():\n        sys.exit(\"unclean shutdown, fix state by hand\")\n    Path(\"clean_shutdown\").unlink()",
+        "after": "def start():\n    for tmp in glob.glob(\"state/*.tmp\"):   # leftovers of an interrupted write\n        os.remove(tmp)\n    state = load_state_or_replay_journal()\n    return state                          # same path after kill -9 or clean stop"
+      },
+      "pitfall": "Having a separate, rarely run 'recovery mode' is the trap: untested code that first executes during an incident."
+    },
+    "fr": {
+      "why": "Un programme crash-only n'a pas de code d'arrêt spécial : l'arrêter et le faire planter, c'est le même événement, donc le chemin de démarrage est le seul chemin de reprise et il est exercé à chaque fois. Ça marche seulement si l'état sur disque est cohérent à chaque instant. C'est mieux qu'un drapeau \"arrêt propre\", que justement un kill -9 ne pose jamais.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def start():\n    if not Path(\"clean_shutdown\").exists():\n        sys.exit(\"arrêt sale, réparer l'état à la main\")\n    Path(\"clean_shutdown\").unlink()",
+        "after": "def start():\n    for tmp in glob.glob(\"state/*.tmp\"):   # restes d'une écriture interrompue\n        os.remove(tmp)\n    state = load_state_or_replay_journal()\n    return state                          # même chemin après kill -9 ou arrêt propre"
+      },
+      "pitfall": "Le piège, c'est un \"mode récupération\" à part, rarement lancé : du code non testé qui s'exécute pour la première fois pendant un incident."
+    }
+  },
+  "graceful-shutdown": {
+    "en": {
+      "why": "When a service is stopped or redeployed, the system sends SIGTERM and later SIGKILL. A program that honors SIGTERM finishes the current item, removes its temp files and exits, instead of dying in the middle of a write. Without that, every deploy has a small chance of leaving corrupt state.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    process(next_item())     # SIGTERM kills it mid-write",
+        "after": "stop = False\n\ndef on_term(signum, frame):\n    global stop\n    stop = True\n\nsignal.signal(signal.SIGTERM, on_term)\nwhile not stop:\n    process(next_item())     # the current item always finishes\ncleanup()"
+      },
+      "pitfall": "Handling the signal is not enough if the loop blocks forever on a read or a sleep; make waits interruptible and keep the cleanup shorter than the supervisor's kill delay."
+    },
+    "fr": {
+      "why": "Quand un service est arrêté ou redéployé, le système envoie SIGTERM puis, plus tard, SIGKILL. Un programme qui respecte SIGTERM termine l'élément en cours, supprime ses temporaires et sort, au lieu de mourir en pleine écriture. Sans ça, chaque déploiement a une petite chance de laisser un état corrompu.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    process(next_item())     # SIGTERM le tue en pleine écriture",
+        "after": "stop = False\n\ndef on_term(signum, frame):\n    global stop\n    stop = True\n\nsignal.signal(signal.SIGTERM, on_term)\nwhile not stop:\n    process(next_item())     # l'élément en cours se termine toujours\ncleanup()"
+      },
+      "pitfall": "Gérer le signal ne suffit pas si la boucle bloque indéfiniment sur une lecture ou un sleep ; rends les attentes interruptibles et garde un nettoyage plus court que le délai de kill du superviseur."
+    }
+  },
+  "quarantine": {
+    "en": {
+      "why": "When a file or record looks wrong, deleting it destroys the evidence and any chance of fixing the cause or recovering it. Quarantine moves it aside, out of the normal flow, with a note of why. The pipeline keeps running and you can inspect the item later.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "rm incoming/broken.mp4",
+        "after": "mkdir -p quarantine\nmv incoming/broken.mp4 \"quarantine/$(date +%s)-broken.mp4\"\necho \"$(date -Is) broken.mp4 moved: ffprobe failed\" >> quarantine/log.txt"
+      },
+      "pitfall": "A quarantine nobody looks at is a slow delete; give it an alert or a size limit and a person who reads it."
+    },
+    "fr": {
+      "why": "Quand un fichier ou un enregistrement a l'air faux, le supprimer détruit la preuve et toute chance de corriger la cause ou de le récupérer. La quarantaine le met à part, hors du flux normal, avec une note sur la raison. Le pipeline continue et tu peux inspecter l'élément plus tard.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "rm incoming/broken.mp4",
+        "after": "mkdir -p quarantine\nmv incoming/broken.mp4 \"quarantine/$(date +%s)-broken.mp4\"\necho \"$(date -Is) broken.mp4 déplacé : ffprobe a échoué\" >> quarantine/log.txt"
+      },
+      "pitfall": "Une quarantaine que personne ne regarde est une suppression lente ; donne-lui une alerte ou une limite de taille et quelqu'un qui la lit."
+    }
+  },
+  "poison-message": {
+    "en": {
+      "why": "A poison message is an input that fails every time it is processed: malformed data, or a handler bug on one shape of payload. If failed messages go back in the queue, it loops forever and starves everything behind it. Count the failures and after N tries move it to a dead-letter place.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    msg = queue.get()\n    try:\n        handle(msg)\n    except Exception:\n        queue.put(msg)       # same message, same crash, forever",
+        "after": "MAX_TRIES = 3\nwhile True:\n    msg = queue.get()\n    try:\n        handle(msg)\n    except Exception:\n        msg[\"tries\"] = msg.get(\"tries\", 0) + 1\n        if msg[\"tries\"] >= MAX_TRIES:\n            dead_letter.put(msg)   # set aside for a human\n        else:\n            queue.put(msg)"
+      },
+      "pitfall": "Retrying poison messages is not harmless: with at-least-once delivery and no counter, one bad message can keep a consumer busy forever."
+    },
+    "fr": {
+      "why": "Un message poison est une entrée qui échoue à chaque traitement : donnée mal formée, ou bug du handler pour une forme de payload. Si les messages en échec retournent dans la file, il boucle sans fin et affame tout ce qui est derrière. Compte les échecs et, après N essais, déplace-le vers un dead letter.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    msg = queue.get()\n    try:\n        handle(msg)\n    except Exception:\n        queue.put(msg)       # même message, même crash, à l'infini",
+        "after": "MAX_TRIES = 3\nwhile True:\n    msg = queue.get()\n    try:\n        handle(msg)\n    except Exception:\n        msg[\"tries\"] = msg.get(\"tries\", 0) + 1\n        if msg[\"tries\"] >= MAX_TRIES:\n            dead_letter.put(msg)   # mis de côté pour un humain\n        else:\n            queue.put(msg)"
+      },
+      "pitfall": "Retenter un message poison n'est pas anodin : en at-least-once et sans compteur, un seul mauvais message peut occuper un consommateur à jamais."
+    }
+  },
+  "append-only": {
+    "en": {
+      "why": "An append-only file is only ever added to at the end, never edited in place. You get the full history for free, a crash can at worst truncate the last line, and readers never see a half-rewritten file. It is the base of logs, journals and event-sourced state.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "echo \"$status\" > status.json      # yesterday's value is gone",
+        "after": "printf '{\"ts\":\"%s\",\"status\":\"%s\"}\\n' \"$(date -Is)\" \"$status\" >> events.jsonl\ntail -n 1 events.jsonl               # current state = last line"
+      },
+      "pitfall": "After a crash the last line may be cut short, so readers must tolerate or skip an incomplete final line."
+    },
+    "fr": {
+      "why": "Un fichier append-only n'est jamais modifié sur place, on ajoute seulement à la fin. L'historique complet vient gratuitement, un crash au pire tronque la dernière ligne, et les lecteurs ne voient jamais un fichier à moitié réécrit. C'est la base des logs, des journaux et de l'état par événements.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "echo \"$status\" > status.json      # la valeur d'hier a disparu",
+        "after": "printf '{\"ts\":\"%s\",\"status\":\"%s\"}\\n' \"$(date -Is)\" \"$status\" >> events.jsonl\ntail -n 1 events.jsonl               # état courant = dernière ligne"
+      },
+      "pitfall": "Après un crash, la dernière ligne peut être coupée : les lecteurs doivent tolérer ou ignorer une dernière ligne incomplète."
+    }
+  },
+  "tombstone-soft-delete": {
+    "en": {
+      "why": "A hard delete is final: the row, and anything that referred to it, is gone, and a mistake cannot be undone. A tombstone (a deleted_at column, a marker file) marks the item as deleted but keeps it, so you can restore it and other systems can learn about the deletion. You purge for real later, on a schedule.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "DELETE FROM users WHERE id = 42;",
+        "after": "UPDATE users SET deleted_at = now() WHERE id = 42;\n\nSELECT * FROM users WHERE deleted_at IS NULL;   -- normal queries"
+      },
+      "pitfall": "Every query must filter out the deleted rows, and a unique constraint on (say) email will block re-creating the same user unless it ignores the deleted ones."
+    },
+    "fr": {
+      "why": "Une suppression dure est définitive : la ligne, et tout ce qui la référençait, a disparu, et une erreur ne se rattrape pas. Un tombstone (colonne deleted_at, fichier marqueur) marque l'élément comme supprimé mais le garde : tu peux le restaurer et les autres systèmes peuvent apprendre la suppression. La vraie purge vient plus tard, selon un planning.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "DELETE FROM users WHERE id = 42;",
+        "after": "UPDATE users SET deleted_at = now() WHERE id = 42;\n\nSELECT * FROM users WHERE deleted_at IS NULL;   -- requêtes normales"
+      },
+      "pitfall": "Chaque requête doit filtrer les lignes supprimées, et une contrainte d'unicité sur l'email bloquera la recréation du même utilisateur si elle ne tient pas compte des supprimés."
+    }
+  },
+  "single-writer": {
+    "en": {
+      "why": "When several processes write the same state, updates overwrite each other and nobody can say who changed what. Making one process the only writer removes the race by design, and every other process either reads or goes through that writer's tool. Locks are the fallback; one owner is simpler.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# cron job A\njq '.paused = true' state.json > state.tmp && mv state.tmp state.json\n# cron job B, at the same moment\njq '.retries += 1' state.json > state.tmp && mv state.tmp state.json\n# both read the old file: one of the two changes is lost",
+        "after": "# only ops.py writes state.json; everyone else asks it\n./ops.py pause\n# readers: jq .paused state.json"
+      },
+      "pitfall": "A 'quick manual edit' of the state file by a person is a second writer too; the rule only holds if it covers humans."
+    },
+    "fr": {
+      "why": "Quand plusieurs process écrivent le même état, les mises à jour s'écrasent et personne ne sait qui a changé quoi. Faire d'un seul process l'unique écrivain supprime la course par construction : tous les autres lisent ou passent par l'outil de cet écrivain. Les verrous sont le plan B, un seul propriétaire est plus simple.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# job cron A\njq '.paused = true' state.json > state.tmp && mv state.tmp state.json\n# job cron B, au même moment\njq '.retries += 1' state.json > state.tmp && mv state.tmp state.json\n# les deux lisent l'ancien fichier : un des deux changements est perdu",
+        "after": "# seul ops.py écrit state.json ; les autres lui demandent\n./ops.py pause\n# lecteurs : jq .paused state.json"
+      },
+      "pitfall": "Une \"petite édition à la main\" du fichier d'état par une personne est aussi un second écrivain ; la règle ne tient que si elle couvre les humains."
+    }
+  },
+  "idempotency-key": {
+    "en": {
+      "why": "Networks and queues redeliver: a timeout makes the client resend, and the server cannot tell a retry from a new request. If each request carries a unique key chosen by the sender, the receiver can record the keys it has handled and ignore repeats. This is how payment APIs let you retry a charge safely.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(msg):\n    charge_customer(msg[\"user\"], msg[\"amount\"])   # a retry charges twice",
+        "after": "def handle(msg):\n    with db:                                       # one transaction\n        cur = db.execute(\n            \"INSERT OR IGNORE INTO done(id) VALUES (?)\", (msg[\"id\"],))\n        if cur.rowcount == 0:\n            return                                 # already processed\n        charge_customer(msg[\"user\"], msg[\"amount\"])"
+      },
+      "pitfall": "The key must identify the operation and be reused on every retry; generating a fresh random id per attempt defeats it entirely."
+    },
+    "fr": {
+      "why": "Les réseaux et les files relivrent les messages : un timeout fait renvoyer le client, et le serveur ne distingue pas un retry d'une nouvelle requête. Si chaque requête porte une clé unique choisie par l'émetteur, le destinataire peut noter les clés traitées et ignorer les répétitions. C'est comme ça que les API de paiement permettent de retenter un débit sans risque.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(msg):\n    charge_customer(msg[\"user\"], msg[\"amount\"])   # un retry débite deux fois",
+        "after": "def handle(msg):\n    with db:                                       # une seule transaction\n        cur = db.execute(\n            \"INSERT OR IGNORE INTO done(id) VALUES (?)\", (msg[\"id\"],))\n        if cur.rowcount == 0:\n            return                                 # déjà traité\n        charge_customer(msg[\"user\"], msg[\"amount\"])"
+      },
+      "pitfall": "La clé doit identifier l'opération et être réutilisée à chaque retry ; générer un id aléatoire neuf à chaque tentative annule tout l'intérêt."
+    }
+  },
+  "at-least-once-exactly-once": {
+    "en": {
+      "why": "A queue can promise at-most-once (may lose), at-least-once (may duplicate) or exactly-once. True exactly-once across a network is not something you get for free, so the realistic recipe is at-least-once delivery plus deduplication on the consumer. Acknowledge only after the work is done, and make repeats harmless.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "msg = queue.get()\nqueue.ack(msg)            # ack first: a crash now loses the message\nprocess(msg)",
+        "after": "msg = queue.get()\nif msg[\"id\"] not in seen:     # seen is persisted with the result\n    process(msg)\n    seen.add(msg[\"id\"])\nqueue.ack(msg)                # ack last: a crash redelivers, dedup absorbs it"
+      },
+      "pitfall": "Deduplication state kept only in memory vanishes in the same crash that triggers the redelivery; store it with the result."
+    },
+    "fr": {
+      "why": "Une file peut promettre at-most-once (peut perdre), at-least-once (peut dupliquer) ou exactly-once. Un vrai exactly-once à travers un réseau ne s'obtient pas gratuitement, donc la recette réaliste est une livraison at-least-once plus une déduplication côté consommateur. N'acquitte qu'après le travail et rends les répétitions inoffensives.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "msg = queue.get()\nqueue.ack(msg)            # ack d'abord : un crash ici perd le message\nprocess(msg)",
+        "after": "msg = queue.get()\nif msg[\"id\"] not in seen:     # seen est persisté avec le résultat\n    process(msg)\n    seen.add(msg[\"id\"])\nqueue.ack(msg)                # ack en dernier : un crash relivre, la dédup l'absorbe"
+      },
+      "pitfall": "Un état de déduplication gardé seulement en mémoire disparaît avec le même crash qui déclenche la relivraison ; stocke-le avec le résultat."
+    }
+  },
+  "transient-permanent": {
+    "en": {
+      "why": "Some errors go away by themselves (a timeout, a 503, a dropped connection) and some never will (a 404, a 401, invalid input). Retrying a permanent error wastes time and hammers the server, while giving up on a transient one drops work that would have succeeded. Classify the error first, then decide.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for attempt in range(5):\n    r = requests.get(url, timeout=10)\n    if r.ok:\n        return r\n    time.sleep(2 ** attempt)    # retries a 404 five times too",
+        "after": "RETRY = {429, 500, 502, 503, 504}\nfor attempt in range(5):\n    try:\n        r = requests.get(url, timeout=10)\n    except (requests.Timeout, requests.ConnectionError):\n        r = None                              # transient: retry\n    if r is not None and r.ok:\n        return r\n    if r is not None and r.status_code not in RETRY:\n        raise PermanentError(r.status_code)   # 401, 404: retrying changes nothing\n    time.sleep(2 ** attempt)\nraise GiveUp(url)"
+      },
+      "pitfall": "Do not classify by exception type alone: many clients raise the same error for both cases (requests' raise_for_status gives an HTTPError for a 404 and a 503 alike), so look at the status code or the error code."
+    },
+    "fr": {
+      "why": "Certaines erreurs passent toutes seules (timeout, 503, connexion coupée) et d'autres jamais (404, 401, entrée invalide). Retenter une erreur permanente fait perdre du temps et martèle le serveur ; abandonner sur une erreur transitoire jette un travail qui aurait réussi. Classe l'erreur d'abord, puis décide.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for attempt in range(5):\n    r = requests.get(url, timeout=10)\n    if r.ok:\n        return r\n    time.sleep(2 ** attempt)    # retente aussi un 404 cinq fois",
+        "after": "RETRY = {429, 500, 502, 503, 504}\nfor attempt in range(5):\n    try:\n        r = requests.get(url, timeout=10)\n    except (requests.Timeout, requests.ConnectionError):\n        r = None                              # transitoire : on retente\n    if r is not None and r.ok:\n        return r\n    if r is not None and r.status_code not in RETRY:\n        raise PermanentError(r.status_code)   # 401, 404 : retenter ne change rien\n    time.sleep(2 ** attempt)\nraise GiveUp(url)"
+      },
+      "pitfall": "Ne classe pas selon le seul type d'exception : beaucoup de clients lèvent la même erreur dans les deux cas (raise_for_status de requests donne une HTTPError pour un 404 comme pour un 503), regarde le code de statut ou le code d'erreur."
+    }
+  },
+  "watchdog": {
+    "en": {
+      "why": "A process can be alive and useless: deadlocked, stuck on a dead socket, spinning without progress. A supervisor that only checks that the PID exists will never restart it. A watchdog demands a regular sign of progress and restarts the service when the sign stops, which with systemd means WatchdogSec plus the program sending WATCHDOG=1 via sd_notify.",
+      "example": {
+        "kind": "code",
+        "lang": "ini",
+        "before": "[Service]\nExecStart=/usr/bin/feeder\n# restarts it if it dies, not if it hangs\nRestart=always",
+        "after": "[Service]\nType=notify\nExecStart=/usr/bin/feeder\nRestart=on-failure\n# no WATCHDOG=1 ping within 60 s: killed and restarted\nWatchdogSec=60"
+      },
+      "pitfall": "Pinging from a separate thread that keeps running even when the main work is stuck defeats the watchdog; send the ping from the loop that does the real work."
+    },
+    "fr": {
+      "why": "Un process peut être vivant et inutile : interblocage, coincé sur un socket mort, tourne dans le vide. Un superviseur qui vérifie seulement que le PID existe ne le relancera jamais. Un watchdog exige un signe régulier de progression et redémarre le service quand le signe s'arrête : avec systemd, c'est WatchdogSec plus le programme qui envoie WATCHDOG=1 via sd_notify.",
+      "example": {
+        "kind": "code",
+        "lang": "ini",
+        "before": "[Service]\nExecStart=/usr/bin/feeder\n# le relance s'il meurt, pas s'il se fige\nRestart=always",
+        "after": "[Service]\nType=notify\nExecStart=/usr/bin/feeder\nRestart=on-failure\n# pas de ping WATCHDOG=1 en 60 s : tué et relancé\nWatchdogSec=60"
+      },
+      "pitfall": "Pinger depuis un thread séparé qui tourne même quand le vrai travail est bloqué annule le watchdog ; envoie le ping depuis la boucle qui fait le travail."
+    }
+  },
+  "let-it-crash-supervision": {
+    "en": {
+      "why": "After an unexpected error, a program's memory may be inconsistent, and patching on top of it often makes things worse. Let it crash means: do not write defensive code for the unforeseen, exit with an error, and let a supervisor restart a fresh process on a clean state. Handle expected errors locally, crash on the rest.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    try:\n        step()\n    except Exception as e:\n        log.error(e)      # carry on with state we no longer trust",
+        "after": "while True:\n    step()                # any exception ends the process, exit code != 0\n\n# supervisor (systemd): Restart=on-failure, RestartSec=5\n# restart = clean state, loaded again from disk"
+      },
+      "pitfall": "It only works with a supervisor and state that survives a restart; a crash with nobody to restart it, or with in-memory-only state, is just an outage."
+    },
+    "fr": {
+      "why": "Après une erreur inattendue, la mémoire du programme peut être incohérente, et rafistoler par-dessus aggrave souvent les choses. Let it crash veut dire : ne pas écrire de code défensif pour l'imprévu, sortir avec une erreur et laisser un superviseur relancer un process neuf sur un état propre. Traite localement les erreurs attendues, laisse planter le reste.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "while True:\n    try:\n        step()\n    except Exception as e:\n        log.error(e)      # on continue avec un état auquel on ne fait plus confiance",
+        "after": "while True:\n    step()                # toute exception termine le process, code de sortie != 0\n\n# supervisor (systemd): Restart=on-failure, RestartSec=5\n# relance = état propre, rechargé depuis le disque"
+      },
+      "pitfall": "Ça ne marche qu'avec un superviseur et un état qui survit au redémarrage ; un crash sans personne pour relancer, ou avec un état seulement en mémoire, c'est juste une panne."
+    }
+  },
+  "durable-fsync": {
+    "en": {
+      "why": "When write() returns, the data is usually only in the operating system cache, and a power cut can lose it, or leave the rename applied with an empty file. fsync forces it to the disk. Do it before the rename for state that must survive a power failure, and accept that it costs speed.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with open(tmp, \"w\") as f:\n    f.write(data)\nos.replace(tmp, path)       # may still sit only in the page cache",
+        "after": "with open(tmp, \"w\") as f:\n    f.write(data)\n    f.flush()               # Python buffer -> OS\n    os.fsync(f.fileno())    # OS cache -> disk\nos.replace(tmp, path)"
+      },
+      "pitfall": "Calling f.flush() alone is not durable, since it only empties the language buffer; for the rename itself to survive, also fsync the containing directory."
+    },
+    "fr": {
+      "why": "Quand write() rend la main, les données sont en général seulement dans le cache de l'OS, et une coupure de courant peut les perdre, ou laisser le rename appliqué avec un fichier vide. fsync force l'écriture sur le disque. Fais-le avant le rename pour l'état qui doit survivre à une coupure, et accepte que ça coûte de la vitesse.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with open(tmp, \"w\") as f:\n    f.write(data)\nos.replace(tmp, path)       # peut n'exister que dans le cache de pages",
+        "after": "with open(tmp, \"w\") as f:\n    f.write(data)\n    f.flush()               # buffer Python -> OS\n    os.fsync(f.fileno())    # cache OS -> disque\nos.replace(tmp, path)"
+      },
+      "pitfall": "Un f.flush() seul n'est pas durable, il ne vide que le buffer du langage ; pour que le rename lui-même survive, fais aussi un fsync du dossier qui le contient."
+    }
+  },
+  "write-ahead-intent-log-wal": {
+    "en": {
+      "why": "A multi-step operation can be interrupted between steps and leave the system half-changed with no trace of what was intended. Write the intent to durable storage first, then do the steps, then erase the intent. At restart, a leftover intent tells you exactly what to finish or roll back. Databases do this under the name write-ahead log.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "os.remove(old)              # crash here: nothing says what was planned\nshutil.move(tmp, new)",
+        "after": "write_atomic(\"intent.json\", {\"op\": \"swap\", \"old\": old, \"tmp\": tmp, \"new\": new})\nos.remove(old)\nshutil.move(tmp, new)\nos.remove(\"intent.json\")      # done\n\n# at startup: if intent.json exists, finish or cancel that operation"
+      },
+      "pitfall": "Recovery must itself be idempotent, because a crash during recovery makes you replay the same intent again."
+    },
+    "fr": {
+      "why": "Une opération en plusieurs étapes peut être interrompue entre deux étapes et laisser le système à moitié modifié, sans trace de ce qui était prévu. Écris l'intention sur un support durable d'abord, fais les étapes, puis efface l'intention. Au redémarrage, une intention restante te dit exactement quoi finir ou annuler. Les bases de données font ça sous le nom de write-ahead log.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "os.remove(old)              # crash ici : rien ne dit ce qui était prévu\nshutil.move(tmp, new)",
+        "after": "write_atomic(\"intent.json\", {\"op\": \"swap\", \"old\": old, \"tmp\": tmp, \"new\": new})\nos.remove(old)\nshutil.move(tmp, new)\nos.remove(\"intent.json\")      # fini\n\n# au démarrage : si intent.json existe, finir ou annuler cette opération"
+      },
+      "pitfall": "La reprise doit elle-même être idempotente, car un crash pendant la reprise te fait rejouer la même intention."
+    }
+  },
+  "compensation-saga": {
+    "en": {
+      "why": "Across several services you cannot wrap everything in one transaction. A saga gives each step an inverse action (reserve and release, charge and refund) and, when a later step fails, runs the inverses of the completed ones in reverse order. The system returns to a coherent state without a global rollback.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "reserve_stock(order)\ncharge_card(order)           # fails: stock stays reserved\ncreate_shipment(order)",
+        "after": "steps = [(reserve_stock, release_stock),\n         (charge_card, refund_card),\n         (create_shipment, cancel_shipment)]\nundo = []\ntry:\n    for do, compensate in steps:\n        do(order)\n        undo.append(compensate)\nexcept Exception:\n    for compensate in reversed(undo):\n        compensate(order)         # undo in reverse order\n    raise"
+      },
+      "pitfall": "A compensation is a new action that can also fail and is not always a perfect inverse (a sent email cannot be unsent), so it must be idempotent and logged."
+    },
+    "fr": {
+      "why": "Entre plusieurs services, on ne peut pas tout envelopper dans une transaction. Une saga donne à chaque étape une action inverse (réserver et libérer, débiter et rembourser) et, quand une étape ultérieure échoue, exécute les inverses des étapes terminées dans l'ordre inverse. Le système revient à un état cohérent sans rollback global.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "reserve_stock(order)\ncharge_card(order)           # échoue : le stock reste réservé\ncreate_shipment(order)",
+        "after": "steps = [(reserve_stock, release_stock),\n         (charge_card, refund_card),\n         (create_shipment, cancel_shipment)]\nundo = []\ntry:\n    for do, compensate in steps:\n        do(order)\n        undo.append(compensate)\nexcept Exception:\n    for compensate in reversed(undo):\n        compensate(order)         # annulation dans l'ordre inverse\n    raise"
+      },
+      "pitfall": "Une compensation est une nouvelle action qui peut aussi échouer et n'est pas toujours un inverse parfait (un mail envoyé ne se retire pas) : elle doit être idempotente et journalisée."
+    }
+  },
+  "outbox": {
+    "en": {
+      "why": "Updating the database and then sending a message are two separate writes, and a crash between them gives you a state change nobody was told about. The outbox pattern writes the state and the message to send in the same local transaction, and a relay then publishes from that table until the receiver acknowledges. Delivery becomes at-least-once, so the receiver should deduplicate.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "db.execute(\"UPDATE orders SET status='paid' WHERE id=?\", (oid,))\ndb.commit()\nbroker.publish(\"order.paid\", payload)   # crash before this line: event lost",
+        "after": "with db:                                 # state and message: one transaction\n    db.execute(\"UPDATE orders SET status='paid' WHERE id=?\", (oid,))\n    db.execute(\"INSERT INTO outbox(topic, payload) VALUES (?, ?)\",\n               (\"order.paid\", payload))\n\n# separate relay loop, repeated until the broker acknowledges\nfor id_, topic, body in db.execute(\n        \"SELECT id, topic, payload FROM outbox WHERE sent_at IS NULL\").fetchall():\n    broker.publish(topic, body)\n    db.execute(\"UPDATE outbox SET sent_at = CURRENT_TIMESTAMP WHERE id=?\", (id_,))\n    db.commit()"
+      },
+      "pitfall": "The relay can publish a row and crash before marking it sent, so it will send twice; consumers need an idempotency key."
+    },
+    "fr": {
+      "why": "Mettre à jour la base puis envoyer un message, ce sont deux écritures séparées, et un crash entre les deux donne un changement d'état dont personne n'a été prévenu. Le pattern outbox écrit l'état et le message à envoyer dans la même transaction locale, puis un relais publie depuis cette table jusqu'à l'accusé du destinataire. La livraison devient at-least-once, donc le destinataire doit dédupliquer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "db.execute(\"UPDATE orders SET status='paid' WHERE id=?\", (oid,))\ndb.commit()\nbroker.publish(\"order.paid\", payload)   # crash avant cette ligne : événement perdu",
+        "after": "with db:                                 # état et message : une transaction\n    db.execute(\"UPDATE orders SET status='paid' WHERE id=?\", (oid,))\n    db.execute(\"INSERT INTO outbox(topic, payload) VALUES (?, ?)\",\n               (\"order.paid\", payload))\n\n# boucle de relais séparée, répétée jusqu'à l'accusé du broker\nfor id_, topic, body in db.execute(\n        \"SELECT id, topic, payload FROM outbox WHERE sent_at IS NULL\").fetchall():\n    broker.publish(topic, body)\n    db.execute(\"UPDATE outbox SET sent_at = CURRENT_TIMESTAMP WHERE id=?\", (id_,))\n    db.commit()"
+      },
+      "pitfall": "Le relais peut publier une ligne puis planter avant de la marquer envoyée, donc elle partira deux fois ; les consommateurs ont besoin d'une clé d'idempotence."
+    }
+  },
+  "lease": {
+    "en": {
+      "why": "A normal lock has no idea its owner died, so a crashed holder blocks everyone forever. A lease is a lock with an expiry: the holder must renew it, and if it stops renewing, the lock frees itself and another worker can take over. It trades a little certainty for guaranteed liveness.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "mkdir /tmp/job.lock || exit 1   # holder crashes: locked forever\n./run-job.sh\nrmdir /tmp/job.lock",
+        "after": "# OK if we got it, empty if someone holds it; expires alone after 30 s\n[ \"$(redis-cli SET lock:job worker-1 NX EX 30)\" = OK ] || exit 1\n./run-job.sh                                # renew before 30 s if it takes longer\nredis-cli DEL lock:job"
+      },
+      "pitfall": "If the holder is just slow and its lease expires, two workers now believe they hold the lock; make the work safe against that, for example with a fencing token."
+    },
+    "fr": {
+      "why": "Un verrou classique ne sait pas que son propriétaire est mort, donc un détenteur planté bloque tout le monde à jamais. Un bail est un verrou avec une expiration : le détenteur doit le renouveler, et s'il arrête, le verrou se libère seul et un autre worker peut reprendre. On échange un peu de certitude contre la garantie que ça avance.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "mkdir /tmp/job.lock || exit 1   # le détenteur plante : verrouillé à jamais\n./run-job.sh\nrmdir /tmp/job.lock",
+        "after": "# OK si on l'obtient, vide si quelqu'un le détient ; expire seul après 30 s\n[ \"$(redis-cli SET lock:job worker-1 NX EX 30)\" = OK ] || exit 1\n./run-job.sh                                # à renouveler avant 30 s si ça dure plus\nredis-cli DEL lock:job"
+      },
+      "pitfall": "Si le détenteur est juste lent et que son bail expire, deux workers croient détenir le verrou ; rends le travail sûr contre ça, par exemple avec un fencing token."
+    }
+  },
+  "spof": {
+    "en": {
+      "why": "A single point of failure is the one component whose loss stops the whole system, and it is often invisible until it breaks: one disk, one API key, one server, one person. Naming each SPOF is the first step, after which you give it a second path or at least an alert that fires before the users notice. Asking an agent to enumerate them is a cheap way to find the ones you forgot.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Is my setup reliable?",
+        "after": "List every single point of failure in this pipeline, from source to final output.\nFor each link: what stops if it dies, how I would notice, and the cheapest second path or alert.\nRank them by impact, and do not touch any code."
+      },
+      "pitfall": "The SPOF people miss is not the server but the shared dependency behind it: the DNS, the credential, the cron on one machine, the one person who knows how."
+    },
+    "fr": {
+      "why": "Un point unique de défaillance est le composant dont la perte arrête tout le système, et il reste souvent invisible jusqu'à la panne : un disque, une clé d'API, un serveur, une personne. Le nommer est la première étape, puis tu lui donnes un second chemin ou au moins une alerte qui sonne avant que les utilisateurs s'en aperçoivent. Demander à un agent de les énumérer est une façon pas chère de trouver ceux que tu as oubliés.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Mon montage est-il fiable ?",
+        "after": "Liste chaque point unique de défaillance de ce pipeline, de la source à la sortie finale.\nPour chaque maillon : ce qui s'arrête s'il tombe, comment je m'en rendrais compte, et le second chemin ou l'alerte le moins cher.\nClasse-les par impact, et ne touche à aucun code."
+      },
+      "pitfall": "Le SPOF qu'on rate n'est pas le serveur mais la dépendance partagée derrière : le DNS, l'identifiant, le cron sur une seule machine, la seule personne qui sait."
+    }
+  },
+  "safe-default": {
+    "en": {
+      "why": "Most tools are run with no options, sometimes by mistake or by someone who has never read the code. The default behavior should therefore be the least dangerous one: preview, read-only, small scope. The destructive or expensive action needs an explicit flag that a person had to type on purpose.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# cleanup.sh: deletes as soon as it runs\nfor f in old/*; do rm -- \"$f\"; done",
+        "after": "# cleanup.sh: dry run unless --apply is given\napply=0\n[ \"${1:-}\" = \"--apply\" ] && apply=1\nfor f in old/*; do\n  if [ \"$apply\" = 1 ]; then rm -- \"$f\"; else echo \"would delete $f\"; fi\ndone"
+      },
+      "pitfall": "A safe default that gets bypassed by an alias or a wrapper script ('always pass --apply') is no longer safe; keep the explicit flag at the point of use."
+    },
+    "fr": {
+      "why": "La plupart des outils sont lancés sans option, parfois par erreur ou par quelqu'un qui n'a jamais lu le code. Le comportement par défaut doit donc être le moins dangereux : aperçu, lecture seule, petite portée. L'action destructrice ou coûteuse demande un flag explicite qu'une personne a dû taper exprès.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# cleanup.sh : supprime dès qu'il tourne\nfor f in old/*; do rm -- \"$f\"; done",
+        "after": "# cleanup.sh : simulation sauf si --apply est donné\napply=0\n[ \"${1:-}\" = \"--apply\" ] && apply=1\nfor f in old/*; do\n  if [ \"$apply\" = 1 ]; then rm -- \"$f\"; else echo \"supprimerait $f\"; fi\ndone"
+      },
+      "pitfall": "Un défaut sûr contourné par un alias ou un script enveloppe (\"toujours passer --apply\") n'est plus sûr ; garde le flag explicite au point d'usage."
+    }
+  },
+  "orphan-zombie": {
+    "en": {
+      "why": "A crash never cleans up after itself: it leaves temp files, lock files whose owner is dead, and child processes with no parent. Unless something removes them, the next run is blocked by a stale lock or slowly buried in leftovers. Make startup (or a periodic job) look for these leftovers and clear them.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# start of myjob.sh\n[ -e /run/myjob.pid ] && { echo \"already running\"; exit 1; }\necho $$ > /run/myjob.pid",
+        "after": "# start of myjob.sh: clean what a previous crash left\nfind /var/tmp/myjob -name '*.tmp' -mmin +60 -delete\nif [ -e /run/myjob.pid ] && ! kill -0 \"$(cat /run/myjob.pid)\" 2>/dev/null; then\n  rm -f /run/myjob.pid        # stale pid file: the holder is dead\nfi\n[ -e /run/myjob.pid ] && { echo \"already running\"; exit 1; }\necho $$ > /run/myjob.pid"
+      },
+      "pitfall": "Cleaning by age or pattern too broadly deletes live files of a running instance; only remove what is provably stale, such as a lock whose PID is gone."
+    },
+    "fr": {
+      "why": "Un crash ne range jamais derrière lui : il laisse des fichiers temporaires, des verrous dont le propriétaire est mort, des process enfants sans parent. Si rien ne les retire, le run suivant est bloqué par un verrou périmé ou enseveli peu à peu sous les restes. Fais chercher et effacer ces restes au démarrage (ou par un job périodique).",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# début de myjob.sh\n[ -e /run/myjob.pid ] && { echo \"already running\"; exit 1; }\necho $$ > /run/myjob.pid",
+        "after": "# début de myjob.sh : on nettoie ce qu'un crash précédent a laissé\nfind /var/tmp/myjob -name '*.tmp' -mmin +60 -delete\nif [ -e /run/myjob.pid ] && ! kill -0 \"$(cat /run/myjob.pid)\" 2>/dev/null; then\n  rm -f /run/myjob.pid        # pid file périmé : le détenteur est mort\nfi\n[ -e /run/myjob.pid ] && { echo \"already running\"; exit 1; }\necho $$ > /run/myjob.pid"
+      },
+      "pitfall": "Nettoyer par âge ou par motif de façon trop large supprime des fichiers vivants d'une instance en cours ; ne retire que ce qui est prouvé périmé, comme un verrou dont le PID n'existe plus."
+    }
+  },
+  "retention": {
+    "en": {
+      "why": "Without a rule, data piles up until the disk is full, or is deleted by whoever panics first. A retention policy states how much you keep and for how long (the last N, N days), and the code enforces it automatically. It covers backups, logs, caches and uploaded files, and it is also a legal question for personal data.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# nobody prunes /var/backups/db: the disk fills in a month",
+        "after": "# keep the last 7 dumps, and nothing older than 30 days\nls -1t /var/backups/db/*.sql.gz | tail -n +8 | xargs -r rm --\nfind /var/backups/db -name '*.sql.gz' -mtime +30 -delete"
+      },
+      "pitfall": "A retention rule that is only written in a document and not enforced by a job does not exist; and the pruning job needs its own alert, since a silent failure means you either fill the disk or delete too much."
+    },
+    "fr": {
+      "why": "Sans règle, les données s'accumulent jusqu'au disque plein, ou sont supprimées par le premier qui panique. Une politique de rétention dit combien tu gardes et combien de temps (les N derniers, N jours), et le code l'applique tout seul. Ça couvre sauvegardes, logs, caches et fichiers envoyés, et c'est aussi une question légale pour les données personnelles.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# personne n'élague /var/backups/db : le disque est plein en un mois",
+        "after": "# garde les 7 derniers dumps, et rien de plus vieux que 30 jours\nls -1t /var/backups/db/*.sql.gz | tail -n +8 | xargs -r rm --\nfind /var/backups/db -name '*.sql.gz' -mtime +30 -delete"
+      },
+      "pitfall": "Une règle de rétention seulement écrite dans un document et non appliquée par un job n'existe pas ; et le job d'élagage a besoin de sa propre alerte, car un échec silencieux remplit le disque ou supprime trop."
+    }
+  },
+  "output-validation": {
+    "en": {
+      "why": "A command exiting with code 0 only says it finished, not that what it produced is usable: the file can be empty, truncated or the wrong length. Before publishing or handing a result to the next stage, check it the way you would check an input you received: size, format, duration, schema.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "ffmpeg -y -i in.mp4 out.mp4 && publish out.mp4",
+        "after": "ffmpeg -y -i in.mp4 out.mp4 || exit 1\ndur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out.mp4)\nok=$(awk -v d=\"$dur\" 'BEGIN { print (d > 1700 && d < 1900) }')\n[ \"$ok\" = 1 ] || { echo \"bad duration: $dur\" >&2; exit 1; }\npublish out.mp4"
+      },
+      "pitfall": "Validating with the same code that produced the output only repeats its mistakes; use an independent check such as ffprobe or a schema validator."
+    },
+    "fr": {
+      "why": "Une commande qui sort avec le code 0 dit seulement qu'elle a fini, pas que ce qu'elle a produit est exploitable : le fichier peut être vide, tronqué ou de mauvaise durée. Avant de publier ou de passer un résultat à l'étape suivante, vérifie-le comme une entrée reçue : taille, format, durée, schéma.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "ffmpeg -y -i in.mp4 out.mp4 && publish out.mp4",
+        "after": "ffmpeg -y -i in.mp4 out.mp4 || exit 1\ndur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out.mp4)\nok=$(awk -v d=\"$dur\" 'BEGIN { print (d > 1700 && d < 1900) }')\n[ \"$ok\" = 1 ] || { echo \"durée incorrecte : $dur\" >&2; exit 1; }\npublish out.mp4"
+      },
+      "pitfall": "Valider avec le même code que celui qui a produit la sortie ne fait que répéter ses erreurs ; utilise un contrôle indépendant comme ffprobe ou un validateur de schéma."
+    }
+  },
+  "sanity-check": {
+    "en": {
+      "why": "Code can run without errors and still produce nonsense: a scraper that returns a price of 0, a ratio over 100 percent, a date in 1970. A sanity check compares the result to plausible bounds and stops right there, instead of letting a wrong value spread into reports, alerts and decisions.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "price = parse_price(html)\nsave(price)                      # parser broke: saves 0.00 or 12000000",
+        "after": "price = parse_price(html)\nif not 0.01 <= price <= 100_000:\n    raise ValueError(f\"absurd price {price}, not saved\")\nsave(price)"
+      },
+      "pitfall": "Bounds set too wide never fire, and bounds set too tight stop on real events; derive them from observed data and review them when they trip."
+    },
+    "fr": {
+      "why": "Un code peut tourner sans erreur et produire n'importe quoi : un scraper qui renvoie un prix de 0, un ratio au-dessus de 100 %, une date en 1970. Une garde de cohérence compare le résultat à des bornes plausibles et s'arrête là, au lieu de laisser une valeur fausse se propager dans les rapports, les alertes et les décisions.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "price = parse_price(html)\nsave(price)                      # parseur cassé : sauve 0.00 ou 12000000",
+        "after": "price = parse_price(html)\nif not 0.01 <= price <= 100_000:\n    raise ValueError(f\"prix absurde {price}, non sauvé\")\nsave(price)"
+      },
+      "pitfall": "Des bornes trop larges ne se déclenchent jamais, trop serrées elles bloquent de vrais événements ; dérive-les des données observées et revois-les quand elles se déclenchent."
+    }
+  },
+  "empty-state-bootstrap": {
+    "en": {
+      "why": "Developers always test a program in a warm state, with its files, cache and database already in place. The first start on a new machine, after a restore or after a wipe is a different code path, and it is often the one that breaks. Test that a start from nothing works and builds what it needs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "state = json.load(open(\"state.json\"))   # first start: FileNotFoundError",
+        "after": "try:\n    state = json.load(open(\"state.json\"))\nexcept FileNotFoundError:\n    state = {\"offset\": 0}                 # fresh start\n\n# test it: rm -rf state.json cache/ && python app.py --once"
+      },
+      "pitfall": "Catching too broad an error, such as any exception, treats a corrupted state file as 'empty' and silently starts over; handle only the missing-file case."
+    },
+    "fr": {
+      "why": "On teste toujours un programme à chaud, avec ses fichiers, son cache et sa base déjà en place. Le premier démarrage sur une machine neuve, après une restauration ou un effacement est un autre chemin de code, et c'est souvent celui qui casse. Teste qu'un démarrage à partir de rien marche et crée ce dont il a besoin.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "state = json.load(open(\"state.json\"))   # premier démarrage : FileNotFoundError",
+        "after": "try:\n    state = json.load(open(\"state.json\"))\nexcept FileNotFoundError:\n    state = {\"offset\": 0}                 # démarrage neuf\n\n# à tester : rm -rf state.json cache/ && python app.py --once"
+      },
+      "pitfall": "Attraper une erreur trop large, comme toute exception, traite un fichier d'état corrompu comme \"vide\" et repart de zéro en silence ; ne gère que le cas du fichier absent."
+    }
+  },
+  "bounded-restart": {
+    "en": {
+      "why": "A supervisor that restarts a failing service forever turns a bug into a crash loop: CPU burned, logs flooded, an external API hammered, and nobody told. Bounding the restarts means that after N failures in a window the service stays down and an alert goes out, so a human decides. Restarting is meant for transient faults, not for a bug that fails every time.",
+      "example": {
+        "kind": "code",
+        "lang": "ini",
+        "before": "[Unit]\n# no limit: a crash loop runs forever\nStartLimitIntervalSec=0\n\n[Service]\nRestart=always\nRestartSec=1",
+        "after": "[Unit]\nStartLimitIntervalSec=300\n# more than 5 starts in 5 min: stop and mark failed\nStartLimitBurst=5\n# your own unit that sends the alert\nOnFailure=alert@%n.service\n\n[Service]\nRestart=on-failure\nRestartSec=5"
+      },
+      "pitfall": "A service stopped by its start limit is silent unless something watches for it; wire the failure to an alert, and know the command that resets the counter (systemctl reset-failed)."
+    },
+    "fr": {
+      "why": "Un superviseur qui relance sans fin un service en échec transforme un bug en boucle de crash : CPU brûlé, logs inondés, API externe martelée, et personne n'est prévenu. Borner les relances veut dire qu'après N échecs dans une fenêtre, le service reste arrêté et une alerte part, pour qu'un humain décide. Relancer sert aux pannes transitoires, pas à un bug qui échoue à chaque fois.",
+      "example": {
+        "kind": "code",
+        "lang": "ini",
+        "before": "[Unit]\n# aucune limite : une boucle de crash tourne à l'infini\nStartLimitIntervalSec=0\n\n[Service]\nRestart=always\nRestartSec=1",
+        "after": "[Unit]\nStartLimitIntervalSec=300\n# plus de 5 démarrages en 5 min : arrêt et marqué failed\nStartLimitBurst=5\n# ta propre unité qui envoie l'alerte\nOnFailure=alert@%n.service\n\n[Service]\nRestart=on-failure\nRestartSec=5"
+      },
+      "pitfall": "Un service arrêté par sa limite de relances est muet si rien ne le surveille ; branche l'échec sur une alerte, et connais la commande qui remet le compteur à zéro (systemctl reset-failed)."
+    }
+  },
+  "replayable-replay": {
+    "en": {
+      "why": "If you only store the computed result, a bug in the computation corrupts it for good, and the original information is gone. If you keep the raw inputs (events, requests, files as received), you can fix the bug and rebuild the correct state by replaying them. It also gives you a way to test a new version against real history.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "counts[event[\"user\"]] += 1     # only the result is kept\nsave(counts)                     # a bug in the counting: no way back",
+        "after": "with open(\"events.jsonl\", \"a\") as f:\n    f.write(json.dumps(event) + \"\\n\")      # raw input, kept as received\n\ndef rebuild():\n    counts = collections.Counter()\n    for line in open(\"events.jsonl\"):\n        counts[json.loads(line)[\"user\"]] += 1\n    return counts                          # fixed the bug? replay and get the right state"
+      },
+      "pitfall": "Replay is only trustworthy if the processing is deterministic and the raw inputs are immutable; replaying with a hidden clock or a changed schema gives a different state."
+    },
+    "fr": {
+      "why": "Si tu ne stockes que le résultat calculé, un bug dans le calcul le corrompt pour de bon, et l'information d'origine a disparu. Si tu gardes les entrées brutes (événements, requêtes, fichiers tels que reçus), tu peux corriger le bug et reconstruire le bon état en les rejouant. Ça permet aussi de tester une nouvelle version sur l'historique réel.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "counts[event[\"user\"]] += 1     # seul le résultat est gardé\nsave(counts)                     # un bug dans le comptage : pas de retour possible",
+        "after": "with open(\"events.jsonl\", \"a\") as f:\n    f.write(json.dumps(event) + \"\\n\")      # entrée brute, gardée telle que reçue\n\ndef rebuild():\n    counts = collections.Counter()\n    for line in open(\"events.jsonl\"):\n        counts[json.loads(line)[\"user\"]] += 1\n    return counts                          # bug corrigé ? on rejoue et on obtient le bon état"
+      },
+      "pitfall": "Le replay n'est fiable que si le traitement est déterministe et les entrées brutes immuables ; rejouer avec une horloge cachée ou un schéma changé donne un autre état."
+    }
+  }
+}

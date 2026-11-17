@@ -1,0 +1,332 @@
+{
+  "signals": {
+    "en": {
+      "why": "A process can be asked to stop (TERM) or cut down by the kernel with no chance to react (KILL). TERM lets it flush buffers, release locks and delete temp files. You need the difference whenever a service must be stopped without corrupting its state.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "kill -9 1234",
+        "after": "kill -TERM 1234\nsleep 10\n# still alive after the grace period? only then cut it down\nkill -0 1234 2>/dev/null && kill -KILL 1234"
+      },
+      "pitfall": "KILL cannot be caught, so the process leaves half-written files, stale lock files and open connections behind; using it first is the classic mistake."
+    },
+    "fr": {
+      "why": "Un processus peut recevoir une demande d'arrêt (TERM) ou être abattu par le noyau sans pouvoir réagir (KILL). TERM lui laisse le temps de vider ses tampons, libérer ses verrous et supprimer ses fichiers temporaires. La différence compte dès qu'il faut arrêter un service sans corrompre son état.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "kill -9 1234",
+        "after": "kill -TERM 1234\nsleep 10\n# toujours vivant après le délai ? alors seulement on l'abat\nkill -0 1234 2>/dev/null && kill -KILL 1234"
+      },
+      "pitfall": "KILL ne peut pas être intercepté : le processus laisse des fichiers à moitié écrits, des verrous périmés et des connexions ouvertes ; l'envoyer en premier est l'erreur classique."
+    }
+  },
+  "kill-by-pid": {
+    "en": {
+      "why": "A pattern like a process name can match processes you never meant to touch, including another service or your own shell. A PID points at exactly one process. It matters on any shared machine or production box.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pkill -f python",
+        "after": "pid=$(cat /run/myapp.pid)\nps -o pid,user,args -p \"$pid\"   # is this really the right process?\nkill -TERM \"$pid\""
+      },
+      "pitfall": "A stale pidfile or a PID reused by another program makes the kill hit the wrong process; check the command line of that PID right before sending the signal."
+    },
+    "fr": {
+      "why": "Un motif comme un nom de processus peut viser des processus que tu ne voulais pas toucher, un autre service ou ton propre shell. Un PID désigne exactement un processus. C'est important sur toute machine partagée ou de production.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "pkill -f python",
+        "after": "pid=$(cat /run/myapp.pid)\nps -o pid,user,args -p \"$pid\"   # est-ce bien le bon processus ?\nkill -TERM \"$pid\""
+      },
+      "pitfall": "Un pidfile périmé ou un PID réutilisé par un autre programme fait tuer le mauvais processus ; relis la ligne de commande de ce PID juste avant d'envoyer le signal."
+    }
+  },
+  "process-tree": {
+    "en": {
+      "why": "A parent that dies does not take its children with it: workers, shell wrappers and helper processes keep running as orphans. Killing only the parent leaves a service half alive, still holding ports and files. Stop the whole group, then check nothing remains.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "kill -TERM 1234   # workers spawned by 1234 keep running",
+        "after": "pgid=$(ps -o pgid= -p 1234 | tr -d ' ')\nkill -TERM -- \"-$pgid\"      # negative number = the whole process group\nsleep 5\npgrep -g \"$pgid\" && echo \"leftovers, check them\""
+      },
+      "pitfall": "A PID is not always the group leader, so `-PID` can hit nothing or the wrong group; read the real group id with `ps -o pgid=` first."
+    },
+    "fr": {
+      "why": "Un parent qui meurt n'emporte pas ses enfants : workers, wrappers shell et processus auxiliaires continuent comme orphelins. Tuer seulement le parent laisse un service à moitié vivant, qui garde ses ports et ses fichiers. On arrête le groupe entier, puis on vérifie qu'il ne reste rien.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "kill -TERM 1234   # les workers lancés par 1234 continuent",
+        "after": "pgid=$(ps -o pgid= -p 1234 | tr -d ' ')\nkill -TERM -- \"-$pgid\"      # nombre négatif = tout le groupe de processus\nsleep 5\npgrep -g \"$pgid\" && echo \"il en reste, à vérifier\""
+      },
+      "pitfall": "Un PID n'est pas toujours le chef de groupe, donc `-PID` peut ne rien viser ou viser le mauvais groupe ; lis d'abord le vrai identifiant de groupe avec `ps -o pgid=`."
+    }
+  },
+  "port-in-use": {
+    "en": {
+      "why": "\"Address already in use\" means another process is already listening on that port, often your own previous instance that did not exit. Asking the system who owns the port turns a guess into a fact. Do it before launching, and again after stopping to confirm the port is free.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./server --port 8080\n# Error: address already in use",
+        "after": "ss -ltnp 'sport = :8080'     # who listens on 8080?\nsudo systemctl stop myapp\nss -ltnp 'sport = :8080'     # empty now? then start again\n./server --port 8080"
+      },
+      "pitfall": "Without root, `ss -p` does not show processes owned by other users, so a listening line with an empty process column still means the port is taken; rerun it with sudo to see who holds it."
+    },
+    "fr": {
+      "why": "\"Address already in use\" veut dire qu'un autre processus écoute déjà sur ce port, souvent ta propre instance précédente qui ne s'est pas arrêtée. Demander au système qui possède le port transforme une supposition en fait. On le fait avant de lancer, et encore après l'arrêt pour confirmer que le port est libre.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./server --port 8080\n# Error: address already in use",
+        "after": "ss -ltnp 'sport = :8080'     # qui écoute sur 8080 ?\nsudo systemctl stop myapp\nss -ltnp 'sport = :8080'     # vide maintenant ? alors on relance\n./server --port 8080"
+      },
+      "pitfall": "Sans root, `ss -p` n'affiche pas les processus des autres utilisateurs : une ligne en écoute sans nom de processus veut quand même dire que le port est pris ; relance avec sudo pour voir qui le tient."
+    }
+  },
+  "descriptor-leak": {
+    "en": {
+      "why": "Every open file and socket uses a descriptor, and each process has a limited number of them. If code opens resources and never closes them, the count creeps up until \"Too many open files\" appears, often days after the bug was written. A guaranteed close fixes it; counting descriptors over time proves it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def read_header(path):\n    fd = os.open(path, os.O_RDONLY)\n    return os.read(fd, 16)    # fd is never closed",
+        "after": "def read_header(path):\n    with open(path, \"rb\") as f:   # closed even on error\n        return f.read(16)\n# watch it: ls /proc/PID/fd | wc -l  (should stay flat)"
+      },
+      "pitfall": "Checking the count once proves nothing; a leak only shows as a number that keeps climbing, so sample `/proc/PID/fd` several times under load."
+    },
+    "fr": {
+      "why": "Chaque fichier et chaque socket ouverts consomment un descripteur, et chaque processus n'en a qu'un nombre limité. Si le code ouvre des ressources sans jamais les fermer, le compteur grimpe jusqu'à \"Too many open files\", souvent des jours après l'écriture du bug. Une fermeture garantie règle le problème ; compter les descripteurs dans la durée le prouve.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def read_header(path):\n    fd = os.open(path, os.O_RDONLY)\n    return os.read(fd, 16)    # fd n'est jamais fermé",
+        "after": "def read_header(path):\n    with open(path, \"rb\") as f:   # fermé même en cas d'erreur\n        return f.read(16)\n# à surveiller : ls /proc/PID/fd | wc -l  (doit rester plat)"
+      },
+      "pitfall": "Compter une seule fois ne prouve rien ; une fuite se voit comme un nombre qui monte sans cesse, donc échantillonne `/proc/PID/fd` plusieurs fois sous charge."
+    }
+  },
+  "oom": {
+    "en": {
+      "why": "When memory runs out the kernel's OOM killer picks a process and sends it SIGKILL. Your process dies instantly, so it cannot write a log line, and the app log looks innocent. The evidence is in the kernel log, and a per-service memory cap makes the failure local and predictable.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "tail -f /var/log/myapp.log   # nothing, the process just disappeared",
+        "after": "dmesg -T | grep -i -E 'out of memory|killed process'\n# cap the service so it cannot take the whole machine down\nsudo systemctl set-property myapp.service MemoryMax=512M"
+      },
+      "pitfall": "The app log is silent because SIGKILL gives no time to write; people keep searching it instead of reading the kernel log."
+    },
+    "fr": {
+      "why": "Quand la mémoire manque, l'OOM killer du noyau choisit un processus et lui envoie SIGKILL. Ton processus meurt net, donc il n'écrit aucune ligne de log et le journal de l'appli a l'air innocent. La preuve est dans le log du noyau, et un plafond mémoire par service rend la panne locale et prévisible.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "tail -f /var/log/myapp.log   # rien, le processus a simplement disparu",
+        "after": "dmesg -T | grep -i -E 'out of memory|killed process'\n# plafonner le service pour qu'il ne fasse pas tomber toute la machine\nsudo systemctl set-property myapp.service MemoryMax=512M"
+      },
+      "pitfall": "Le log de l'appli est muet parce que SIGKILL ne laisse pas le temps d'écrire ; on continue à le fouiller au lieu de lire le log du noyau."
+    }
+  },
+  "disk-full": {
+    "en": {
+      "why": "A disk can be full in two ways: no free bytes, or no free inodes (too many tiny files). Both give \"No space left on device\", but only one shows in a plain `df -h`. Alerting before 100 % gives you time to act instead of finding out from a crash.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "df -h    # 40 % used, yet writes fail with \"No space left on device\"",
+        "after": "df -h /var     # bytes\ndf -i /var     # inodes\nfor col in pcent ipcent; do\n  use=$(df --output=$col /var | tail -1 | tr -dc 0-9)\n  [ \"${use:-0}\" -ge 90 ] && echo \"disk /var $col at ${use} %\"\ndone"
+      },
+      "pitfall": "Deleting a big log file that a process still holds open frees nothing until that process closes it or restarts."
+    },
+    "fr": {
+      "why": "Un disque peut être plein de deux façons : plus d'octets libres, ou plus d'inodes (trop de petits fichiers). Les deux donnent \"No space left on device\", mais un seul se voit avec un simple `df -h`. Alerter avant 100 % laisse le temps d'agir au lieu de l'apprendre par un crash.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "df -h    # 40 % utilisé, pourtant les écritures échouent avec \"No space left on device\"",
+        "after": "df -h /var     # octets\ndf -i /var     # inodes\nfor col in pcent ipcent; do\n  use=$(df --output=$col /var | tail -1 | tr -dc 0-9)\n  [ \"${use:-0}\" -ge 90 ] && echo \"disque /var $col à ${use} %\"\ndone"
+      },
+      "pitfall": "Supprimer un gros fichier de log qu'un processus garde ouvert ne libère rien tant que ce processus ne l'a pas fermé ou n'a pas redémarré."
+    }
+  },
+  "same-filesystem": {
+    "en": {
+      "why": "`rename` swaps a name in one step only when source and destination are on the same volume. Across volumes it fails or becomes copy then delete, so a reader can see a half-written file. Creating the temp file next to its final path keeps the swap atomic.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "tmp = \"/tmp/out.json.tmp\"\nwith open(tmp, \"w\") as f:\n    f.write(data)\nos.replace(tmp, \"/data/out.json\")   # /tmp and /data may be two volumes",
+        "after": "def atomic_write(path, data):\n    d = os.path.dirname(path)\n    fd, tmp = tempfile.mkstemp(dir=d)   # same directory, same volume\n    with os.fdopen(fd, \"w\") as f:\n        f.write(data)\n        f.flush()\n        os.fsync(f.fileno())\n    os.replace(tmp, path)               # atomic swap"
+      },
+      "pitfall": "`shutil.move` quietly falls back to copy then delete across volumes, which looks like it works but is not atomic."
+    },
+    "fr": {
+      "why": "`rename` échange un nom en une seule étape seulement si la source et la destination sont sur le même volume. D'un volume à l'autre, il échoue ou devient copie puis suppression, et un lecteur peut voir un fichier à moitié écrit. Créer le fichier temporaire à côté de sa destination finale garde l'échange atomique.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "tmp = \"/tmp/out.json.tmp\"\nwith open(tmp, \"w\") as f:\n    f.write(data)\nos.replace(tmp, \"/data/out.json\")   # /tmp et /data peuvent être deux volumes",
+        "after": "def atomic_write(path, data):\n    d = os.path.dirname(path)\n    fd, tmp = tempfile.mkstemp(dir=d)   # même dossier, même volume\n    with os.fdopen(fd, \"w\") as f:\n        f.write(data)\n        f.flush()\n        os.fsync(f.fileno())\n    os.replace(tmp, path)               # échange atomique"
+      },
+      "pitfall": "`shutil.move` retombe en silence sur copie puis suppression entre volumes : ça a l'air de marcher mais ce n'est pas atomique."
+    }
+  },
+  "hard-link-symbolic-link": {
+    "en": {
+      "why": "A hard link is a second name for the same content on disk, so it costs no extra space and survives deleting the other name. A symbolic link is a small file holding a path, so it can be repointed in one step. Together they give cheap duplicates and instant version switches.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp -r releases/v2 current      # full copy, slow, to redo at every switch\ncp big.bin jobs/42/big.bin     # doubles the space",
+        "after": "ln big.bin jobs/42/big.bin        # hard link: second name, no copy\nln -sfn releases/v2 current.new   # symbolic link built beside the live one\nmv -T current.new current         # switched by one atomic rename"
+      },
+      "pitfall": "A hard link is not a backup: a write in place shows through both names, a tool that saves by replacing the file silently splits them, and it cannot cross filesystems."
+    },
+    "fr": {
+      "why": "Un lien dur est un second nom pour le même contenu sur le disque : il ne coûte aucune place et survit à la suppression de l'autre nom. Un lien symbolique est un petit fichier qui contient un chemin, donc on peut le repointer en une étape. Ensemble : doublons presque gratuits et bascule de version instantanée.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp -r releases/v2 current      # copie complète, lente, à refaire à chaque bascule\ncp big.bin jobs/42/big.bin     # double la place",
+        "after": "ln big.bin jobs/42/big.bin        # lien dur : second nom, aucune copie\nln -sfn releases/v2 current.new   # lien symbolique préparé à côté\nmv -T current.new current         # bascule par un seul rename atomique"
+      },
+      "pitfall": "Un lien dur n'est pas une sauvegarde : une écriture en place se voit sous les deux noms, un outil qui enregistre en remplaçant le fichier les sépare en silence, et il ne traverse pas les systèmes de fichiers."
+    }
+  },
+  "steal-iowait": {
+    "en": {
+      "why": "A slow program is not always slow code. `steal` is CPU time the hypervisor gave to another VM, and `iowait` is time spent waiting for the disk; in both cases rewriting your loop changes nothing. One quick look at `vmstat` tells you where the time really goes.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"the script is slow\", so rewrite the hot loop...",
+        "after": "vmstat 2 3\n# columns: us sy id wa st\n# high wa = disk wait, high st = hypervisor took the CPU, high us = your code"
+      },
+      "pitfall": "The first line of `vmstat` is an average since boot, not the current state; read the following lines."
+    },
+    "fr": {
+      "why": "Un programme lent n'a pas forcément un code lent. `steal` est du temps CPU donné par l'hyperviseur à une autre VM, et `iowait` du temps passé à attendre le disque ; dans les deux cas, réécrire ta boucle ne change rien. Un coup d'œil à `vmstat` dit où passe vraiment le temps.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"le script est lent\", donc on réécrit la boucle chaude...",
+        "after": "vmstat 2 3\n# colonnes : us sy id wa st\n# wa haut = attente disque, st haut = l'hyperviseur prend le CPU, us haut = ton code"
+      },
+      "pitfall": "La première ligne de `vmstat` est une moyenne depuis le boot, pas l'état actuel ; lis les lignes suivantes."
+    }
+  },
+  "load-load-average": {
+    "en": {
+      "why": "The load average counts the tasks running or waiting to run, averaged over 1, 5 and 15 minutes. A number alone means nothing: 4.0 is saturated on 4 cores and almost idle on 32. Divide by the core count before reacting.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "uptime\n# load average: 4.02, 3.80, 3.10   -> \"it is overloaded!\"",
+        "after": "uptime\nnproc\n# 4.02 on 4 cores = saturated, 4.02 on 16 cores = about 25 % busy"
+      },
+      "pitfall": "On Linux the load also counts tasks stuck in uninterruptible disk wait, so a high load with an idle CPU points to the disk, not to computation."
+    },
+    "fr": {
+      "why": "Le load average compte les tâches qui tournent ou attendent de tourner, moyenné sur 1, 5 et 15 minutes. Un chiffre seul ne veut rien dire : 4,0 sature 4 cœurs et laisse 32 cœurs presque au repos. On divise par le nombre de cœurs avant de réagir.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "uptime\n# load average: 4.02, 3.80, 3.10   -> \"c'est surchargé !\"",
+        "after": "uptime\nnproc\n# 4.02 sur 4 cœurs = saturé, 4.02 sur 16 cœurs = environ 25 % occupé"
+      },
+      "pitfall": "Sous Linux la charge compte aussi les tâches bloquées en attente disque ininterruptible : une charge haute avec un CPU au repos pointe vers le disque, pas vers le calcul."
+    }
+  },
+  "systemd-unit": {
+    "en": {
+      "why": "A systemd unit describes a service once: what to run, when to restart it, what it needs, its limits. systemd then supervises it and keeps its logs in journald. A background process started by hand has none of that and silently stays dead after a crash or a reboot.",
+      "example": {
+        "kind": "code",
+        "lang": "ini",
+        "before": "nohup ./app > app.log 2>&1 &   # no restart, no limits, lost at reboot",
+        "after": "[Unit]\nWants=network-online.target\nAfter=network-online.target\n[Service]\nExecStart=/opt/app/run\nRestart=on-failure\nLimitNOFILE=65536\nMemoryMax=512M\n\n[Install]\nWantedBy=multi-user.target\n# logs: journalctl -u myapp"
+      },
+      "pitfall": "`restart` cuts a running service and its connections while `start` leaves it alone if it is already up; reaching for `restart` out of habit causes needless outages."
+    },
+    "fr": {
+      "why": "Une unité systemd décrit un service une fois pour toutes : quoi lancer, quand le relancer, ce dont il dépend, ses limites. systemd le supervise ensuite et garde ses logs dans journald. Un processus lancé à la main en arrière-plan n'a rien de tout ça et reste mort après un crash ou un reboot.",
+      "example": {
+        "kind": "code",
+        "lang": "ini",
+        "before": "nohup ./app > app.log 2>&1 &   # pas de relance, pas de limites, perdu au reboot",
+        "after": "[Unit]\nWants=network-online.target\nAfter=network-online.target\n[Service]\nExecStart=/opt/app/run\nRestart=on-failure\nLimitNOFILE=65536\nMemoryMax=512M\n\n[Install]\nWantedBy=multi-user.target\n# logs : journalctl -u myapp"
+      },
+      "pitfall": "`restart` coupe un service en cours et ses connexions alors que `start` n'y touche pas s'il tourne déjà ; prendre `restart` par réflexe provoque des coupures inutiles."
+    }
+  },
+  "timer-cron": {
+    "en": {
+      "why": "Cron and systemd timers both run a job on a schedule, but a bare schedule line is fragile. If a run takes longer than the interval, two copies overlap and fight over the same files. Add a lock, keep the output, and decide on purpose what happens to runs missed while the machine was off.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "*/5 * * * * /opt/job.sh",
+        "after": "# crontab: one run at a time, output kept\n*/5 * * * * flock -n /run/job.lock /opt/job.sh >> /var/log/job.log 2>&1\n# systemd timer equivalent for catch-up after downtime:\n# [Timer] Persistent=true"
+      },
+      "pitfall": "Cron does not replay runs missed while the machine was off and runs with a minimal PATH, so a job that works in your shell can fail silently there."
+    },
+    "fr": {
+      "why": "Cron et les timers systemd lancent tous deux un travail à heure fixe, mais une simple ligne de planification est fragile. Si une exécution dépasse l'intervalle, deux copies se chevauchent et se disputent les mêmes fichiers. Ajoute un verrou, garde la sortie, et décide exprès de ce qui arrive aux exécutions ratées pendant que la machine était éteinte.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "*/5 * * * * /opt/job.sh",
+        "after": "# crontab : une exécution à la fois, sortie conservée\n*/5 * * * * flock -n /run/job.lock /opt/job.sh >> /var/log/job.log 2>&1\n# équivalent timer systemd pour rattraper après un arrêt de la machine :\n# [Timer] Persistent=true"
+      },
+      "pitfall": "Cron ne rejoue pas les exécutions ratées machine éteinte et tourne avec un PATH minimal : un job qui marche dans ton shell peut échouer en silence ici."
+    }
+  },
+  "ulimit": {
+    "en": {
+      "why": "`ulimit` sets per-process ceilings such as open files and stack size. Hitting one looks like a bug in your code (\"Too many open files\", a stack overflow) while the code is fine and the ceiling is low. Read the limits first, then decide whether the code or the limit must change.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"Too many open files\" -> start hunting in the code",
+        "after": "ulimit -n                              # limit of this shell only\ngrep 'open files' /proc/PID/limits     # limit of the real process\nls /proc/PID/fd | wc -l                # how many it uses right now"
+      },
+      "pitfall": "The `ulimit` of your shell is not the limit of a service started by systemd; read `/proc/PID/limits` of the actual process."
+    },
+    "fr": {
+      "why": "`ulimit` fixe des plafonds par processus, comme les fichiers ouverts et la taille de pile. En atteindre un ressemble à un bug du code (\"Too many open files\", un dépassement de pile) alors que le code est correct et que le plafond est bas. On lit d'abord les limites, puis on décide s'il faut changer le code ou la limite.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"Too many open files\" -> on part chercher dans le code",
+        "after": "ulimit -n                              # limite de ce shell seulement\ngrep 'open files' /proc/PID/limits     # limite du vrai processus\nls /proc/PID/fd | wc -l                # combien il en utilise maintenant"
+      },
+      "pitfall": "Le `ulimit` de ton shell n'est pas la limite d'un service lancé par systemd ; lis `/proc/PID/limits` du processus réel."
+    }
+  },
+  "nice-ionice": {
+    "en": {
+      "why": "A heavy background job (reindex, backup, encode) competes with your live service for CPU and disk. `nice` lowers its CPU priority and `ionice` lowers its disk priority, so the live service wins when both want the machine. The job takes longer, nobody notices.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./reindex.sh    # same priority as the live service, users feel the slowdown",
+        "after": "# lowest CPU priority, disk only when idle\nnice -n 19 ionice -c 3 ./reindex.sh"
+      },
+      "pitfall": "`nice` only changes who goes first when there is contention, it does not cap usage; for a hard ceiling use a limit such as systemd's `CPUQuota`."
+    },
+    "fr": {
+      "why": "Un gros travail de fond (réindexation, sauvegarde, encodage) se bat avec ton service en direct pour le CPU et le disque. `nice` baisse sa priorité CPU et `ionice` sa priorité disque, donc le service en direct passe d'abord quand les deux veulent la machine. Le travail dure plus longtemps, personne ne le remarque.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./reindex.sh    # même priorité que le service en direct, les utilisateurs sentent le ralentissement",
+        "after": "# priorité CPU minimale, disque seulement au repos\nnice -n 19 ionice -c 3 ./reindex.sh"
+      },
+      "pitfall": "`nice` ne change que l'ordre de passage en cas de contention, il ne plafonne pas l'usage ; pour un plafond dur, utilise une limite comme `CPUQuota` de systemd."
+    }
+  }
+}

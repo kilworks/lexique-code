@@ -1,0 +1,354 @@
+{
+  "screen-states": {
+    "en": {
+      "why": "A screen is rarely full. Before the data arrives it is loading, if the request fails it is in error, if only part of it loads it is partial, and for a new user it is empty. If you only build the full case, users meet a blank page or a crash in the other four.",
+      "example": {
+        "kind": "code",
+        "lang": "tsx",
+        "before": "function Orders({ orders }) {\n  return <ul>{orders.map(o => <li key={o.id}>{o.label}</li>)}</ul>;\n}",
+        "after": "function Orders({ status, orders, error, retry }) {\n  if (status === \"loading\") return <Skeleton rows={3} />;\n  if (status === \"error\") return <ErrorBox message={error} onRetry={retry} />;\n  if (orders.length === 0) return <Empty action=\"Create an order\" />;\n  return (\n    <>\n      {status === \"partial\" && <Notice>Some orders could not load.</Notice>}\n      <ul>{orders.map(o => <li key={o.id}>{o.label}</li>)}</ul>\n    </>\n  );\n}"
+      },
+      "pitfall": "Testing only with a rich fixture, so the empty, loading and error states are never drawn or run before users hit them."
+    },
+    "fr": {
+      "why": "Un écran est rarement plein. Avant l'arrivée des données il est en chargement, si la requête échoue il est en erreur, si une partie seulement arrive il est partiel, et pour un nouvel utilisateur il est vide. Si tu ne codes que le cas plein, l'utilisateur tombe sur une page blanche ou un plantage dans les quatre autres.",
+      "example": {
+        "kind": "code",
+        "lang": "tsx",
+        "before": "function Orders({ orders }) {\n  return <ul>{orders.map(o => <li key={o.id}>{o.label}</li>)}</ul>;\n}",
+        "after": "function Orders({ status, orders, error, retry }) {\n  if (status === \"loading\") return <Skeleton rows={3} />;\n  if (status === \"error\") return <ErrorBox message={error} onRetry={retry} />;\n  if (orders.length === 0) return <Empty action=\"Créer une commande\" />;\n  return (\n    <>\n      {status === \"partial\" && <Notice>Certaines commandes n'ont pas pu charger.</Notice>}\n      <ul>{orders.map(o => <li key={o.id}>{o.label}</li>)}</ul>\n    </>\n  );\n}"
+      },
+      "pitfall": "Tester uniquement avec un jeu de données riche : les états vide, chargement et erreur ne sont ni dessinés ni exécutés avant que les utilisateurs ne tombent dessus."
+    }
+  },
+  "useful-empty-state": {
+    "en": {
+      "why": "An empty list is the first thing a new user sees, and a bare 'No data' leaves them stuck. A useful empty state says in one sentence why it is empty and offers the action that fills it.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<p>No data</p>",
+        "after": "<div class=\"empty\">\n  <p>You have no projects yet. Create one to start tracking tasks.</p>\n  <button>Create a project</button>\n</div>"
+      },
+      "pitfall": "Writing a message that only states the emptiness ('Nothing here') with no button, so the user has to guess the next step."
+    },
+    "fr": {
+      "why": "Une liste vide est la première chose que voit un nouvel utilisateur, et un simple 'Aucune donnée' le laisse bloqué. Un état vide utile dit en une phrase pourquoi c'est vide et propose l'action qui le remplit.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<p>Aucune donnée</p>",
+        "after": "<div class=\"empty\">\n  <p>Tu n'as pas encore de projet. Crées-en un pour suivre tes tâches.</p>\n  <button>Créer un projet</button>\n</div>"
+      },
+      "pitfall": "Écrire un message qui constate seulement le vide ('Rien ici') sans bouton, si bien que l'utilisateur doit deviner la suite."
+    }
+  },
+  "immediate-feedback": {
+    "en": {
+      "why": "If a click seems to do nothing for a second, people click again and trigger the action twice. Every control should react at once: a pressed state, an activity indicator while it works, then a visible result or error.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "button.addEventListener(\"click\", async () => {\n  await fetch(\"/api/save\", { method: \"POST\", body });\n});",
+        "after": "button.addEventListener(\"click\", async () => {\n  button.disabled = true;\n  button.textContent = \"Saving...\";\n  try {\n    const res = await fetch(\"/api/save\", { method: \"POST\", body });\n    if (!res.ok) throw new Error(String(res.status));\n    button.textContent = \"Saved\";\n  } catch {\n    button.textContent = \"Save failed, retry\";\n    button.disabled = false;\n  }\n});"
+      },
+      "pitfall": "Showing feedback only on success, so a failed request leaves a button that looks idle and a user who does not know what happened."
+    },
+    "fr": {
+      "why": "Si un clic semble ne rien faire pendant une seconde, les gens recliquent et déclenchent l'action deux fois. Chaque contrôle doit réagir tout de suite : état pressé, indicateur d'activité pendant le travail, puis résultat ou erreur visible.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "button.addEventListener(\"click\", async () => {\n  await fetch(\"/api/save\", { method: \"POST\", body });\n});",
+        "after": "button.addEventListener(\"click\", async () => {\n  button.disabled = true;\n  button.textContent = \"Enregistrement...\";\n  try {\n    const res = await fetch(\"/api/save\", { method: \"POST\", body });\n    if (!res.ok) throw new Error(String(res.status));\n    button.textContent = \"Enregistré\";\n  } catch {\n    button.textContent = \"Échec, réessayer\";\n    button.disabled = false;\n  }\n});"
+      },
+      "pitfall": "Ne montrer un retour qu'en cas de succès : une requête qui échoue laisse un bouton d'apparence inactive et un utilisateur qui ne sait pas ce qui s'est passé."
+    }
+  },
+  "optimistic-ui": {
+    "en": {
+      "why": "Waiting for the server before updating the screen makes a fast action feel slow. With an optimistic UI you apply the change locally at once, send the request, and only undo the change if the server refuses.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "async function like(id) {\n  await api.like(id);\n  setLikes(n => n + 1);\n}",
+        "after": "async function like(id) {\n  setLikes(n => n + 1);            // show it now\n  try {\n    await api.like(id);\n  } catch {\n    setLikes(n => n - 1);          // roll back\n    toast(\"Could not save your like. Try again.\");\n  }\n}"
+      },
+      "pitfall": "Applying the change locally but forgetting the rollback and the message, so the screen keeps showing something the server never accepted."
+    },
+    "fr": {
+      "why": "Attendre le serveur avant de mettre l'écran à jour rend lente une action rapide. Avec une UI optimiste, tu appliques le changement en local tout de suite, tu envoies la requête, et tu ne l'annules que si le serveur refuse.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "async function like(id) {\n  await api.like(id);\n  setLikes(n => n + 1);\n}",
+        "after": "async function like(id) {\n  setLikes(n => n + 1);            // afficher tout de suite\n  try {\n    await api.like(id);\n  } catch {\n    setLikes(n => n - 1);          // revenir en arrière\n    toast(\"Impossible d'enregistrer ton like. Réessaie.\");\n  }\n}"
+      },
+      "pitfall": "Appliquer le changement en local mais oublier le retour en arrière et le message : l'écran continue d'afficher ce que le serveur n'a jamais accepté."
+    }
+  },
+  "undoable": {
+    "en": {
+      "why": "A confirmation dialog on every action trains people to click 'OK' without reading. It is better to do the action at once and offer an 'Undo' for a few seconds, and keep confirmation for what truly cannot be reversed.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "if (confirm(\"Archive this message?\")) {\n  archive(id);\n}",
+        "after": "archive(id);\ntoast(\"Message archived\", {\n  action: { label: \"Undo\", onClick: () => restore(id) },\n  duration: 8000,\n});"
+      },
+      "pitfall": "Offering 'Undo' on something that cannot really be restored (a sent email, a purged file), which is worse than asking first."
+    },
+    "fr": {
+      "why": "Une boîte de confirmation à chaque action apprend aux gens à cliquer 'OK' sans lire. Mieux vaut faire l'action tout de suite et proposer 'Annuler' quelques secondes, en gardant la confirmation pour ce qui est vraiment irréversible.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "if (confirm(\"Archiver ce message ?\")) {\n  archive(id);\n}",
+        "after": "archive(id);\ntoast(\"Message archivé\", {\n  action: { label: \"Annuler\", onClick: () => restore(id) },\n  duration: 8000,\n});"
+      },
+      "pitfall": "Proposer 'Annuler' sur ce qui ne peut pas vraiment être restauré (un mail envoyé, un fichier purgé) : c'est pire que de demander avant."
+    }
+  },
+  "progressive-disclosure": {
+    "en": {
+      "why": "A screen that shows every option at once overwhelms newcomers and hides the main path. Progressive disclosure shows the essentials first and puts the rest one click away, so beginners are not lost and experts still reach everything.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<form>\n  <input name=\"url\">\n  <input name=\"timeout\"> <input name=\"retries\">\n  <input name=\"proxy\"> <input name=\"user-agent\">\n  <button>Start</button>\n</form>",
+        "after": "<form>\n  <input name=\"url\">\n  <details>\n    <summary>Advanced options</summary>\n    <input name=\"timeout\"> <input name=\"retries\">\n    <input name=\"proxy\"> <input name=\"user-agent\">\n  </details>\n  <button>Start</button>\n</form>"
+      },
+      "pitfall": "Hiding something the user needs on the main path (a required field, an error cause) behind the collapsed part."
+    },
+    "fr": {
+      "why": "Un écran qui montre toutes les options d'un coup noie les débutants et cache le chemin principal. La divulgation progressive montre l'essentiel d'abord et met le reste à un clic, pour que les novices ne soient pas perdus et que les experts atteignent tout.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<form>\n  <input name=\"url\">\n  <input name=\"timeout\"> <input name=\"retries\">\n  <input name=\"proxy\"> <input name=\"user-agent\">\n  <button>Lancer</button>\n</form>",
+        "after": "<form>\n  <input name=\"url\">\n  <details>\n    <summary>Options avancées</summary>\n    <input name=\"timeout\"> <input name=\"retries\">\n    <input name=\"proxy\"> <input name=\"user-agent\">\n  </details>\n  <button>Lancer</button>\n</form>"
+      },
+      "pitfall": "Cacher dans la partie repliée ce dont l'utilisateur a besoin sur le chemin principal (un champ obligatoire, la cause d'une erreur)."
+    }
+  },
+  "visual-hierarchy": {
+    "en": {
+      "why": "When every element shouts equally, the eye has nowhere to land and users hesitate. Visual hierarchy uses size, weight and color so one thing stands out first: the primary action, with everything else clearly lower.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<button class=\"btn\">Save</button>\n<button class=\"btn\">Cancel</button>\n<button class=\"btn\">Delete</button>",
+        "after": "<button class=\"btn btn-primary\">Save</button>\n<button class=\"btn btn-ghost\">Cancel</button>\n<button class=\"btn btn-link\">Delete draft</button>"
+      },
+      "pitfall": "Making several actions primary on the same screen, so nothing is primary and the user has to read everything to choose."
+    },
+    "fr": {
+      "why": "Quand tous les éléments crient pareil, l'œil ne sait pas où se poser et l'utilisateur hésite. La hiérarchie visuelle joue sur la taille, le poids et la couleur pour qu'une chose ressorte d'abord : l'action principale, le reste nettement en dessous.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<button class=\"btn\">Enregistrer</button>\n<button class=\"btn\">Annuler</button>\n<button class=\"btn\">Supprimer</button>",
+        "after": "<button class=\"btn btn-primary\">Enregistrer</button>\n<button class=\"btn btn-ghost\">Annuler</button>\n<button class=\"btn btn-link\">Supprimer le brouillon</button>"
+      },
+      "pitfall": "Rendre plusieurs actions principales sur le même écran : plus rien n'est principal et l'utilisateur doit tout lire pour choisir."
+    }
+  },
+  "affordance": {
+    "en": {
+      "why": "People should know what is clickable without trying. An affordance is the visual hint: a button looks pressable, a link looks like a link, and the cursor and hover state confirm it.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<div onclick=\"save()\">save</div>",
+        "after": "<button type=\"button\" class=\"btn\" onclick=\"save()\">Save</button>\n<style>\n  .btn { padding: 8px 16px; border-radius: 6px; cursor: pointer; }\n  .btn:hover { filter: brightness(0.95); }\n</style>"
+      },
+      "pitfall": "Making something look clickable that is not (an underlined plain label), or the reverse, a clickable area styled like flat text."
+    },
+    "fr": {
+      "why": "L'utilisateur doit savoir ce qui se clique sans essayer. L'affordance est l'indice visuel : un bouton a l'air d'un bouton, un lien a l'air d'un lien, et le curseur et le survol le confirment.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<div onclick=\"save()\">enregistrer</div>",
+        "after": "<button type=\"button\" class=\"btn\" onclick=\"save()\">Enregistrer</button>\n<style>\n  .btn { padding: 8px 16px; border-radius: 6px; cursor: pointer; }\n  .btn:hover { filter: brightness(0.95); }\n</style>"
+      },
+      "pitfall": "Donner l'air cliquable à ce qui ne l'est pas (un libellé simple souligné), ou l'inverse : une zone cliquable stylée comme du texte plat."
+    }
+  },
+  "accessible": {
+    "en": {
+      "why": "Some users rely on the keyboard or a screen reader, others have low vision. If a control cannot be focused, has no name or has weak contrast, those users are locked out. Native elements and a few rules cover most of it.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<div class=\"icon\" onclick=\"closeDialog()\">x</div>\n<style>*:focus { outline: none; }</style>",
+        "after": "<button type=\"button\" aria-label=\"Close dialog\" onclick=\"closeDialog()\">x</button>\n<style>\n  button:focus-visible { outline: 2px solid #1a56db; outline-offset: 2px; }\n</style>"
+      },
+      "pitfall": "Removing the focus outline (outline: none) with no replacement, which makes keyboard navigation impossible to follow."
+    },
+    "fr": {
+      "why": "Certains utilisateurs naviguent au clavier ou avec un lecteur d'écran, d'autres voient mal. Si un contrôle n'est pas focusable, n'a pas de nom ou manque de contraste, ces personnes sont bloquées. Les éléments natifs et quelques règles couvrent l'essentiel.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<div class=\"icon\" onclick=\"closeDialog()\">x</div>\n<style>*:focus { outline: none; }</style>",
+        "after": "<button type=\"button\" aria-label=\"Fermer la boîte de dialogue\" onclick=\"closeDialog()\">x</button>\n<style>\n  button:focus-visible { outline: 2px solid #1a56db; outline-offset: 2px; }\n</style>"
+      },
+      "pitfall": "Supprimer le contour de focus (outline: none) sans remplacement : la navigation au clavier devient impossible à suivre."
+    }
+  },
+  "reduced-motion": {
+    "en": {
+      "why": "Large or constant motion can cause nausea or distraction for some users, and they can ask their operating system to cut it. Your CSS can read that preference through the prefers-reduced-motion media query and tone animations down.",
+      "example": {
+        "kind": "code",
+        "lang": "css",
+        "before": ".panel { animation: slide-in 600ms ease-out; }",
+        "after": ".panel { animation: slide-in 600ms ease-out; }\n\n@media (prefers-reduced-motion: reduce) {\n  .panel { animation: none; }\n}"
+      },
+      "pitfall": "Using animation as the only way to show a change (a bounce for an error), so with motion off the information disappears."
+    },
+    "fr": {
+      "why": "Un mouvement ample ou constant peut donner la nausée ou distraire certains utilisateurs, qui peuvent demander à leur système de le réduire. Ton CSS lit cette préférence avec la media query prefers-reduced-motion et peut calmer les animations.",
+      "example": {
+        "kind": "code",
+        "lang": "css",
+        "before": ".panel { animation: slide-in 600ms ease-out; }",
+        "after": ".panel { animation: slide-in 600ms ease-out; }\n\n@media (prefers-reduced-motion: reduce) {\n  .panel { animation: none; }\n}"
+      },
+      "pitfall": "Utiliser l'animation comme seul moyen de signaler un changement (un rebond pour une erreur) : sans mouvement, l'information disparaît."
+    }
+  },
+  "design-tokens": {
+    "en": {
+      "why": "Hardcoded colors and spacings scatter across components, so a rebrand or a dark theme means hunting through every file. Design tokens give each value a name once, and components only use the name.",
+      "example": {
+        "kind": "code",
+        "lang": "css",
+        "before": ".card { background: #ffffff; padding: 17px; color: #1a1a1a; }",
+        "after": ":root { --color-surface: #ffffff; --color-text: #1a1a1a; --space-4: 16px; }\n@media (prefers-color-scheme: dark) {\n  :root { --color-surface: #16181d; --color-text: #f2f2f2; }\n}\n.card { background: var(--color-surface); padding: var(--space-4); color: var(--color-text); }"
+      },
+      "pitfall": "Naming tokens after their value (--blue-500 used as the link color) instead of their role, so a theme change forces you to make --blue-500 not blue or to hunt down every use."
+    },
+    "fr": {
+      "why": "Les couleurs et espacements en dur s'éparpillent dans les composants : un changement de charte ou un thème sombre oblige alors à fouiller chaque fichier. Les tokens de design donnent un nom à chaque valeur une seule fois, et les composants n'utilisent que le nom.",
+      "example": {
+        "kind": "code",
+        "lang": "css",
+        "before": ".card { background: #ffffff; padding: 17px; color: #1a1a1a; }",
+        "after": ":root { --color-surface: #ffffff; --color-text: #1a1a1a; --space-4: 16px; }\n@media (prefers-color-scheme: dark) {\n  :root { --color-surface: #16181d; --color-text: #f2f2f2; }\n}\n.card { background: var(--color-surface); padding: var(--space-4); color: var(--color-text); }"
+      },
+      "pitfall": "Nommer les tokens d'après leur valeur (--blue-500 utilisé comme couleur de lien) plutôt que d'après leur rôle : au changement de thème, il faut soit rendre --blue-500 pas bleu, soit traquer chaque usage."
+    }
+  },
+  "microcopy": {
+    "en": {
+      "why": "Small texts decide whether people understand an interface: button labels, errors, hints. A button that says what it does and an error that says what to do next save users from guessing and cut support requests.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "[Submit]\nError 400: invalid request",
+        "after": "[Save changes]\nWe could not save your changes. Check your connection and try again."
+      },
+      "pitfall": "Writing errors from the system's point of view (a code, 'invalid request') instead of telling the user what happened and what to do."
+    },
+    "fr": {
+      "why": "Les petits textes décident si on comprend une interface : libellés de boutons, erreurs, indications. Un bouton qui dit ce qu'il fait et une erreur qui dit quoi faire ensuite évitent aux gens de deviner et réduisent les demandes au support.",
+      "example": {
+        "kind": "code",
+        "lang": "text",
+        "before": "[Valider]\nErreur 400 : requête invalide",
+        "after": "[Enregistrer les modifications]\nImpossible d'enregistrer tes modifications. Vérifie ta connexion et réessaie."
+      },
+      "pitfall": "Écrire les erreurs du point de vue du système (un code, 'requête invalide') au lieu de dire à l'utilisateur ce qui s'est passé et quoi faire."
+    }
+  },
+  "i18n": {
+    "en": {
+      "why": "Texts written inside the code are hard to translate and break as soon as a second language arrives. i18n moves them into keys, and handles plurals, dates and numbers, which differ by language, with the platform's formatters.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "label.textContent = count + \" item(s) on \" + date.toLocaleDateString(\"en-US\");",
+        "after": "// en.json: { \"cart\": { \"items_one\": \"{{count}} item\", \"items_other\": \"{{count}} items\" } }\nlabel.textContent = t(\"cart.items\", { count });\ndateEl.textContent = new Intl.DateTimeFormat(locale).format(date);"
+      },
+      "pitfall": "Building sentences by concatenating translated pieces, which breaks word order in languages that do not follow English."
+    },
+    "fr": {
+      "why": "Les textes écrits dans le code sont difficiles à traduire et cassent dès qu'une deuxième langue arrive. L'i18n les range dans des clés et gère pluriels, dates et nombres, qui varient selon la langue, avec les formateurs de la plateforme.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "label.textContent = count + \" article(s) le \" + date.toLocaleDateString(\"fr-FR\");",
+        "after": "// fr.json : { \"cart\": { \"items_one\": \"{{count}} article\", \"items_other\": \"{{count}} articles\" } }\nlabel.textContent = t(\"cart.items\", { count });\ndateEl.textContent = new Intl.DateTimeFormat(locale).format(date);"
+      },
+      "pitfall": "Construire les phrases en collant des morceaux traduits : l'ordre des mots casse dans les langues qui ne suivent pas l'anglais."
+    }
+  },
+  "layout-shift": {
+    "en": {
+      "why": "When an image, font or ad loads late and pushes the text down, users lose their place or tap the wrong thing. Layout shift is avoided by reserving the space before the content arrives.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<img src=\"hero.jpg\">\n<p>Article text...</p>",
+        "after": "<img src=\"hero.jpg\" width=\"1200\" height=\"630\" style=\"max-width:100%; height:auto\">\n<p>Article text...</p>"
+      },
+      "pitfall": "Inserting content above what the user is already reading (a banner, a late ad) with no reserved height."
+    },
+    "fr": {
+      "why": "Quand une image, une police ou une pub charge tard et pousse le texte vers le bas, l'utilisateur perd sa place ou touche le mauvais élément. On évite le saut de mise en page en réservant la place avant l'arrivée du contenu.",
+      "example": {
+        "kind": "code",
+        "lang": "html",
+        "before": "<img src=\"hero.jpg\">\n<p>Texte de l'article...</p>",
+        "after": "<img src=\"hero.jpg\" width=\"1200\" height=\"630\" style=\"max-width:100%; height:auto\">\n<p>Texte de l'article...</p>"
+      },
+      "pitfall": "Insérer du contenu au-dessus de ce que l'utilisateur lit déjà (un bandeau, une pub tardive) sans hauteur réservée."
+    }
+  },
+  "virtualized-list": {
+    "en": {
+      "why": "Rendering thousands of rows creates thousands of DOM nodes, and scrolling becomes slow. A virtualized list keeps in the DOM only the rows that are on screen, plus a few around them, and swaps them as you scroll.",
+      "example": {
+        "kind": "code",
+        "lang": "tsx",
+        "before": "<ul>{rows.map(r => <li key={r.id}>{r.name}</li>)}</ul>",
+        "after": "import { FixedSizeList } from \"react-window\"; // 1.x API\n\n<FixedSizeList height={480} width=\"100%\" itemCount={rows.length} itemSize={32}>\n  {({ index, style }) => <div style={style}>{rows[index].name}</div>}\n</FixedSizeList>"
+      },
+      "pitfall": "Virtualizing a short list (a few dozen rows), which adds complexity and breaks find-in-page for no gain."
+    },
+    "fr": {
+      "why": "Afficher des milliers de lignes crée des milliers de nœuds DOM et le défilement devient lent. Une liste virtualisée ne garde dans le DOM que les lignes à l'écran, plus quelques-unes autour, et les remplace pendant le défilement.",
+      "example": {
+        "kind": "code",
+        "lang": "tsx",
+        "before": "<ul>{rows.map(r => <li key={r.id}>{r.name}</li>)}</ul>",
+        "after": "import { FixedSizeList } from \"react-window\"; // 1.x API\n\n<FixedSizeList height={480} width=\"100%\" itemCount={rows.length} itemSize={32}>\n  {({ index, style }) => <div style={style}>{rows[index].name}</div>}\n</FixedSizeList>"
+      },
+      "pitfall": "Virtualiser une liste courte (quelques dizaines de lignes) : ça ajoute de la complexité et casse la recherche dans la page pour aucun gain."
+    }
+  },
+  "the-interface-acts": {
+    "en": {
+      "why": "A console that only displays problems makes the operator copy a name, open a terminal and fix by hand. A control tool should put the fix next to the problem: each alert comes with the button that acts on it.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Build a status page showing each service and whether it is healthy.",
+        "after": "Build a status page for each service. For every service that is down or failing, show a Restart button next to the error, and a \"Show logs\" button. Clicking Restart calls the restart endpoint, shows the result, and offers a retry on failure. A problem without an action is a bug."
+      },
+      "pitfall": "Adding actions that run with no visible result or no way to see what was done, so the operator cannot tell whether the fix worked."
+    },
+    "fr": {
+      "why": "Une console qui se contente d'afficher les problèmes oblige l'opérateur à copier un nom, ouvrir un terminal et réparer à la main. Un outil de pilotage met la réparation à côté du problème : chaque alerte vient avec le bouton qui agit dessus.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fais une page d'état qui affiche chaque service et s'il est en bonne santé.",
+        "after": "Fais une page d'état pour chaque service. Pour chaque service en panne ou en échec, affiche un bouton Redémarrer à côté de l'erreur, et un bouton \"Voir les logs\". Redémarrer appelle l'endpoint de redémarrage, affiche le résultat, et propose de réessayer en cas d'échec. Un problème sans action est un bug."
+      },
+      "pitfall": "Ajouter des actions qui s'exécutent sans résultat visible ni trace de ce qui a été fait : l'opérateur ne sait pas si la réparation a marché."
+    }
+  }
+}

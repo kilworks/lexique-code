@@ -1,0 +1,552 @@
+{
+  "profile-before-optimizing": {
+    "en": {
+      "why": "Programmers guess wrong about where time goes, so they spend a day speeding up code that was 2% of the run. A profiler gives the real split in seconds. Do it before touching anything, and again after.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# parse() feels slow, rewrite it\nvim parse.py",
+        "after": "python -m cProfile -s tottime main.py | head -20\n# optimize only the top entry (most time in its own code), then profile again"
+      },
+      "pitfall": "Profiling a toy input or a debug build shows a different picture than the real workload, so profile with production-sized data."
+    },
+    "fr": {
+      "why": "On devine mal où part le temps : on passe une journée à accélérer du code qui pesait 2 % de l'exécution. Un profileur donne la vraie répartition en quelques secondes. À faire avant de toucher quoi que ce soit, puis après.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# parse() me semble lent, je le réécris\nvim parse.py",
+        "after": "python -m cProfile -s tottime main.py | head -20\n# n'optimiser que l'entrée du haut (le plus de temps dans son propre code), puis reprofiler"
+      },
+      "pitfall": "Profiler un jeu de données jouet ou un build debug donne une autre image que la vraie charge : profiler avec des données de taille réelle."
+    }
+  },
+  "hot-path": {
+    "en": {
+      "why": "A program spends most of its time in a small part of the code, usually a loop body or a request handler. Effort spent elsewhere is wasted and makes code harder to read. Find that part and move everything that does not change out of it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for row in rows:\n    cfg = json.loads(open(\"cfg.json\").read())\n    out.append(row * cfg[\"factor\"])",
+        "after": "factor = json.loads(open(\"cfg.json\").read())[\"factor\"]\nout = [row * factor for row in rows]"
+      },
+      "pitfall": "Micro-optimizing code that runs once at startup, while the real hot path is somewhere else."
+    },
+    "fr": {
+      "why": "Un programme passe l'essentiel de son temps dans une petite partie du code, souvent un corps de boucle ou un handler de requête. L'effort dépensé ailleurs est perdu et rend le code plus dur à lire. Trouver cette partie et en sortir tout ce qui ne change pas.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for row in rows:\n    cfg = json.loads(open(\"cfg.json\").read())\n    out.append(row * cfg[\"factor\"])",
+        "after": "factor = json.loads(open(\"cfg.json\").read())[\"factor\"]\nout = [row * factor for row in rows]"
+      },
+      "pitfall": "Micro-optimiser du code exécuté une seule fois au démarrage, alors que le vrai chemin chaud est ailleurs."
+    }
+  },
+  "complexity-o-n": {
+    "en": {
+      "why": "O(n) describes how the cost grows with the input size. A loop inside a loop, or `x in some_list` inside a loop, is O(n squared): fine with 100 items, painful with 100 000. It often hides behind a harmless-looking line.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "seen = []\nfor x in items:\n    if x not in seen:   # scans the whole list each time\n        seen.append(x)",
+        "after": "seen = set()\nunique = []\nfor x in items:\n    if x not in seen:   # constant time\n        seen.add(x)\n        unique.append(x)"
+      },
+      "pitfall": "Testing with 50 items, where an O(n squared) version looks instant, then shipping it to a table with a million rows."
+    },
+    "fr": {
+      "why": "O(n) décrit comment le coût grandit avec la taille de l'entrée. Une boucle dans une boucle, ou `x in une_liste` dans une boucle, est en O(n au carré) : correct avec 100 éléments, douloureux avec 100 000. Ça se cache souvent derrière une ligne anodine.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "seen = []\nfor x in items:\n    if x not in seen:   # parcourt toute la liste à chaque tour\n        seen.append(x)",
+        "after": "seen = set()\nunique = []\nfor x in items:\n    if x not in seen:   # temps constant\n        seen.add(x)\n        unique.append(x)"
+      },
+      "pitfall": "Tester avec 50 éléments, où la version quadratique a l'air instantanée, puis la livrer sur une table d'un million de lignes."
+    }
+  },
+  "n-1": {
+    "en": {
+      "why": "N+1 means one query to get a list, then one more query for each item of it. With 500 items that is 501 round trips, each with its own network latency. The fix is to ask for all the related rows at once.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for user in users:\n    cur.execute(\"SELECT * FROM orders WHERE user_id = ?\", (user.id,))\n    user.orders = cur.fetchall()",
+        "after": "ids = [u.id for u in users]\nmarks = \",\".join(\"?\" * len(ids))\ncur.execute(f\"SELECT * FROM orders WHERE user_id IN ({marks})\", ids)\nrows = cur.fetchall()   # then group by user_id in memory"
+      },
+      "pitfall": "ORMs with lazy loading hide it: the code looks innocent, so count the queries in the log. Also chunk big id lists, databases limit the number of parameters."
+    },
+    "fr": {
+      "why": "N+1, c'est une requête pour obtenir une liste, puis une requête de plus pour chaque élément. Avec 500 éléments, ça fait 501 allers-retours, chacun avec sa latence réseau. Le correctif est de demander toutes les lignes liées d'un coup.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for user in users:\n    cur.execute(\"SELECT * FROM orders WHERE user_id = ?\", (user.id,))\n    user.orders = cur.fetchall()",
+        "after": "ids = [u.id for u in users]\nmarks = \",\".join(\"?\" * len(ids))\ncur.execute(f\"SELECT * FROM orders WHERE user_id IN ({marks})\", ids)\nrows = cur.fetchall()   # puis regrouper par user_id en mémoire"
+      },
+      "pitfall": "Les ORM en lazy loading le cachent : le code a l'air innocent, donc compter les requêtes dans le log. Découper aussi les grosses listes d'ids, les bases limitent le nombre de paramètres."
+    }
+  },
+  "batch": {
+    "en": {
+      "why": "Every call to a database, an API or a disk has a fixed cost before any data moves. Sending items in packets pays that cost once per packet instead of once per item. The packet size must be bounded so one batch never exhausts memory or hits a server limit.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for r in rows:\n    cur.execute(\"INSERT INTO t VALUES (?, ?)\", r)\n    conn.commit()   # one commit per row",
+        "after": "for i in range(0, len(rows), 1000):\n    cur.executemany(\"INSERT INTO t VALUES (?, ?)\", rows[i:i + 1000])\n    conn.commit()   # one commit per 1000 rows"
+      },
+      "pitfall": "An unbounded batch: one failure loses everything, and the packet can exceed memory or the API's maximum size."
+    },
+    "fr": {
+      "why": "Chaque appel à une base, une API ou un disque a un coût fixe avant que la moindre donnée circule. Envoyer par paquets paie ce coût une fois par paquet au lieu d'une fois par élément. La taille du paquet doit être bornée pour qu'un lot n'épuise jamais la mémoire ni ne dépasse une limite du serveur.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for r in rows:\n    cur.execute(\"INSERT INTO t VALUES (?, ?)\", r)\n    conn.commit()   # un commit par ligne",
+        "after": "for i in range(0, len(rows), 1000):\n    cur.executemany(\"INSERT INTO t VALUES (?, ?)\", rows[i:i + 1000])\n    conn.commit()   # un commit par tranche de 1000 lignes"
+      },
+      "pitfall": "Un lot non borné : un seul échec perd tout, et le paquet peut dépasser la mémoire ou la taille maximale de l'API."
+    }
+  },
+  "streaming": {
+    "en": {
+      "why": "Loading a whole file or response into memory fails exactly when the data gets big, and wastes time waiting for the last byte before starting. Streaming handles each piece as it arrives, so memory stays flat whatever the size.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "lines = open(\"big.log\").read().splitlines()\nerrors = len([l for l in lines if \"ERROR\" in l])",
+        "after": "with open(\"big.log\") as f:\n    errors = sum(1 for line in f if \"ERROR\" in line)"
+      },
+      "pitfall": "Calling `.read()`, `.readlines()` or `list(...)` somewhere in the chain quietly turns a stream back into a full load."
+    },
+    "fr": {
+      "why": "Charger un fichier ou une réponse entière en mémoire casse exactement quand les données grossissent, et fait attendre le dernier octet avant de commencer. Le streaming traite chaque morceau à son arrivée : la mémoire reste plate quelle que soit la taille.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "lines = open(\"big.log\").read().splitlines()\nerrors = len([l for l in lines if \"ERROR\" in l])",
+        "after": "with open(\"big.log\") as f:\n    errors = sum(1 for line in f if \"ERROR\" in line)"
+      },
+      "pitfall": "Un `.read()`, `.readlines()` ou `list(...)` quelque part dans la chaîne retransforme discrètement le flux en chargement complet."
+    }
+  },
+  "zero-copy": {
+    "en": {
+      "why": "Copying gigabytes to rename, move or cut a file costs time, disk wear and space for nothing. A rename on the same filesystem or a hard link changes metadata only, so it takes milliseconds. A stream copy (`ffmpeg -c copy`) still writes the bytes but skips the costly decode and re-encode.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp /data/big.mkv /archive/big.mkv && rm /data/big.mkv\nffmpeg -i in.mp4 -ss 60 -t 30 cut.mp4   # re-encodes everything",
+        "after": "mv /data/big.mkv /archive/big.mkv         # rename, no copy on the same filesystem\nffmpeg -ss 60 -t 30 -i in.mp4 -c copy cut.mp4   # no re-encode"
+      },
+      "pitfall": "A rename or hard link only works inside one filesystem, and `-c copy` can only cut on keyframes."
+    },
+    "fr": {
+      "why": "Copier des gigaoctets pour renommer, déplacer ou couper un fichier coûte du temps, de l'usure disque et de la place pour rien. Un renommage sur le même système de fichiers ou un lien dur ne touchent que les métadonnées : quelques millisecondes. Une copie de flux (`ffmpeg -c copy`) écrit encore les octets mais saute le décodage et le réencodage, qui coûtent cher.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp /data/big.mkv /archive/big.mkv && rm /data/big.mkv\nffmpeg -i in.mp4 -ss 60 -t 30 cut.mp4   # réencode tout",
+        "after": "mv /data/big.mkv /archive/big.mkv         # renommage, aucune copie sur le même système de fichiers\nffmpeg -ss 60 -t 30 -i in.mp4 -c copy cut.mp4   # sans réencodage"
+      },
+      "pitfall": "Un renommage ou un lien dur ne marche qu'à l'intérieur d'un même système de fichiers, et `-c copy` ne coupe que sur les images clés."
+    }
+  },
+  "memoization-cache": {
+    "en": {
+      "why": "If a function is slow and called again with the same inputs, computing it again is wasted work. A cache stores the result under a key. It is only safe if you say how the key is built, how long an entry lives and what makes it invalid.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def rate(cur):\n    return requests.get(f\"https://api.example.com/rate/{cur}\").json()[\"rate\"]",
+        "after": "_cache = {}\nTTL = 300   # seconds\n\ndef rate(cur):\n    hit = _cache.get(cur)   # key = the currency\n    if hit and time.monotonic() - hit[0] < TTL:\n        return hit[1]\n    value = requests.get(f\"https://api.example.com/rate/{cur}\").json()[\"rate\"]\n    _cache[cur] = (time.monotonic(), value)\n    return value\n# invalidation: expires after TTL, or _cache.pop(cur) on a known change"
+      },
+      "pitfall": "A cache without an invalidation rule serves stale data forever, or its key forgets one parameter and returns the wrong answer."
+    },
+    "fr": {
+      "why": "Si une fonction est lente et rappelée avec les mêmes entrées, la recalculer est du travail perdu. Un cache range le résultat sous une clé. Il n'est sûr que si on dit comment la clé est construite, combien de temps vit une entrée et ce qui l'invalide.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def rate(cur):\n    return requests.get(f\"https://api.example.com/rate/{cur}\").json()[\"rate\"]",
+        "after": "_cache = {}\nTTL = 300   # secondes\n\ndef rate(cur):\n    hit = _cache.get(cur)   # clé = la devise\n    if hit and time.monotonic() - hit[0] < TTL:\n        return hit[1]\n    value = requests.get(f\"https://api.example.com/rate/{cur}\").json()[\"rate\"]\n    _cache[cur] = (time.monotonic(), value)\n    return value\n# invalidation : expire après TTL, ou _cache.pop(cur) si on sait que ça a changé"
+      },
+      "pitfall": "Un cache sans règle d'invalidation sert des données périmées pour toujours, ou sa clé oublie un paramètre et renvoie la mauvaise réponse."
+    }
+  },
+  "lazy": {
+    "en": {
+      "why": "Lazy code does the work only when someone asks for the result. If you build a full list but the caller reads three items, you paid for all the others. Generators and on-demand loading start fast and keep memory small.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def load(paths):\n    return [json.load(open(p)) for p in paths]   # parses every file now\n\nfor doc in load(paths)[:3]:\n    handle(doc)",
+        "after": "def load(paths):\n    for p in paths:\n        with open(p) as f:\n            yield json.load(f)   # one file, only when asked\n\nfor doc in itertools.islice(load(paths), 3):   # only 3 files read\n    handle(doc)"
+      },
+      "pitfall": "A generator can be read only once, and errors surface late, at the moment of iteration rather than at the call."
+    },
+    "fr": {
+      "why": "Le code lazy ne fait le travail que quand quelqu'un demande le résultat. Si on construit une liste entière alors que l'appelant lit trois éléments, on a payé tous les autres. Les générateurs et le chargement à la demande démarrent vite et gardent la mémoire petite.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def load(paths):\n    return [json.load(open(p)) for p in paths]   # lit tous les fichiers maintenant\n\nfor doc in load(paths)[:3]:\n    handle(doc)",
+        "after": "def load(paths):\n    for p in paths:\n        with open(p) as f:\n            yield json.load(f)   # un fichier, seulement à la demande\n\nfor doc in itertools.islice(load(paths), 3):   # seulement 3 fichiers lus\n    handle(doc)"
+      },
+      "pitfall": "Un générateur ne se lit qu'une fois, et les erreurs remontent tard, à l'itération et pas à l'appel."
+    }
+  },
+  "honest-benchmark": {
+    "en": {
+      "why": "One timing run is noise: the disk cache, the CPU clock and other processes all change the result. An honest benchmark warms up first, repeats the run, reports the median and always compares on the same machine under the same load.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "t = time.time()\nf()\nprint(time.time() - t)",
+        "after": "f()   # warm-up, not counted\nruns = []\nfor _ in range(15):\n    t = time.perf_counter()\n    f()\n    runs.append(time.perf_counter() - t)\nprint(statistics.median(runs))"
+      },
+      "pitfall": "Comparing version A measured this morning on a laptop with version B measured tonight on a server."
+    },
+    "fr": {
+      "why": "Une seule mesure, c'est du bruit : le cache disque, la fréquence du CPU et les autres processus changent le résultat. Un benchmark honnête chauffe d'abord, répète, donne la médiane et compare toujours sur la même machine sous la même charge.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "t = time.time()\nf()\nprint(time.time() - t)",
+        "after": "f()   # échauffement, non compté\nruns = []\nfor _ in range(15):\n    t = time.perf_counter()\n    f()\n    runs.append(time.perf_counter() - t)\nprint(statistics.median(runs))"
+      },
+      "pitfall": "Comparer la version A mesurée ce matin sur un portable à la version B mesurée ce soir sur un serveur."
+    }
+  },
+  "percentiles-p50-p99": {
+    "en": {
+      "why": "An average blends fast and slow requests into a number nobody actually experiences. p50 is what a typical request gets, p99 is the slowest 1%. Users remember the slow ones, and a service that calls many others hits the tail often.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "print(\"avg\", sum(lat) / len(lat))",
+        "after": "q = statistics.quantiles(lat, n=100)   # 99 cut points\nprint(\"p50\", q[49], \"p99\", q[98])"
+      },
+      "pitfall": "Computing p99 from a handful of samples: it is meaningless below a few hundred measurements."
+    },
+    "fr": {
+      "why": "Une moyenne mélange requêtes rapides et lentes dans un chiffre que personne ne vit vraiment. Le p50 est ce que reçoit une requête typique, le p99 est le 1 % le plus lent. Les utilisateurs retiennent les lentes, et un service qui en appelle beaucoup d'autres tombe souvent sur un cas lent de la queue de distribution.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "print(\"moy\", sum(lat) / len(lat))",
+        "after": "q = statistics.quantiles(lat, n=100)   # 99 points de coupe\nprint(\"p50\", q[49], \"p99\", q[98])"
+      },
+      "pitfall": "Calculer un p99 avec une poignée d'échantillons : ça ne veut rien dire en dessous de quelques centaines de mesures."
+    }
+  },
+  "bottleneck": {
+    "en": {
+      "why": "When stages run side by side as a pipeline, the slowest one sets the overall throughput, and speeding up any other changes nothing. Timing each stage shows which one it is. Once it is fixed, another stage becomes the bottleneck, so measure again.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# \"the pipeline is slow, make it faster\"\ndata = download(url)\ndata = decode(data)\ndata = upload(transform(data))",
+        "after": "stages = [(\"download\", download), (\"decode\", decode), (\"transform\", transform), (\"upload\", upload)]\ndata = url\nfor name, fn in stages:\n    t = time.perf_counter()\n    data = fn(data)\n    print(name, round(time.perf_counter() - t, 2), \"s\")"
+      },
+      "pitfall": "Optimizing the stage that is easiest or most fun instead of the one the timing shows, and not remeasuring afterwards."
+    },
+    "fr": {
+      "why": "Quand les étapes tournent côte à côte en chaîne, la plus lente fixe le débit global, et accélérer une autre ne change rien. Chronométrer chaque étape montre laquelle c'est. Une fois réglée, une autre étape devient le goulot : remesurer.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# \"la chaîne est lente, accélère-la\"\ndata = download(url)\ndata = decode(data)\ndata = upload(transform(data))",
+        "after": "stages = [(\"download\", download), (\"decode\", decode), (\"transform\", transform), (\"upload\", upload)]\ndata = url\nfor name, fn in stages:\n    t = time.perf_counter()\n    data = fn(data)\n    print(name, round(time.perf_counter() - t, 2), \"s\")"
+      },
+      "pitfall": "Optimiser l'étape la plus facile ou la plus amusante plutôt que celle que le chronomètre désigne, et ne pas remesurer ensuite."
+    }
+  },
+  "amdahl-s-law": {
+    "en": {
+      "why": "If only a fraction p of the work can be sped up, the total gain is capped no matter how much you throw at it. With 60% parallel work, even infinite cores give 2.5x at best. Computing this first tells you whether parallelizing is worth the complexity.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# 16 cores, so it will be about 16x faster",
+        "after": "p = 0.60   # measured parallel share\nn = 16\nspeedup = 1 / ((1 - p) + p / n)\nprint(round(speedup, 2))   # 2.29, hard cap is 1 / (1 - p) = 2.5"
+      },
+      "pitfall": "Assuming the whole program parallelizes (p close to 1) instead of measuring the share that really does, which gives a hopeful but false estimate."
+    },
+    "fr": {
+      "why": "Si seule une part p du travail peut être accélérée, le gain total est plafonné quoi qu'on y mette. Avec 60 % de travail parallélisable, même une infinité de cœurs donne 2,5x au mieux. Faire ce calcul d'abord dit si paralléliser vaut la complexité.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# 16 cœurs, donc environ 16x plus vite",
+        "after": "p = 0.60   # part parallèle mesurée\nn = 16\nspeedup = 1 / ((1 - p) + p / n)\nprint(round(speedup, 2))   # 2.29, plafond 1 / (1 - p) = 2.5"
+      },
+      "pitfall": "Supposer que tout le programme se parallélise (p proche de 1) au lieu de mesurer la part qui l'est vraiment, ce qui donne une estimation flatteuse mais fausse."
+    }
+  },
+  "i-o-bound-cpu-bound": {
+    "en": {
+      "why": "A task is I/O-bound when it mostly waits (network, disk) and CPU-bound when it mostly computes. Waiting tasks gain from threads or async because the wait overlaps. Computing tasks need several processes or a stronger machine, because in standard CPython the GIL lets only one thread run Python code at a time.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "pages = [fetch(u) for u in urls]        # waits one by one\ndigests = [heavy(c) for c in chunks]    # computes one by one",
+        "after": "from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor\n\nwith ThreadPoolExecutor(16) as ex:      # waiting: threads\n    pages = list(ex.map(fetch, urls))\nwith ProcessPoolExecutor() as ex:       # computing: processes\n    digests = list(ex.map(heavy, chunks))"
+      },
+      "pitfall": "Throwing threads at a CPU-bound Python task: with the GIL it gets no faster, sometimes slower."
+    },
+    "fr": {
+      "why": "Une tâche est I/O-bound quand elle attend surtout (réseau, disque) et CPU-bound quand elle calcule surtout. Les tâches qui attendent gagnent avec des threads ou de l'async car les attentes se recouvrent. Celles qui calculent demandent plusieurs processus ou une machine plus forte, car dans le CPython standard le GIL ne laisse tourner qu'un thread Python à la fois.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "pages = [fetch(u) for u in urls]        # attend une par une\ndigests = [heavy(c) for c in chunks]    # calcule un par un",
+        "after": "from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor\n\nwith ThreadPoolExecutor(16) as ex:      # attente : threads\n    pages = list(ex.map(fetch, urls))\nwith ProcessPoolExecutor() as ex:       # calcul : processus\n    digests = list(ex.map(heavy, chunks))"
+      },
+      "pitfall": "Lancer des threads sur une tâche CPU-bound en Python : avec le GIL, pas plus rapide, parfois plus lent."
+    }
+  },
+  "pool-keep-alive": {
+    "en": {
+      "why": "Opening a connection costs a TCP handshake and often a TLS handshake, which for a small request can take longer than the request itself. A session with a pool keeps connections open and reuses them across calls. It is one line of change for a large drop in latency.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for u in urls:\n    r = requests.get(u)   # new connection every time",
+        "after": "with requests.Session() as s:   # pool, connections reused\n    for u in urls:\n        r = s.get(u)"
+      },
+      "pitfall": "Creating a new client or session inside the function that is called in the loop, which silently defeats the pool."
+    },
+    "fr": {
+      "why": "Ouvrir une connexion coûte un handshake TCP et souvent TLS, qui pour une petite requête peut prendre plus longtemps que la requête elle-même. Une session avec un pool garde les connexions ouvertes et les réutilise d'un appel à l'autre. Une ligne à changer pour une grosse baisse de latence.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for u in urls:\n    r = requests.get(u)   # nouvelle connexion à chaque fois",
+        "after": "with requests.Session() as s:   # pool, connexions réutilisées\n    for u in urls:\n        r = s.get(u)"
+      },
+      "pitfall": "Créer un nouveau client ou une nouvelle session dans la fonction appelée en boucle, ce qui annule le pool sans bruit."
+    }
+  },
+  "index": {
+    "en": {
+      "why": "Looking something up by scanning a whole collection costs O(n) every time. A dictionary in memory, or an index on the column in a database, jumps straight to the answer. Build it once, then every lookup is cheap.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for o in orders:\n    u = next(u for u in users if u[\"id\"] == o[\"user_id\"])   # scan each time",
+        "after": "by_id = {u[\"id\"]: u for u in users}   # built once\nfor o in orders:\n    u = by_id[o[\"user_id\"]]"
+      },
+      "pitfall": "Adding an index and never checking it is used (`EXPLAIN` in SQL), or building the dict inside the loop so it is rebuilt each time."
+    },
+    "fr": {
+      "why": "Chercher en parcourant toute une collection coûte O(n) à chaque fois. Un dictionnaire en mémoire, ou un index sur la colonne en base, va droit à la réponse. On le construit une fois, ensuite chaque recherche est bon marché.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for o in orders:\n    u = next(u for u in users if u[\"id\"] == o[\"user_id\"])   # balayage à chaque fois",
+        "after": "by_id = {u[\"id\"]: u for u in users}   # construit une fois\nfor o in orders:\n    u = by_id[o[\"user_id\"]]"
+      },
+      "pitfall": "Ajouter un index sans vérifier qu'il sert (`EXPLAIN` en SQL), ou construire le dict dans la boucle donc le refaire à chaque tour."
+    }
+  },
+  "delta": {
+    "en": {
+      "why": "Sending the whole thing again when 1% changed wastes bandwidth and time. A delta transfer sends only the difference. `rsync` compares files and sends only changed parts, and a resume by byte range picks up where a broken transfer stopped.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "scp -r build/* user@host:/srv/app/   # everything, every time",
+        "after": "rsync -az --partial --info=progress2 build/ user@host:/srv/app/   # only what changed, resumable"
+      },
+      "pitfall": "Forgetting that a trailing slash changes what `rsync` copies, and that `--delete` removes files on the destination."
+    },
+    "fr": {
+      "why": "Renvoyer le tout quand 1 % a changé gaspille bande passante et temps. Un transfert en delta n'envoie que la différence. `rsync` compare les fichiers et n'envoie que les parties modifiées, et une reprise par plage d'octets repart là où un transfert coupé s'est arrêté.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "scp -r build/* user@host:/srv/app/   # tout, à chaque fois",
+        "after": "rsync -az --partial --info=progress2 build/ user@host:/srv/app/   # seulement ce qui a changé, reprenable"
+      },
+      "pitfall": "Oublier qu'un slash final change ce que `rsync` copie, et que `--delete` supprime des fichiers côté destination."
+    }
+  },
+  "stale-while-revalidate": {
+    "en": {
+      "why": "Waiting for a fresh answer makes the user wait; showing an old answer is instant. Stale-while-revalidate does both: it serves the cached copy immediately and refreshes it in the background for the next request. It fits data that can be a little old without harm.",
+      "example": {
+        "kind": "code",
+        "lang": "http",
+        "before": "Cache-Control: no-cache",
+        "after": "Cache-Control: max-age=60, stale-while-revalidate=300\n# fresh for 60 s, then served stale for up to 300 s more while it refetches"
+      },
+      "pitfall": "Using it on data that must never be stale (balances, stock, permissions), or assuming every CDN and browser honors the header."
+    },
+    "fr": {
+      "why": "Attendre une réponse fraîche fait attendre l'utilisateur, afficher une ancienne est instantané. Stale-while-revalidate fait les deux : il sert la copie du cache tout de suite et la rafraîchit en fond pour la requête suivante. Ça convient aux données qui peuvent être un peu vieilles sans dégât.",
+      "example": {
+        "kind": "code",
+        "lang": "http",
+        "before": "Cache-Control: no-cache",
+        "after": "Cache-Control: max-age=60, stale-while-revalidate=300\n# frais 60 s, puis servi périmé jusqu'à 300 s de plus pendant qu'il se recharge"
+      },
+      "pitfall": "L'appliquer à des données qui ne doivent jamais être périmées (soldes, stock, permissions), ou croire que tous les CDN et navigateurs respectent l'en-tête."
+    }
+  },
+  "cold-start": {
+    "en": {
+      "why": "The first call pays for loading code, opening connections, filling caches and compiling. It is far slower than the calls after it. If you average it with the rest you get a number that describes neither the first call nor the usual one.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "times = []\nfor _ in range(20):\n    t = time.perf_counter()\n    handler(event)\n    times.append(time.perf_counter() - t)\nprint(sum(times) / len(times))   # cold call is hidden in the average",
+        "after": "t = time.perf_counter()\nhandler(event)\ncold = time.perf_counter() - t\n\nwarm = []\nfor _ in range(20):\n    t = time.perf_counter()\n    handler(event)\n    warm.append(time.perf_counter() - t)\nprint(f\"cold {cold:.3f}s, warm median {statistics.median(warm):.3f}s\")"
+      },
+      "pitfall": "Averaging the cold call into the steady-state numbers, or only ever measuring warm and being surprised by the first user."
+    },
+    "fr": {
+      "why": "Le premier appel paie le chargement du code, l'ouverture des connexions, le remplissage des caches et la compilation. Il est bien plus lent que les suivants. Le moyenner avec le reste donne un chiffre qui ne décrit ni le premier appel ni l'appel habituel.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "times = []\nfor _ in range(20):\n    t = time.perf_counter()\n    handler(event)\n    times.append(time.perf_counter() - t)\nprint(sum(times) / len(times))   # l'appel à froid est noyé dans la moyenne",
+        "after": "t = time.perf_counter()\nhandler(event)\ncold = time.perf_counter() - t\n\nwarm = []\nfor _ in range(20):\n    t = time.perf_counter()\n    handler(event)\n    warm.append(time.perf_counter() - t)\nprint(f\"froid {cold:.3f}s, chaud médiane {statistics.median(warm):.3f}s\")"
+      },
+      "pitfall": "Moyenner l'appel à froid dans les chiffres du régime établi, ou ne mesurer qu'à chaud et s'étonner du premier utilisateur."
+    }
+  },
+  "performance-budget": {
+    "en": {
+      "why": "Without a number, performance slowly degrades one small change at a time and nobody notices. A budget fixes a ceiling per stage, for example 200 KB of JavaScript or 300 ms for a request, and a check fails the build when it is crossed. The argument then happens at the time of the change.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"the bundle feels heavy\"\nls -lh dist/app.js",
+        "after": "size=$(wc -c < dist/app.js)\nlimit=200000   # bytes\nif [ \"$size\" -gt \"$limit\" ]; then\n  echo \"app.js is $size B, budget is $limit B\"\n  exit 1\nfi"
+      },
+      "pitfall": "A budget nobody enforces in CI is a wish. Set it from a measurement, not a guess, and keep the headroom realistic."
+    },
+    "fr": {
+      "why": "Sans chiffre, la performance se dégrade doucement, un petit changement à la fois, sans que personne ne le voie. Un budget fixe un plafond par étape, par exemple 200 Ko de JavaScript ou 300 ms pour une requête, et un contrôle fait échouer le build quand il est franchi. La discussion a lieu au moment du changement.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# \"le bundle a l'air lourd\"\nls -lh dist/app.js",
+        "after": "size=$(wc -c < dist/app.js)\nlimit=200000   # octets\nif [ \"$size\" -gt \"$limit\" ]; then\n  echo \"app.js fait $size o, budget $limit o\"\n  exit 1\nfi"
+      },
+      "pitfall": "Un budget que personne ne fait respecter en CI est un vœu pieux. Le fixer à partir d'une mesure, pas d'une intuition, avec une marge réaliste."
+    }
+  },
+  "skip-the-work": {
+    "en": {
+      "why": "The cheapest operation is the one that never runs. Before making a stage faster, ask whether it needs to happen at all: is the output already up to date, is the result ever used, is the input unchanged. Removing a stage beats optimizing it.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for src in sources:\n    convert(src, out_dir / (src.stem + \".webp\"))   # redone every run",
+        "after": "for src in sources:\n    dst = out_dir / (src.stem + \".webp\")\n    if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime:\n        continue   # output is already up to date\n    convert(src, dst)"
+      },
+      "pitfall": "Spending days speeding up a step that a simple freshness check would have skipped entirely."
+    },
+    "fr": {
+      "why": "L'opération la moins chère est celle qui ne s'exécute jamais. Avant d'accélérer une étape, se demander si elle doit avoir lieu : la sortie est-elle déjà à jour, le résultat sert-il, l'entrée a-t-elle changé. Supprimer une étape vaut mieux que l'optimiser.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for src in sources:\n    convert(src, out_dir / (src.stem + \".webp\"))   # refait à chaque exécution",
+        "after": "for src in sources:\n    dst = out_dir / (src.stem + \".webp\")\n    if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime:\n        continue   # la sortie est déjà à jour\n    convert(src, dst)"
+      },
+      "pitfall": "Passer des jours à accélérer une étape qu'un simple test de fraîcheur aurait évitée entièrement."
+    }
+  },
+  "memory-leak": {
+    "en": {
+      "why": "A leak is memory that the program keeps holding although it no longer needs it, typically a list, dict or cache that only grows. The process slowly gets bigger until the system kills it, often days after the bug was introduced. Watching memory over time shows it; one snapshot does not.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# restart the service every night and hope\n0 3 * * * systemctl restart myapp",
+        "after": "# RSS in KB every minute, then look at the trend\nwhile true; do\n  echo \"$(date +%T) $(ps -o rss= -p \"$PID\")\" >> rss.log\n  sleep 60\ndone"
+      },
+      "pitfall": "Calling a plateau a leak: memory that rises while caches warm up and then stays flat is normal, so watch for long enough."
+    },
+    "fr": {
+      "why": "Une fuite, c'est de la mémoire que le programme garde alors qu'il n'en a plus besoin, typiquement une liste, un dict ou un cache qui ne fait que grossir. Le processus grossit lentement jusqu'à ce que le système le tue, souvent des jours après l'introduction du bug. Observer la mémoire dans la durée la révèle, un seul instantané non.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# redémarrer le service chaque nuit et espérer\n0 3 * * * systemctl restart myapp",
+        "after": "# RSS en Ko chaque minute, puis regarder la tendance\nwhile true; do\n  echo \"$(date +%T) $(ps -o rss= -p \"$PID\")\" >> rss.log\n  sleep 60\ndone"
+      },
+      "pitfall": "Appeler fuite un palier : la mémoire qui monte pendant le chauffage des caches puis reste plate est normale, donc observer assez longtemps."
+    }
+  },
+  "flamegraph": {
+    "en": {
+      "why": "A flamegraph stacks the call stacks from a sampling profiler: the wider a box, the more time was spent in that function and everything it calls. You read it by looking for wide plateaus near the top, not tall thin towers. It turns thousands of samples into one picture.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# sprinkle print(\"step 3\", time.time()) in the code,\n# then compare the timestamps by eye\npython app.py",
+        "after": "py-spy record -o flame.svg --pid 1234          # attach to a running Python process\npy-spy record -o flame.svg -- python app.py    # or profile a script from the start\n# open flame.svg, find the widest boxes"
+      },
+      "pitfall": "Reading height as slowness: a tall stack is only a deep call chain, width is what costs time."
+    },
+    "fr": {
+      "why": "Un flamegraph empile les piles d'appels d'un profileur par échantillonnage : plus une case est large, plus on a passé de temps dans cette fonction et ses appels. On le lit en cherchant les plateaux larges près du haut, pas les tours hautes et fines. Il transforme des milliers d'échantillons en une image.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# semer des print(\"step 3\", time.time()) dans le code,\n# puis comparer les horodatages à l'œil\npython app.py",
+        "after": "py-spy record -o flame.svg --pid 1234          # s'attacher à un processus Python en cours\npy-spy record -o flame.svg -- python app.py    # ou profiler un script dès le départ\n# ouvrir flame.svg, repérer les cases les plus larges"
+      },
+      "pitfall": "Lire la hauteur comme de la lenteur : une pile haute n'est qu'une chaîne d'appels profonde, c'est la largeur qui coûte du temps."
+    }
+  },
+  "perceived-latency": {
+    "en": {
+      "why": "Users judge speed by when something useful appears, not by when everything finished. Showing the layout, the first results or a skeleton right away feels fast even if the total time is the same. Loading the secondary parts afterwards keeps the screen alive.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const [user, feed, stats] = await Promise.all([getUser(), getFeed(), getStats()]);\nrender({ user, feed, stats });   // blank until the slowest one is back",
+        "after": "const state = { user: null, feed: null, stats: null };\nrender(state);   // skeleton right away\ngetUser().then(u => { state.user = u; render(state); });\ngetFeed().then(f => { state.feed = f; render(state); });\ngetStats().then(s => { state.stats = s; render(state); });"
+      },
+      "pitfall": "Hiding a slow request behind a spinner that never changes, or shifting the layout when late content lands. The real time is unchanged, so keep measuring it too."
+    },
+    "fr": {
+      "why": "L'utilisateur juge la vitesse au moment où quelque chose d'utile apparaît, pas à celui où tout est fini. Afficher tout de suite la mise en page, les premiers résultats ou un squelette paraît rapide même à durée totale égale. Charger le secondaire après garde l'écran vivant.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const [user, feed, stats] = await Promise.all([getUser(), getFeed(), getStats()]);\nrender({ user, feed, stats });   // écran vide tant que la plus lente n'est pas revenue",
+        "after": "const state = { user: null, feed: null, stats: null };\nrender(state);   // squelette tout de suite\ngetUser().then(u => { state.user = u; render(state); });\ngetFeed().then(f => { state.feed = f; render(state); });\ngetStats().then(s => { state.stats = s; render(state); });"
+      },
+      "pitfall": "Cacher une requête lente derrière un spinner qui ne bouge pas, ou décaler la mise en page quand le contenu arrive en retard. Le temps réel ne change pas, donc continuer à le mesurer aussi."
+    }
+  },
+  "cost-per-call": {
+    "en": {
+      "why": "Some APIs bill each call or cap the number you can make per minute or day. A loop that calls them for every item, with duplicates and no memory, burns money or hits the quota halfway. Count the calls, cache repeated ones and stop at a ceiling you chose.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "answers = [call_api(q) for q in questions]   # duplicates billed again",
+        "after": "MAX_CALLS = 200\ncache, calls, answers = {}, 0, []\nfor q in questions:\n    if q not in cache:\n        if calls >= MAX_CALLS:\n            raise RuntimeError(\"call budget reached\")\n        cache[q] = call_api(q)\n        calls += 1\n    answers.append(cache[q])\nprint(calls, \"billed calls for\", len(questions), \"questions\")"
+      },
+      "pitfall": "Retrying failed calls without a limit: every retry is billed and counts against the quota too."
+    },
+    "fr": {
+      "why": "Certaines API facturent chaque appel ou plafonnent leur nombre par minute ou par jour. Une boucle qui les appelle pour chaque élément, avec des doublons et sans mémoire, brûle de l'argent ou tape le quota à mi-chemin. Compter les appels, mettre en cache les répétés et s'arrêter à un plafond choisi.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "answers = [call_api(q) for q in questions]   # les doublons sont refacturés",
+        "after": "MAX_CALLS = 200\ncache, calls, answers = {}, 0, []\nfor q in questions:\n    if q not in cache:\n        if calls >= MAX_CALLS:\n            raise RuntimeError(\"plafond d'appels atteint\")\n        cache[q] = call_api(q)\n        calls += 1\n    answers.append(cache[q])\nprint(calls, \"appels facturés pour\", len(questions), \"questions\")"
+      },
+      "pitfall": "Réessayer les appels en échec sans limite : chaque nouvel essai est facturé et compte aussi dans le quota."
+    }
+  }
+}

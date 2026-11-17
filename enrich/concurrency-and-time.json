@@ -1,0 +1,684 @@
+{
+  "race-condition": {
+    "en": {
+      "why": "Two threads or processes read and write the same data, and the final value depends on who gets there first. The bug appears only under load, so it passes every test on your laptop and fails in production. Fix it by finding the shared state, then either protecting it with a lock or removing the sharing.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "counter = 0\n\ndef work():\n    global counter\n    for _ in range(100_000):\n        counter += 1  # read, add, write: not atomic\n\n# two threads running work(): counter can end below 200000",
+        "after": "import threading\n\ncounter = 0\nlock = threading.Lock()\n\ndef work():\n    global counter\n    for _ in range(100_000):\n        with lock:  # the whole read-modify-write is one step\n            counter += 1\n\n# two threads running work(): counter is always 200000"
+      },
+      "pitfall": "Wrapping only the write in a lock while the read that feeds it stays outside, so the race just moves."
+    },
+    "fr": {
+      "why": "Deux threads ou processus lisent et écrivent la même donnée, et le résultat final dépend de qui arrive le premier. Le bug n'apparaît que sous charge : il passe tous les tests en local et casse en prod. On le corrige en identifiant l'état partagé, puis en le protégeant par un verrou ou en supprimant le partage.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "counter = 0\n\ndef work():\n    global counter\n    for _ in range(100_000):\n        counter += 1  # lire, ajouter, écrire : pas atomique\n\n# deux threads lancent work() : counter peut finir sous 200000",
+        "after": "import threading\n\ncounter = 0\nlock = threading.Lock()\n\ndef work():\n    global counter\n    for _ in range(100_000):\n        with lock:  # tout le lire-modifier-écrire devient une seule étape\n            counter += 1\n\n# deux threads lancent work() : counter vaut toujours 200000"
+      },
+      "pitfall": "Ne verrouiller que l'écriture alors que la lecture qui l'alimente reste dehors : la race condition ne fait que se déplacer."
+    }
+  },
+  "toctou": {
+    "en": {
+      "why": "Time-of-check to time-of-use: you test a condition, then act on it, but the world changed between the two lines. On a file system or a database another process can slip in at exactly that gap. The fix is to make check and action a single operation the system guarantees as atomic.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import os\n\nif not os.path.exists(path):  # check ...\n    with open(path, \"w\") as f:\n        f.write(pid)",
+        "after": "try:\n    with open(path, \"x\") as f:  # create only if absent, in one call (O_EXCL)\n        f.write(pid)\nexcept FileExistsError:\n    pass  # someone else got there first"
+      },
+      "pitfall": "Adding a second check right before the action, which only narrows the gap and never closes it."
+    },
+    "fr": {
+      "why": "Time-of-check to time-of-use : on teste une condition puis on agit, mais le monde a changé entre les deux lignes. Sur un système de fichiers ou une base, un autre processus peut se glisser exactement dans cet intervalle. Le remède : fusionner le test et l'action en une seule opération que le système garantit atomique.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import os\n\nif not os.path.exists(path):  # test ...\n    with open(path, \"w\") as f:\n        f.write(pid)",
+        "after": "try:\n    with open(path, \"x\") as f:  # créer seulement si absent, en un seul appel (O_EXCL)\n        f.write(pid)\nexcept FileExistsError:\n    pass  # quelqu'un a été plus rapide"
+      },
+      "pitfall": "Rajouter un second test juste avant l'action : l'intervalle se réduit mais ne se ferme jamais."
+    }
+  },
+  "compare-and-swap-optimistic": {
+    "en": {
+      "why": "Instead of locking a row while a user edits it, you let everyone read freely and make the write conditional on nothing having changed since the read. If the version moved, the write is refused and you reread. It scales well when conflicts are rare and avoids holding locks across slow steps.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "UPDATE docs\nSET body = :body\nWHERE id = :id;",
+        "after": "UPDATE docs\nSET body = :body, version = version + 1\nWHERE id = :id AND version = :seen_version;\n-- 0 rows affected = someone else wrote first: reread, retry"
+      },
+      "pitfall": "Ignoring the 'zero rows updated' result, so a lost update is silently treated as a success."
+    },
+    "fr": {
+      "why": "Au lieu de verrouiller une ligne pendant qu'un utilisateur l'édite, tout le monde lit librement et l'écriture est conditionnée à l'absence de changement depuis la lecture. Si la version a bougé, l'écriture est refusée et on relit. Ça passe bien à l'échelle quand les conflits sont rares et évite de tenir un verrou pendant une étape lente.",
+      "example": {
+        "kind": "code",
+        "lang": "sql",
+        "before": "UPDATE docs\nSET body = :body\nWHERE id = :id;",
+        "after": "UPDATE docs\nSET body = :body, version = version + 1\nWHERE id = :id AND version = :seen_version;\n-- 0 ligne modifiée = quelqu'un a écrit avant : relire, réessayer"
+      },
+      "pitfall": "Ignorer le résultat « zéro ligne modifiée » : une mise à jour perdue passe en silence pour un succès."
+    }
+  },
+  "deadlock": {
+    "en": {
+      "why": "Task A holds lock 1 and waits for lock 2, while task B holds lock 2 and waits for lock 1: nobody ever moves again. It usually shows up as a service that hangs with zero CPU use. Break it by always taking locks in the same order, and by never waiting forever.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# thread 1\nwith lock_a:\n    with lock_b:\n        transfer()\n\n# thread 2\nwith lock_b:\n    with lock_a:\n        transfer()",
+        "after": "# both threads: same order, a then b, with a timeout\nif lock_a.acquire(timeout=2):\n    try:\n        if lock_b.acquire(timeout=2):\n            try:\n                transfer()\n            finally:\n                lock_b.release()\n    finally:\n        lock_a.release()"
+      },
+      "pitfall": "Fixing the order in one function but forgetting a second code path that takes the same two locks the other way round."
+    },
+    "fr": {
+      "why": "La tâche A tient le verrou 1 et attend le 2, la tâche B tient le 2 et attend le 1 : plus personne n'avance. Ça se voit en général par un service figé avec 0 % de CPU. On le casse en prenant toujours les verrous dans le même ordre, et en n'attendant jamais indéfiniment.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "# thread 1\nwith lock_a:\n    with lock_b:\n        transfer()\n\n# thread 2\nwith lock_b:\n    with lock_a:\n        transfer()",
+        "after": "# les deux threads : même ordre, a puis b, avec un timeout\nif lock_a.acquire(timeout=2):\n    try:\n        if lock_b.acquire(timeout=2):\n            try:\n                transfer()\n            finally:\n                lock_b.release()\n    finally:\n        lock_a.release()"
+      },
+      "pitfall": "Imposer l'ordre dans une fonction en oubliant un second chemin qui prend les deux mêmes verrous dans l'autre sens."
+    }
+  },
+  "backpressure": {
+    "en": {
+      "why": "When a producer is faster than its consumer, the gap has to go somewhere, and without a limit it goes into memory until the process dies. Backpressure lets the slow side push back: the queue is bounded, and a full queue makes the producer wait or refuse. The system slows down instead of crashing.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import queue\n\nq = queue.Queue()  # unbounded: grows until OOM\nq.put(item)",
+        "after": "import queue\n\nq = queue.Queue(maxsize=100)  # at most 100 items waiting\nq.put(item)  # blocks while full (or put_nowait to refuse)"
+      },
+      "pitfall": "Making the queue bounded but huge, which is the same as no limit until the machine runs out of memory."
+    },
+    "fr": {
+      "why": "Quand un producteur va plus vite que son consommateur, l'écart s'accumule quelque part, et sans limite c'est en mémoire jusqu'à la mort du processus. Le backpressure laisse le côté lent freiner l'autre : la file est bornée, et une file pleine fait attendre ou refuser le producteur. Le système ralentit au lieu de planter.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "import queue\n\nq = queue.Queue()  # illimitée : grossit jusqu'au OOM\nq.put(item)",
+        "after": "import queue\n\nq = queue.Queue(maxsize=100)  # 100 éléments en attente au maximum\nq.put(item)  # bloque tant que c'est plein (ou put_nowait pour refuser)"
+      },
+      "pitfall": "Borner la file mais à une taille énorme : ça revient à ne pas avoir de limite, jusqu'à la panne mémoire."
+    }
+  },
+  "load-shedding": {
+    "en": {
+      "why": "When more work arrives than you can finish, trying to serve everyone makes everyone slow and eventually serves no one. Load shedding deliberately rejects part of the work, the least important first, so the rest finishes on time. A fast, honest refusal is better than a timeout.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    return process(req)  # accepts everything, even when drowning",
+        "after": "MAX_QUEUE = 200\n\ndef handle(req):\n    if queue_size() > MAX_QUEUE and req.priority == \"low\":\n        return Response(503, headers={\"Retry-After\": \"5\"})  # refuse the least important, fast\n    return process(req)"
+      },
+      "pitfall": "Shedding at random instead of by priority, so health checks and paying users get dropped along with the noise."
+    },
+    "fr": {
+      "why": "Quand il arrive plus de travail que tu ne peux en finir, vouloir servir tout le monde rend tout le monde lent et finit par ne servir personne. Le load shedding refuse volontairement une partie du travail, le moins important d'abord, pour que le reste aboutisse à temps. Un refus rapide et franc vaut mieux qu'un timeout.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def handle(req):\n    return process(req)  # accepte tout, même quand on se noie",
+        "after": "MAX_QUEUE = 200\n\ndef handle(req):\n    if queue_size() > MAX_QUEUE and req.priority == \"low\":\n        return Response(503, headers={\"Retry-After\": \"5\"})  # refuser le moins important, vite\n    return process(req)"
+      },
+      "pitfall": "Rejeter au hasard plutôt que par priorité : les health checks et les clients payants passent à la trappe avec le bruit."
+    }
+  },
+  "bulkhead": {
+    "en": {
+      "why": "Like the watertight compartments of a ship, a bulkhead keeps one overloaded component from sinking the others by giving each its own share of CPU, memory or connections. A runaway encoder then starves itself, not the service that must stay up. It is the resource version of 'one role per machine'.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./encode.sh  # takes all the CPU it wants",
+        "after": "systemd-run --scope -p CPUQuota=50% -p MemoryMax=1G nice -n 10 ./encode.sh  # capped: the live push keeps its share"
+      },
+      "pitfall": "Putting several components in the same compartment (one shared thread pool, one shared cgroup slice), so one runaway component still drains all the others."
+    },
+    "fr": {
+      "why": "Comme les cloisons étanches d'un navire, le bulkhead empêche un composant surchargé de couler les autres en donnant à chacun sa part de CPU, de mémoire ou de connexions. Un encodeur emballé s'affame lui-même, pas le service qui doit rester debout. C'est la version ressources de « un rôle par machine ».",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "./encode.sh  # prend tout le CPU qu'il veut",
+        "after": "systemd-run --scope -p CPUQuota=50% -p MemoryMax=1G nice -n 10 ./encode.sh  # plafonné : le push en direct garde sa part"
+      },
+      "pitfall": "Mettre plusieurs composants dans le même compartiment (un seul pool de threads, une seule slice cgroup) : un composant emballé vide encore tous les autres."
+    }
+  },
+  "circuit-breaker": {
+    "en": {
+      "why": "When a dependency is down, retrying every call just burns time, threads and the dependency's last strength. A circuit breaker counts failures, opens after N of them so calls fail instantly, then lets a single trial call through after a pause to see if things recovered. It protects both sides.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def call(f):\n    return f()  # keeps hammering a dead service",
+        "after": "fails, opened_at = 0, 0.0\n\ndef call(f):\n    global fails, opened_at\n    if fails >= 5 and time.monotonic() - opened_at < 30:\n        raise RuntimeError(\"circuit open\")  # fail fast; after 30 s one call tests again\n    try:\n        r, fails = f(), 0\n        return r\n    except Exception:\n        fails, opened_at = fails + 1, time.monotonic()\n        raise"
+      },
+      "pitfall": "Counting every error type, including client mistakes like a 400, so a bad request from one caller opens the circuit for everyone."
+    },
+    "fr": {
+      "why": "Quand une dépendance est tombée, réessayer chaque appel ne fait que brûler du temps, des threads et les dernières forces de la dépendance. Un circuit breaker compte les échecs, s'ouvre après N pour que les appels échouent tout de suite, puis laisse passer un seul appel test après une pause pour voir si ça va mieux. Il protège les deux côtés.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def call(f):\n    return f()  # continue de marteler un service mort",
+        "after": "fails, opened_at = 0, 0.0\n\ndef call(f):\n    global fails, opened_at\n    if fails >= 5 and time.monotonic() - opened_at < 30:\n        raise RuntimeError(\"circuit open\")  # échec immédiat ; après 30 s un appel retente\n    try:\n        r, fails = f(), 0\n        return r\n    except Exception:\n        fails, opened_at = fails + 1, time.monotonic()\n        raise"
+      },
+      "pitfall": "Compter tous les types d'erreur, y compris les fautes du client comme un 400 : une mauvaise requête d'un appelant ouvre le circuit pour tout le monde."
+    }
+  },
+  "rate-limit": {
+    "en": {
+      "why": "A rate limit caps how many requests a client may send per unit of time. As a server you enforce it, often with a token bucket that refills at a steady pace. As a client you must respect it: when the server answers 429, it usually says how long to wait in the Retry-After header.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for url in urls:\n    r = requests.get(url)  # full speed, ignores 429\n    save(r)",
+        "after": "for url in urls:\n    r = requests.get(url)\n    while r.status_code == 429:\n        time.sleep(int(r.headers.get(\"Retry-After\", \"5\")))  # wait as long as the server says\n        r = requests.get(url)\n    save(r)"
+      },
+      "pitfall": "Retrying immediately after a 429, which burns the quota even faster and can get the client banned."
+    },
+    "fr": {
+      "why": "Un rate limit plafonne le nombre de requêtes qu'un client peut envoyer par unité de temps. Côté serveur on l'applique, souvent avec un seau à jetons qui se remplit à rythme régulier. Côté client on le respecte : quand le serveur répond 429, il indique en général combien attendre dans l'en-tête Retry-After.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "for url in urls:\n    r = requests.get(url)  # pleine vitesse, ignore les 429\n    save(r)",
+        "after": "for url in urls:\n    r = requests.get(url)\n    while r.status_code == 429:\n        time.sleep(int(r.headers.get(\"Retry-After\", \"5\")))  # attendre autant que le serveur le demande\n        r = requests.get(url)\n    save(r)"
+      },
+      "pitfall": "Réessayer aussitôt après un 429 : le quota fond encore plus vite et le client peut être banni."
+    }
+  },
+  "debounce-throttle": {
+    "en": {
+      "why": "Some events fire in bursts: keystrokes, scroll, resize, file-change notifications. Debounce waits until the burst stops, then runs once. Throttle runs at most once per interval while it continues. Both cut useless work and the load on whatever you call.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "input.addEventListener(\"input\", () => search(input.value));  // one request per keystroke",
+        "after": "function debounce<A extends unknown[]>(fn: (...a: A) => void, ms: number) {\n  let t: ReturnType<typeof setTimeout>;\n  return (...a: A) => {\n    clearTimeout(t);\n    t = setTimeout(() => fn(...a), ms);\n  };\n}\n\ninput.addEventListener(\"input\", debounce(() => search(input.value), 300));  // one request, 300 ms after the last keystroke"
+      },
+      "pitfall": "Mixing them up: debounce on a scroll handler means nothing happens until the user stops, which feels broken."
+    },
+    "fr": {
+      "why": "Certains événements arrivent en rafale : frappes, scroll, resize, notifications de changement de fichier. Le debounce attend la fin de la rafale puis exécute une fois. Le throttle exécute au plus une fois par intervalle tant que ça continue. Les deux suppriment du travail inutile et de la charge sur ce que tu appelles.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "input.addEventListener(\"input\", () => search(input.value));  // une requête par frappe",
+        "after": "function debounce<A extends unknown[]>(fn: (...a: A) => void, ms: number) {\n  let t: ReturnType<typeof setTimeout>;\n  return (...a: A) => {\n    clearTimeout(t);\n    t = setTimeout(() => fn(...a), ms);\n  };\n}\n\ninput.addEventListener(\"input\", debounce(() => search(input.value), 300));  // une requête, 300 ms après la dernière frappe"
+      },
+      "pitfall": "Les confondre : un debounce sur un scroll ne déclenche rien tant que l'utilisateur n'a pas arrêté, ça donne l'impression que c'est cassé."
+    }
+  },
+  "hysteresis": {
+    "en": {
+      "why": "If an alert fires below a threshold and clears above the very same threshold, a value hovering around it makes the alert flicker on and off. Hysteresis uses two thresholds: one to trigger, a different one to clear. The gap absorbs the noise.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if stock_hours < 2:\n    alert()\nelse:\n    clear()  # flickers around 2 h",
+        "after": "if not alerting and stock_hours < 2:\n    alerting = True\n    alert()\nelif alerting and stock_hours >= 3:  # clears only above 3 h\n    alerting = False\n    clear()"
+      },
+      "pitfall": "Choosing two thresholds that are almost equal, so the gap is smaller than the noise and nothing changes."
+    },
+    "fr": {
+      "why": "Si une alerte se déclenche sous un seuil et se lève au-dessus du même seuil, une valeur qui oscille autour fait clignoter l'alerte. L'hystérésis utilise deux seuils : un pour déclencher, un autre pour lever. L'écart absorbe le bruit.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if stock_hours < 2:\n    alert()\nelse:\n    clear()  # clignote autour de 2 h",
+        "after": "if not alerting and stock_hours < 2:\n    alerting = True\n    alert()\nelif alerting and stock_hours >= 3:  # ne se lève qu'au-dessus de 3 h\n    alerting = False\n    clear()"
+      },
+      "pitfall": "Prendre deux seuils presque égaux : l'écart est plus petit que le bruit et rien ne change."
+    }
+  },
+  "flapping": {
+    "en": {
+      "why": "A service or check that goes up, down, up, down, buzzing your phone each time, is flapping. The state is not wrong so much as unstable at the border, so reacting to every change spams everyone. Make the state sticky: hysteresis, a confirmation delay, or a count of consecutive results.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "new = probe()\nif new != state:\n    state = new\n    notify(state)  # one message per blip",
+        "after": "new = probe()\nstreak = streak + 1 if new == candidate else 1\ncandidate = new\nif streak >= 3 and candidate != state:  # 3 identical results in a row\n    state = candidate\n    notify(state)"
+      },
+      "pitfall": "Debouncing the notification but not the state, so the dashboard still flaps and the history stays unreadable."
+    },
+    "fr": {
+      "why": "Un service ou un check qui passe up, down, up, down, en faisant vibrer ton téléphone à chaque fois, fait du flapping. L'état n'est pas faux, il est instable à la frontière, donc réagir à chaque changement spamme tout le monde. Stabilise l'état : hystérésis, délai de confirmation, ou compteur de résultats consécutifs.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "new = probe()\nif new != state:\n    state = new\n    notify(state)  # un message par à-coup",
+        "after": "new = probe()\nstreak = streak + 1 if new == candidate else 1\ncandidate = new\nif streak >= 3 and candidate != state:  # 3 résultats identiques d'affilée\n    state = candidate\n    notify(state)"
+      },
+      "pitfall": "Ne lisser que la notification et pas l'état : le tableau de bord continue de flapper et l'historique reste illisible."
+    }
+  },
+  "monotonic-clock": {
+    "en": {
+      "why": "The wall clock can jump: NTP corrections, daylight saving, someone setting the date. A duration measured with it can come out negative or huge. A monotonic clock only moves forward at a steady pace, so use it for timeouts, delays and elapsed time, and keep wall time for 'what day is it'.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "start = time.time()\nwork()\nelapsed = time.time() - start  # breaks if the system clock changes",
+        "after": "start = time.monotonic()\nwork()\nelapsed = time.monotonic() - start  # never goes backward"
+      },
+      "pitfall": "Storing a monotonic value in a database or sending it to another machine: its zero point is arbitrary and only means something inside one process."
+    },
+    "fr": {
+      "why": "L'horloge murale peut sauter : corrections NTP, changement d'heure, quelqu'un qui règle la date. Une durée mesurée avec elle peut sortir négative ou énorme. Une horloge monotone avance seulement, à rythme régulier : on l'utilise pour les timeouts, délais et temps écoulé, et on garde l'heure murale pour « quel jour on est ».",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "start = time.time()\nwork()\nelapsed = time.time() - start  # faux si l'horloge système change",
+        "after": "start = time.monotonic()\nwork()\nelapsed = time.monotonic() - start  # ne recule jamais"
+      },
+      "pitfall": "Stocker une valeur monotone en base ou l'envoyer à une autre machine : son zéro est arbitraire et n'a de sens que dans un seul processus."
+    }
+  },
+  "utc-iso-8601": {
+    "en": {
+      "why": "Local times are ambiguous: the same wall-clock hour happens twice when clocks go back, and offsets differ by place. Store and log instants in UTC with the ISO 8601 format, which also sorts correctly as plain text. Convert to the viewer's time zone only at display time.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "from datetime import datetime\n\nts = datetime.now().isoformat()  # local time, no zone",
+        "after": "from datetime import datetime, timezone\n\nts = datetime.now(timezone.utc).strftime(\"%Y-%m-%dT%H:%M:%SZ\")  # e.g. 2026-11-16T22:30:00Z\nshown = datetime.fromisoformat(ts.replace(\"Z\", \"+00:00\")).astimezone()  # local time only for display"
+      },
+      "pitfall": "Storing a local time without its offset, so the hour repeated when clocks go back can no longer be told apart."
+    },
+    "fr": {
+      "why": "Les heures locales sont ambiguës : la même heure murale arrive deux fois quand on recule l'horloge, et les décalages varient selon le lieu. On stocke et on logue les instants en UTC au format ISO 8601, qui se trie même correctement comme du texte. On ne convertit vers le fuseau du lecteur qu'à l'affichage.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "from datetime import datetime\n\nts = datetime.now().isoformat()  # heure locale, sans fuseau",
+        "after": "from datetime import datetime, timezone\n\nts = datetime.now(timezone.utc).strftime(\"%Y-%m-%dT%H:%M:%SZ\")  # ex. 2026-11-16T22:30:00Z\nshown = datetime.fromisoformat(ts.replace(\"Z\", \"+00:00\")).astimezone()  # heure locale seulement à l'affichage"
+      },
+      "pitfall": "Stocker une heure locale sans son décalage : l'heure qui se répète quand on recule l'horloge devient impossible à départager."
+    }
+  },
+  "eventual-consistency": {
+    "en": {
+      "why": "In a system with several copies of the data (replicas, caches), a write reaches them one after another, not instantly. For a short while two readers can see different values; later they all agree. You design around that window instead of pretending it does not exist.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "post = api.create(title)\nitems = replica.list()  # the new post may be missing",
+        "after": "post = api.create(title)\nitems = replica.list()\nif post.id not in [i.id for i in items]:\n    items.append(post)  # show what we just wrote, the replica will catch up"
+      },
+      "pitfall": "Reading from a replica right after a write and treating the missing row as proof the write failed."
+    },
+    "fr": {
+      "why": "Dans un système avec plusieurs copies des données (réplicas, caches), une écriture les atteint l'une après l'autre, pas instantanément. Pendant un court moment deux lecteurs peuvent voir des valeurs différentes ; plus tard tous s'accordent. On conçoit autour de cette fenêtre au lieu de faire comme si elle n'existait pas.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "post = api.create(title)\nitems = replica.list()  # le nouveau post peut manquer",
+        "after": "post = api.create(title)\nitems = replica.list()\nif post.id not in [i.id for i in items]:\n    items.append(post)  # afficher ce qu'on vient d'écrire, le réplica rattrapera"
+      },
+      "pitfall": "Lire sur un réplica juste après une écriture et prendre l'absence de la ligne pour la preuve que l'écriture a échoué."
+    }
+  },
+  "thundering-herd": {
+    "en": {
+      "why": "Many clients or caches all expire, retry or wake up at the same instant, and the backend gets hit by the whole crowd at once. A cache that expires at a round hour, or a hundred workers retrying together, is the classic case. Spread the moments with random jitter, and let only one caller recompute while the others wait.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r.set(key, value, ex=3600)  # every key expires at the same second",
+        "after": "import random\n\nr.set(key, value, ex=3600 + random.randint(0, 300))  # expirations spread over 5 minutes"
+      },
+      "pitfall": "Adding jitter to the first attempt only, while the retries after a failure still line up on the same fixed delays."
+    },
+    "fr": {
+      "why": "Plein de clients ou de caches expirent, réessaient ou se réveillent au même instant, et le backend reçoit toute la foule d'un coup. Un cache qui expire à heure ronde, ou cent workers qui réessaient ensemble, c'est le cas classique. On étale les moments avec un jitter aléatoire, et un seul appelant recalcule pendant que les autres attendent.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "r.set(key, value, ex=3600)  # toutes les clés expirent à la même seconde",
+        "after": "import random\n\nr.set(key, value, ex=3600 + random.randint(0, 300))  # expirations étalées sur 5 minutes"
+      },
+      "pitfall": "Ne mettre du jitter que sur la première tentative, alors que les réessais après échec retombent sur les mêmes délais fixes."
+    }
+  },
+  "single-flight": {
+    "en": {
+      "why": "When 500 requests ask for the same expensive thing at once, computing it 500 times is waste. Single-flight keeps one execution per key: the first request does the work, the others wait and share its result. It is the cure for a cache stampede.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def get(key):\n    return await fetch(key)  # N callers, N fetches",
+        "after": "import asyncio\n\ninflight = {}\n\nasync def get(key):\n    if key not in inflight:\n        t = asyncio.ensure_future(fetch(key))\n        inflight[key] = t\n        t.add_done_callback(lambda _: inflight.pop(key, None))\n    return await asyncio.shield(inflight[key])  # N callers, 1 fetch"
+      },
+      "pitfall": "Sharing a failure: if the first call errors out, every waiter gets that error, so decide whether they should retry."
+    },
+    "fr": {
+      "why": "Quand 500 requêtes demandent la même chose coûteuse en même temps, la calculer 500 fois est du gaspillage. Le single-flight garde une seule exécution par clé : la première requête fait le travail, les autres attendent et partagent son résultat. C'est le remède au cache stampede.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def get(key):\n    return await fetch(key)  # N appelants, N fetch",
+        "after": "import asyncio\n\ninflight = {}\n\nasync def get(key):\n    if key not in inflight:\n        t = asyncio.ensure_future(fetch(key))\n        inflight[key] = t\n        t.add_done_callback(lambda _: inflight.pop(key, None))\n    return await asyncio.shield(inflight[key])  # N appelants, 1 fetch"
+      },
+      "pitfall": "Partager un échec : si le premier appel plante, tous ceux qui attendent reçoivent l'erreur, il faut donc décider s'ils réessaient."
+    }
+  },
+  "bounded-concurrency": {
+    "en": {
+      "why": "Launching one task per item looks parallel and is actually a trap: 10,000 items means 10,000 connections, files or processes at once. Bounded concurrency caps the number of tasks in flight with a semaphore or a fixed-size pool. You get most of the speed without exhausting sockets, memory or the remote server.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "results = await asyncio.gather(*(fetch(u) for u in urls))  # all URLs at once",
+        "after": "sem = asyncio.Semaphore(10)\n\nasync def limited(u):\n    async with sem:\n        return await fetch(u)\n\nresults = await asyncio.gather(*(limited(u) for u in urls))  # 10 at a time"
+      },
+      "pitfall": "Picking the limit by guess instead of by what the slowest resource can take, such as the server's connection limit."
+    },
+    "fr": {
+      "why": "Lancer une tâche par élément a l'air parallèle et c'est un piège : 10 000 éléments, c'est 10 000 connexions, fichiers ou processus en même temps. La concurrence bornée plafonne le nombre de tâches en vol avec un sémaphore ou un pool de taille fixe. On garde l'essentiel de la vitesse sans épuiser sockets, mémoire ou le serveur distant.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "results = await asyncio.gather(*(fetch(u) for u in urls))  # toutes les URL en même temps",
+        "after": "sem = asyncio.Semaphore(10)\n\nasync def limited(u):\n    async with sem:\n        return await fetch(u)\n\nresults = await asyncio.gather(*(limited(u) for u in urls))  # 10 à la fois"
+      },
+      "pitfall": "Choisir la limite au pif plutôt que d'après ce que supporte la ressource la plus faible, comme la limite de connexions du serveur."
+    }
+  },
+  "fan-out-fan-in": {
+    "en": {
+      "why": "Fan-out splits a job into independent pieces that run in parallel; fan-in gathers their results into one. It is how you process a big list faster than one item at a time. The pieces must not depend on each other, and the gathering step must check that every piece came back.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "results = []\nfor batch in batches:\n    results += process(batch)  # one batch after the other",
+        "after": "from concurrent.futures import ThreadPoolExecutor\n\nwith ThreadPoolExecutor(max_workers=4) as pool:\n    parts = list(pool.map(process, batches))  # fan-out: batches in parallel\nresults = [x for part in parts for x in part]\nassert len(results) == sum(len(b) for b in batches)  # fan-in: count what came back"
+      },
+      "pitfall": "Merging whatever came back without counting, so a batch that silently failed leaves a hole nobody notices."
+    },
+    "fr": {
+      "why": "Le fan-out découpe un travail en morceaux indépendants exécutés en parallèle ; le fan-in rassemble leurs résultats en un seul. C'est ainsi qu'on traite une grosse liste plus vite qu'un élément après l'autre. Les morceaux ne doivent pas dépendre les uns des autres, et l'étape de rassemblement doit vérifier que chaque morceau est revenu.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "results = []\nfor batch in batches:\n    results += process(batch)  # un lot après l'autre",
+        "after": "from concurrent.futures import ThreadPoolExecutor\n\nwith ThreadPoolExecutor(max_workers=4) as pool:\n    parts = list(pool.map(process, batches))  # fan-out : lots en parallèle\nresults = [x for part in parts for x in part]\nassert len(results) == sum(len(b) for b in batches)  # fan-in : compter ce qui est revenu"
+      },
+      "pitfall": "Fusionner ce qui est revenu sans compter : un lot qui a échoué en silence laisse un trou que personne ne voit."
+    }
+  },
+  "starvation": {
+    "en": {
+      "why": "A task that is always overtaken by more important ones never runs, even though nothing is broken. It happens with strict priorities, unfair locks, or a queue where newcomers jump ahead. Fix it with a fair queue or aging, where waiting makes a task more urgent over time.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "task = min(tasks, key=lambda t: t.priority)  # low priority may wait forever",
+        "after": "now = time.monotonic()\ntask = min(tasks, key=lambda t: t.priority - (now - t.enqueued) / 10)  # each 10 s of waiting is worth one priority level"
+      },
+      "pitfall": "Adding aging so aggressive that low-priority work ends up jumping the urgent tasks, which defeats the priorities."
+    },
+    "fr": {
+      "why": "Une tâche toujours doublée par des plus importantes ne tourne jamais, alors que rien n'est cassé. Ça arrive avec des priorités strictes, des verrous injustes, ou une file où les nouveaux passent devant. On corrige avec une file équitable ou du vieillissement : plus une tâche attend, plus elle devient urgente.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "task = min(tasks, key=lambda t: t.priority)  # une basse priorité peut attendre à jamais",
+        "after": "now = time.monotonic()\ntask = min(tasks, key=lambda t: t.priority - (now - t.enqueued) / 10)  # 10 s d'attente valent un niveau de priorité"
+      },
+      "pitfall": "Mettre un vieillissement si agressif que le travail peu prioritaire double les tâches urgentes, ce qui annule les priorités."
+    }
+  },
+  "livelock": {
+    "en": {
+      "why": "In a livelock everything is busy, CPU is high and logs scroll, yet no work gets done: two parties keep reacting to each other, like two people stepping aside in the same direction. A deadlock is silent, a livelock is noisy. Monitor progress (items finished), not activity (threads alive, messages sent).",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if worker.is_alive():\n    print(\"ok\")  # alive is not advancing",
+        "after": "done = worker.items_done()\nif done == last_done:\n    alert(\"alive but no progress\")  # progress is what counts\nlast_done = done"
+      },
+      "pitfall": "Watching CPU or heartbeat as proof of health, which is exactly what a livelocked process keeps looking fine on."
+    },
+    "fr": {
+      "why": "Dans un livelock tout s'agite, le CPU est haut et les logs défilent, mais aucun travail n'aboutit : deux parties réagissent sans cesse l'une à l'autre, comme deux personnes qui s'écartent du même côté. Un deadlock est silencieux, un livelock est bruyant. On surveille la progression (éléments terminés), pas l'activité (threads vivants, messages envoyés).",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if worker.is_alive():\n    print(\"ok\")  # vivant ne veut pas dire qu'il avance",
+        "after": "done = worker.items_done()\nif done == last_done:\n    alert(\"alive but no progress\")  # c'est la progression qui compte\nlast_done = done"
+      },
+      "pitfall": "Prendre le CPU ou le heartbeat pour une preuve de bonne santé : c'est précisément ce qu'un processus en livelock continue d'afficher."
+    }
+  },
+  "fencing-token": {
+    "en": {
+      "why": "A lock holder can pause (garbage collection, network stall), lose its lock to someone else, then wake up and write as if nothing happened. A fencing token is a number that increases with each lock grant and travels with every write. The storage remembers the highest number seen and refuses anything older.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def write(key, data):\n    db[key] = data  # a former lock holder can still overwrite",
+        "after": "last_token = {}\n\ndef write(key, data, token):\n    if token < last_token.get(key, 0):\n        raise PermissionError(\"stale token\")  # the old holder is refused\n    last_token[key] = token\n    db[key] = data"
+      },
+      "pitfall": "Checking the token on the client side instead of in the storage, where a paused client would still skip the check."
+    },
+    "fr": {
+      "why": "Un détenteur de verrou peut se figer (garbage collection, coupure réseau), perdre son verrou au profit d'un autre, puis se réveiller et écrire comme si de rien n'était. Un jeton de clôture est un numéro qui augmente à chaque attribution du verrou et accompagne chaque écriture. Le stockage retient le plus grand numéro vu et refuse tout ce qui est plus ancien.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "def write(key, data):\n    db[key] = data  # un ancien détenteur du verrou peut encore écraser",
+        "after": "last_token = {}\n\ndef write(key, data, token):\n    if token < last_token.get(key, 0):\n        raise PermissionError(\"stale token\")  # l'ancien détenteur est refusé\n    last_token[key] = token\n    db[key] = data"
+      },
+      "pitfall": "Vérifier le jeton côté client au lieu du stockage : un client figé passerait à côté de la vérification."
+    }
+  },
+  "clock-skew": {
+    "en": {
+      "why": "Two machines never have exactly the same time, even with NTP: offsets of tens of milliseconds, sometimes seconds, are normal. Comparing their timestamps to decide 'who wrote last' therefore gives wrong answers. When order matters, use a sequence number or version that does not depend on any clock.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if remote.updated_at > local.updated_at:  # two different clocks\n    use(remote)",
+        "after": "if remote.version > local.version:  # a counter incremented at each write\n    use(remote)"
+      },
+      "pitfall": "Trusting 'last write wins' by timestamp, so a machine whose clock runs fast overwrites newer data forever."
+    },
+    "fr": {
+      "why": "Deux machines n'ont jamais exactement la même heure, même avec NTP : des décalages de dizaines de millisecondes, parfois de secondes, sont normaux. Comparer leurs horodatages pour savoir « qui a écrit en dernier » donne donc de mauvaises réponses. Quand l'ordre compte, on utilise un numéro de séquence ou de version qui ne dépend d'aucune horloge.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "if remote.updated_at > local.updated_at:  # deux horloges différentes\n    use(remote)",
+        "after": "if remote.version > local.version:  # un compteur incrémenté à chaque écriture\n    use(remote)"
+      },
+      "pitfall": "Se fier à « la dernière écriture gagne » par horodatage : une machine dont l'horloge avance écrase des données plus récentes."
+    }
+  },
+  "duration-calendar-date": {
+    "en": {
+      "why": "A duration (86,400 seconds) and a calendar date ('tomorrow at 9:00') are different things. On a day when clocks change, tomorrow at 9:00 is 23 or 25 hours away. Use seconds for timeouts and intervals, use dates with a time zone for anything a human schedules, and test the clock-change days.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const next = new Date(d.getTime() + 24 * 3600 * 1000);  // exactly 24 h, not 'tomorrow'",
+        "after": "const next = new Date(d);\nnext.setDate(next.getDate() + 1);  // next calendar day, same local time"
+      },
+      "pitfall": "Writing a test that only runs on an ordinary day, so the bug waits for the first clock change in production."
+    },
+    "fr": {
+      "why": "Une durée (86 400 secondes) et une date civile (« demain à 9 h ») sont deux choses différentes. Un jour de changement d'heure, demain à 9 h est à 23 ou 25 heures. On utilise des secondes pour les timeouts et intervalles, des dates avec fuseau pour tout ce qu'un humain planifie, et on teste les jours de changement d'heure.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const next = new Date(d.getTime() + 24 * 3600 * 1000);  // exactement 24 h, pas « demain »",
+        "after": "const next = new Date(d);\nnext.setDate(next.getDate() + 1);  // jour civil suivant, même heure locale"
+      },
+      "pitfall": "Écrire un test qui ne tourne qu'un jour ordinaire : le bug attend le premier changement d'heure en production."
+    }
+  },
+  "snapshot": {
+    "en": {
+      "why": "Reading a file or database while something else writes it can give you half of the old state and half of the new one. A snapshot is a frozen, consistent copy taken at one instant, and you read the copy instead. Backups, reports and exports should work from a snapshot, never from the live thing.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp app.db backup.db  # may copy a half-written file",
+        "after": "sqlite3 app.db \".backup snap.db\"  # consistent copy, then read the copy\nsqlite3 snap.db \"SELECT count(*) FROM orders;\""
+      },
+      "pitfall": "Using a plain cp on a database file that is being written, which copies a torn state that will not open or is silently wrong."
+    },
+    "fr": {
+      "why": "Lire un fichier ou une base pendant qu'autre chose l'écrit peut te donner une moitié de l'ancien état et une moitié du nouveau. Un snapshot est une copie figée et cohérente prise à un instant, et on lit la copie. Backups, rapports et exports doivent partir d'un snapshot, jamais de l'objet vivant.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cp app.db backup.db  # peut copier un fichier à moitié écrit",
+        "after": "sqlite3 app.db \".backup snap.db\"  # copie cohérente, puis lecture de la copie\nsqlite3 snap.db \"SELECT count(*) FROM orders;\""
+      },
+      "pitfall": "Faire un simple cp sur un fichier de base en cours d'écriture : on copie un état déchiré qui ne s'ouvre pas ou est faux en silence."
+    }
+  },
+  "event-polling": {
+    "en": {
+      "why": "Polling asks 'anything new?' on a timer: it wastes work when nothing changed and reacts late when something did. An event (webhook, inotify, a process exit) tells you the moment it happens. When you must poll, because nothing pushes, set an interval you can justify and bound the total wait.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "while [ -z \"$(ls /tmp/inbox)\" ]; do sleep 1; done  # asks every second, mostly for nothing",
+        "after": "inotifywait -e create,moved_to /tmp/inbox  # returns the moment a file appears"
+      },
+      "pitfall": "Starting the watch after checking the folder, so a file that arrived in between is never noticed."
+    },
+    "fr": {
+      "why": "Le polling demande « du nouveau ? » sur un minuteur : il gaspille du travail quand rien n'a changé et réagit tard quand quelque chose a changé. Un événement (webhook, inotify, fin de processus) te prévient à l'instant où ça arrive. Quand il faut poller, faute de push, on fixe un intervalle justifié et on borne l'attente totale.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "while [ -z \"$(ls /tmp/inbox)\" ]; do sleep 1; done  # demande chaque seconde, le plus souvent pour rien",
+        "after": "inotifywait -e create,moved_to /tmp/inbox  # rend la main dès qu'un fichier apparaît"
+      },
+      "pitfall": "Démarrer l'écoute après avoir regardé le dossier : un fichier arrivé entre les deux n'est jamais vu."
+    }
+  },
+  "advisory-lock": {
+    "en": {
+      "why": "An advisory lock (like flock on Linux) is only a convention: the system does not stop a process that ignores it from touching the file. It protects you only if every writer asks for the same lock first. One script that skips it and the protection is gone.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "n=$(cat count); echo $((n + 1)) > count  # two scripts can both read 5 and write 6",
+        "after": "flock /tmp/count.lock sh -c 'n=$(cat count); echo $((n + 1)) > count'  # every writer takes the same lock file"
+      },
+      "pitfall": "Locking in the main script while a cron job or an editor writes the same file without the lock."
+    },
+    "fr": {
+      "why": "Un verrou consultatif (comme flock sous Linux) n'est qu'une convention : le système n'empêche pas un processus qui l'ignore de toucher le fichier. Il ne te protège que si tous les écrivains demandent d'abord le même verrou. Un seul script qui l'oublie et la protection disparaît.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "n=$(cat count); echo $((n + 1)) > count  # deux scripts peuvent lire 5 et écrire 6 tous les deux",
+        "after": "flock /tmp/count.lock sh -c 'n=$(cat count); echo $((n + 1)) > count'  # tous les écrivains prennent le même fichier de verrou"
+      },
+      "pitfall": "Verrouiller dans le script principal pendant qu'une tâche cron ou un éditeur écrit le même fichier sans le verrou."
+    }
+  },
+  "short-critical-section": {
+    "en": {
+      "why": "While one task holds a lock, every other task that needs it waits, so the time spent inside the lock is time the whole system is serialized. Do the slow part (network call, computation, formatting) before taking the lock, and keep only the shared write inside it. Short sections mean less waiting and fewer deadlocks.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with lock:\n    data = fetch(url)  # slow, and everyone waits for it\n    result = compute(data)\n    cache[key] = result",
+        "after": "data = fetch(url)\nresult = compute(data)  # slow work done outside the lock\nwith lock:\n    cache[key] = result  # only the shared write inside"
+      },
+      "pitfall": "Calling out to another service while holding the lock, so a slow network answer freezes everyone who needs it."
+    },
+    "fr": {
+      "why": "Tant qu'une tâche tient un verrou, toutes celles qui en ont besoin attendent : le temps passé dedans est du temps où tout le système est sérialisé. Fais la partie lente (appel réseau, calcul, formatage) avant de prendre le verrou, et garde dedans seulement l'écriture partagée. Section courte, c'est moins d'attente et moins de deadlocks.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "with lock:\n    data = fetch(url)  # lent, et tout le monde l'attend\n    result = compute(data)\n    cache[key] = result",
+        "after": "data = fetch(url)\nresult = compute(data)  # travail lent fait hors du verrou\nwith lock:\n    cache[key] = result  # seule l'écriture partagée dedans"
+      },
+      "pitfall": "Appeler un autre service en tenant le verrou : une réponse réseau lente fige tous ceux qui en ont besoin."
+    }
+  },
+  "non-blocking-async": {
+    "en": {
+      "why": "An event loop runs all your async code on one thread, so a single blocking call (a synchronous HTTP request, a sleep, a big computation) freezes every other task and the interface with it. Use truly async I/O, or push the blocking or heavy work into a thread or a worker process. The rule: nothing in the loop waits.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def handler():\n    r = requests.get(url)  # blocking call: the whole loop waits\n    return r.json()",
+        "after": "async def handler():\n    r = await asyncio.to_thread(requests.get, url)  # runs in a thread, the loop stays free\n    return r.json()"
+      },
+      "pitfall": "Marking a function async while its body still calls blocking code, which changes nothing and still freezes the loop."
+    },
+    "fr": {
+      "why": "Une boucle d'événements exécute tout ton code async sur un seul thread : un seul appel bloquant (requête HTTP synchrone, sleep, gros calcul) fige toutes les autres tâches et l'interface avec. Utilise de l'I/O vraiment asynchrone, ou envoie le travail bloquant ou lourd dans un thread ou un processus worker. Règle : rien ne fait attendre la boucle.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def handler():\n    r = requests.get(url)  # appel bloquant : toute la boucle attend\n    return r.json()",
+        "after": "async def handler():\n    r = await asyncio.to_thread(requests.get, url)  # tourne dans un thread, la boucle reste libre\n    return r.json()"
+      },
+      "pitfall": "Mettre async sur une fonction dont le corps appelle toujours du code bloquant : rien ne change et la boucle reste figée."
+    }
+  },
+  "serial-parallel": {
+    "en": {
+      "why": "Two awaits in a row run one after the other, even when the second call does not need the first one's result. If they are independent, start them together and wait for both: the total time becomes the slowest call instead of the sum. Keep a cap when the list is long.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const user = await getUser(id);\nconst orders = await getOrders(id);  // waits for getUser before even starting",
+        "after": "const [user, orders] = await Promise.all([\n  getUser(id),\n  getOrders(id),  // both start now, total = the slowest\n]);"
+      },
+      "pitfall": "Parallelizing calls that depend on each other or share state, which trades a slow correct program for a fast wrong one."
+    },
+    "fr": {
+      "why": "Deux await à la suite s'exécutent l'un après l'autre, même quand le second appel n'a pas besoin du résultat du premier. S'ils sont indépendants, on les lance ensemble et on attend les deux : le temps total devient celui du plus lent au lieu de la somme. On garde un plafond quand la liste est longue.",
+      "example": {
+        "kind": "code",
+        "lang": "ts",
+        "before": "const user = await getUser(id);\nconst orders = await getOrders(id);  // attend getUser avant même de démarrer",
+        "after": "const [user, orders] = await Promise.all([\n  getUser(id),\n  getOrders(id),  // les deux partent maintenant, total = le plus lent\n]);"
+      },
+      "pitfall": "Paralléliser des appels qui dépendent l'un de l'autre ou partagent un état : on échange un programme lent et juste contre un rapide et faux."
+    }
+  },
+  "cancellation": {
+    "en": {
+      "why": "A task that is no longer needed (user left, timeout hit, parent failed) should stop, not keep running in the background. Cancellation is a signal sent to the task, which must pass it on to what it started and release what it holds: connections, files, locks. Without that, cancelled work leaks resources.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def work(conn):\n    while True:\n        await step(conn)  # on cancel, conn stays open",
+        "after": "async def work(conn):\n    try:\n        while True:\n            await step(conn)\n    finally:\n        await conn.close()  # always runs, even when cancelled"
+      },
+      "pitfall": "Catching the cancellation error and swallowing it, so the task looks cancelled but keeps going."
+    },
+    "fr": {
+      "why": "Une tâche devenue inutile (utilisateur parti, timeout atteint, parent en échec) doit s'arrêter, pas continuer en arrière-plan. L'annulation est un signal envoyé à la tâche, qui doit le transmettre à ce qu'elle a lancé et libérer ce qu'elle tient : connexions, fichiers, verrous. Sans ça, le travail annulé fuit des ressources.",
+      "example": {
+        "kind": "code",
+        "lang": "python",
+        "before": "async def work(conn):\n    while True:\n        await step(conn)  # à l'annulation, conn reste ouverte",
+        "after": "async def work(conn):\n    try:\n        while True:\n            await step(conn)\n    finally:\n        await conn.close()  # s'exécute toujours, même annulé"
+      },
+      "pitfall": "Attraper l'erreur d'annulation et l'avaler : la tâche a l'air annulée mais continue."
+    }
+  }
+}

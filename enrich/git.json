@@ -1,0 +1,266 @@
+{
+  "review-your-own-diff": {
+    "en": {
+      "why": "A commit is the last moment you can catch the debug print, the half-finished edit or the file you never meant to touch. Reading the whole diff yourself first means the reviewer, or the agent's next session, sees intent instead of leftovers. It costs a minute and saves a revert.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Fix the login bug and commit.",
+        "after": "Fix the login bug. Before committing, run `git diff` and `git diff --staged` in full, read every hunk, and tell me anything that is not part of the fix (debug prints, unrelated edits, formatting churn). Commit only once the diff contains the fix and nothing else."
+      },
+      "pitfall": "Looking at `git status` or the file list instead of the content: a clean list of file names hides a stray `console.log` or a changed constant."
+    },
+    "fr": {
+      "why": "Le commit est le dernier moment pour attraper le print de debug, la modif à moitié finie ou le fichier qu'on ne voulait pas toucher. Relire tout le diff soi-même fait que le relecteur, ou la session suivante de l'agent, voit l'intention et pas des restes. Ça coûte une minute et évite un revert.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "Corrige le bug de login et commit.",
+        "after": "Corrige le bug de login. Avant de commiter, lance `git diff` et `git diff --staged` en entier, lis chaque hunk, et dis-moi tout ce qui ne fait pas partie du correctif (prints de debug, modifs sans rapport, reformatage). Ne commite que quand le diff contient le correctif et rien d'autre."
+      },
+      "pitfall": "Regarder `git status` ou la liste des fichiers au lieu du contenu : une liste propre de noms cache un `console.log` oublié ou une constante modifiée."
+    }
+  },
+  "add-by-name": {
+    "en": {
+      "why": "`git add -A` stages every change in the repo and `git add .` every change under the current folder: the scratch file, a `.env` nobody added to `.gitignore`, the other task's half-done change. Naming each file makes the commit contain exactly what you decided, and forces you to look at what is not in the list. It matters most in a repo where several people or agents work at once.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add -A\ngit commit -m \"update\"",
+        "after": "git status --short\ngit add src/api.py tests/test_api.py\ngit commit -m \"Validate token expiry in api\""
+      },
+      "pitfall": "Naming the right file but staging all of it: if the file also holds unrelated edits, use `git add -p` to pick the hunks."
+    },
+    "fr": {
+      "why": "`git add -A` stage tous les changements du dépôt et `git add .` tous ceux du dossier courant : le fichier brouillon, un `.env` absent du `.gitignore`, le changement à moitié fait d'une autre tâche. Nommer chaque fichier fait que le commit contient exactement ce qu'on a décidé, et oblige à regarder ce qui n'est pas dans la liste. Ça compte surtout dans un dépôt où plusieurs personnes ou agents travaillent en même temps.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add -A\ngit commit -m \"update\"",
+        "after": "git status --short\ngit add src/api.py tests/test_api.py\ngit commit -m \"Valide l'expiration du token dans api\""
+      },
+      "pitfall": "Nommer le bon fichier mais le stager en entier : s'il contient aussi des modifs sans rapport, utiliser `git add -p` pour choisir les hunks."
+    }
+  },
+  "secret-scan": {
+    "en": {
+      "why": "Once a key or token is committed and pushed, deleting it in the next commit does not help: it stays in the history and must be treated as leaked. A quick search of the staged diff before committing is far cheaper than rotating credentials. It is a habit for every commit, not an occasional audit.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add config.py\ngit commit -m \"Add storage config\"",
+        "after": "git add config.py\ngit diff --staged | grep -nEi \"api[_-]?key|secret|token|password|BEGIN .*PRIVATE KEY\"\n# any hit: move the value to an env var, git add the file again, then commit\ngit commit -m \"Add storage config\""
+      },
+      "pitfall": "Removing the secret in a follow-up commit and calling it fixed: it is still in the history, so the key must be revoked and replaced."
+    },
+    "fr": {
+      "why": "Une fois qu'une clé ou un jeton est commité puis poussé, le supprimer au commit suivant ne sert à rien : il reste dans l'historique et doit être considéré comme fuité. Une recherche rapide dans le diff stagé avant de commiter coûte beaucoup moins cher que de renouveler des identifiants. C'est un réflexe à chaque commit, pas un audit occasionnel.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git add config.py\ngit commit -m \"Ajoute la config de stockage\"",
+        "after": "git add config.py\ngit diff --staged | grep -nEi \"api[_-]?key|secret|token|password|BEGIN .*PRIVATE KEY\"\n# si ça matche : passer la valeur en variable d'env, refaire git add du fichier, puis commiter\ngit commit -m \"Ajoute la config de stockage\""
+      },
+      "pitfall": "Supprimer le secret dans un commit suivant et considérer que c'est réglé : il est toujours dans l'historique, il faut révoquer la clé et la remplacer."
+    }
+  },
+  "short-lived-branch": {
+    "en": {
+      "why": "The longer a branch lives, the more main moves under it, and the bigger and riskier the final merge becomes. A branch that lasts hours or a few days stays easy to review and easy to throw away. Keep it to one purpose and bring in main's changes often.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git switch -c big-rewrite\n# three weeks of commits, main moved on\ngit merge main   # 40 conflicts",
+        "after": "git switch main && git pull\ngit switch -c fix-login-redirect\n# one purpose, a few commits\ngit fetch origin && git rebase origin/main   # before the first push\ngit push -u origin fix-login-redirect\n# after the merge: leave the branch, then delete it\ngit switch main && git pull\ngit branch -d fix-login-redirect"
+      },
+      "pitfall": "Letting a \"temporary\" branch collect unrelated work until it is too big to review; split it instead of waiting."
+    },
+    "fr": {
+      "why": "Plus une branche vit longtemps, plus main bouge en dessous, et plus la fusion finale devient grosse et risquée. Une branche qui dure quelques heures ou jours reste facile à relire et facile à jeter. Lui donner un seul objectif et récupérer souvent les changements de main.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git switch -c grosse-refonte\n# trois semaines de commits, main a avancé\ngit merge main   # 40 conflits",
+        "after": "git switch main && git pull\ngit switch -c fix-redirection-login\n# un seul objectif, quelques commits\ngit fetch origin && git rebase origin/main   # avant le premier push\ngit push -u origin fix-redirection-login\n# après la fusion : quitter la branche, puis la supprimer\ngit switch main && git pull\ngit branch -d fix-redirection-login"
+      },
+      "pitfall": "Laisser une branche \"temporaire\" accumuler des travaux sans rapport jusqu'à ce qu'elle soit trop grosse à relire ; la découper plutôt que d'attendre."
+    }
+  },
+  "rebase-merge": {
+    "en": {
+      "why": "Merge keeps history as it happened and adds a merge commit. Rebase replays your commits on top of another base, which gives a straight history but creates new commits with new hashes. That is fine for work only you have, and harmful for a branch others already pulled, because their copy no longer matches.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# feature-x is already pushed and shared\ngit rebase main\ngit push --force",
+        "after": "# shared branch: keep the history\ngit merge main\ngit push\n\n# local branch, never pushed: tidy it\ngit rebase main"
+      },
+      "pitfall": "Rebasing a branch that has been pushed and then force-pushing: teammates are left with duplicated commits and painful conflicts."
+    },
+    "fr": {
+      "why": "Merge garde l'historique tel qu'il s'est passé et ajoute un commit de fusion. Rebase rejoue tes commits sur une autre base, ce qui donne un historique linéaire mais crée de nouveaux commits avec de nouveaux hashs. C'est sans risque sur un travail que tu es seul à avoir, et nuisible sur une branche que d'autres ont déjà récupérée, car leur copie ne correspond plus.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "# feature-x est déjà poussée et partagée\ngit rebase main\ngit push --force",
+        "after": "# branche partagée : garder l'historique\ngit merge main\ngit push\n\n# branche locale, jamais poussée : la nettoyer\ngit rebase main"
+      },
+      "pitfall": "Rebaser une branche déjà poussée puis la force-pusher : les collègues se retrouvent avec des commits dupliqués et des conflits pénibles."
+    }
+  },
+  "force-with-lease": {
+    "en": {
+      "why": "After a rebase or an amend you sometimes must overwrite the remote branch. A bare `--force` does it blindly and erases any commit someone pushed meanwhile. `--force-with-lease` refuses if the remote branch is no longer where you last saw it, so a surprise push stops the overwrite.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git rebase main\ngit push --force origin my-branch",
+        "after": "git rebase main\ngit push --force-with-lease origin my-branch\n# refused? someone pushed: fetch, look, then decide"
+      },
+      "pitfall": "Running `git fetch` first and then forcing: the lease now matches the new remote state without you having looked at the new commits, so look before you push."
+    },
+    "fr": {
+      "why": "Après un rebase ou un amend, il faut parfois écraser la branche distante. Un `--force` nu le fait à l'aveugle et efface tout commit poussé entre-temps par quelqu'un d'autre. `--force-with-lease` refuse si la branche distante n'est plus là où tu l'as vue en dernier, donc un push surprise bloque l'écrasement.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git rebase main\ngit push --force origin ma-branche",
+        "after": "git rebase main\ngit push --force-with-lease origin ma-branche\n# refusé ? quelqu'un a poussé : fetch, regarder, puis décider"
+      },
+      "pitfall": "Faire `git fetch` puis forcer : le lease se cale alors sur le nouvel état distant sans que tu aies vu les nouveaux commits, donc regarder avant de pousser."
+    }
+  },
+  "reflog": {
+    "en": {
+      "why": "Git rarely destroys a commit right away: after a bad reset, rebase or branch delete, the commit is usually still there, just unreachable by name. The reflog lists where HEAD pointed over time, so you can find the hash and get it back in seconds. Looking there first is cheaper than rewriting the work.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "I ran git reset --hard and lost three commits. Redo the work from scratch.",
+        "after": "I ran `git reset --hard HEAD~3` by mistake. Do not redo anything yet. Run `git reflog`, find the entry from before the reset, create a branch on it (`git branch rescue <hash>`), and show me that the three commits are back."
+      },
+      "pitfall": "Expecting the reflog to save uncommitted changes or to last forever: it only records committed states, is local to your clone, and old entries expire."
+    },
+    "fr": {
+      "why": "Git détruit rarement un commit sur le coup : après un mauvais reset, un rebase raté ou une suppression de branche, le commit est en général encore là, simplement plus accessible par aucun nom. Le reflog liste où pointait HEAD au fil du temps, donc on retrouve le hash et on le récupère en quelques secondes. Y regarder d'abord coûte moins que refaire le travail.",
+      "example": {
+        "kind": "prompt",
+        "lang": "text",
+        "before": "J'ai fait git reset --hard et perdu trois commits. Refais le travail depuis zéro.",
+        "after": "J'ai lancé `git reset --hard HEAD~3` par erreur. Ne refais rien pour l'instant. Lance `git reflog`, trouve l'entrée d'avant le reset, crée une branche dessus (`git branch rescue <hash>`) et montre-moi que les trois commits sont revenus."
+      },
+      "pitfall": "Compter sur le reflog pour sauver des changements non commités ou pour toujours : il ne garde que des états commités, il est local au clone et les vieilles entrées expirent."
+    }
+  },
+  "worktree": {
+    "en": {
+      "why": "Switching branches in one folder forces you to stash or commit half-done work, and it changes the files under any running process. `git worktree` checks out another branch in a separate folder that shares the same repository. You can fix a bug on a release branch while your feature stays open next to it.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git stash\ngit switch release\n# fix, commit\ngit switch -\ngit stash pop",
+        "after": "git worktree add -b hotfix-login ../app-hotfix release\ncd ../app-hotfix\n# fix, commit, push\ncd - && git worktree remove ../app-hotfix"
+      },
+      "pitfall": "Trying to check out the same branch in two worktrees (git refuses) or deleting the folder by hand instead of `git worktree remove`."
+    },
+    "fr": {
+      "why": "Changer de branche dans un seul dossier oblige à stasher ou commiter un travail à moitié fait, et change les fichiers sous les processus en cours. `git worktree` extrait une autre branche dans un dossier séparé qui partage le même dépôt. On corrige un bug sur la branche de release pendant que la feature reste ouverte à côté.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git stash\ngit switch release\n# corriger, commiter\ngit switch -\ngit stash pop",
+        "after": "git worktree add -b hotfix-login ../app-hotfix release\ncd ../app-hotfix\n# corriger, commiter, pousser\ncd - && git worktree remove ../app-hotfix"
+      },
+      "pitfall": "Vouloir extraire la même branche dans deux worktrees (git refuse) ou supprimer le dossier à la main au lieu de `git worktree remove`."
+    }
+  },
+  "pickaxe": {
+    "en": {
+      "why": "`git blame` shows who last touched a line, which is often just a reformat. The pickaxe, `git log -S`, finds the commits where a given string was added or removed, so you land on the change that introduced it and its message explains why. It answers \"since when\" and \"why\" in two commands.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git blame src/api.py   # last touch: \"reformat\"",
+        "after": "git log -S\"retry_limit\" --oneline --reverse -- src/   # oldest first\ngit show <hash>   # read the first one: the commit that introduced it"
+      },
+      "pitfall": "Expecting it to find a moved line: `-S` matches commits that change how many times the string appears (use `-G` for a regex on the changed lines)."
+    },
+    "fr": {
+      "why": "`git blame` montre qui a touché la ligne en dernier, souvent un simple reformatage. Le pickaxe, `git log -S`, trouve les commits où une chaîne a été ajoutée ou retirée, donc on tombe sur le changement qui l'a introduite et son message explique pourquoi. Ça répond à \"depuis quand\" et \"pourquoi\" en deux commandes.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git blame src/api.py   # dernier passage : \"reformat\"",
+        "after": "git log -S\"retry_limit\" --oneline --reverse -- src/   # du plus ancien au plus récent\ngit show <hash>   # lire le premier : le commit qui l'a introduite"
+      },
+      "pitfall": "Croire qu'il retrouve une ligne déplacée : `-S` retient les commits qui changent le nombre d'occurrences de la chaîne (`-G` pour une regex sur les lignes modifiées)."
+    }
+  },
+  "version-tag": {
+    "en": {
+      "why": "A tag gives a commit a permanent name such as v1.2.0, so you can rebuild, diff or roll back to exactly what shipped. An annotated tag also records who tagged it, when, and a message. It only works as a reference if the name always points to the same commit.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git tag v1.2.0\ngit push origin v1.2.0\n# a fix lands later\ngit tag -f v1.2.0\ngit push -f origin v1.2.0   # the name now points elsewhere",
+        "after": "git tag -a v1.2.0 -m \"Release 1.2.0\"\ngit push origin v1.2.0\n# a fix lands later: new tag\ngit tag -a v1.2.1 -m \"Release 1.2.1\"\ngit push origin v1.2.1"
+      },
+      "pitfall": "Moving a pushed tag with `-f`: people and CI that already fetched it keep the old commit, so the same version name means two different things."
+    },
+    "fr": {
+      "why": "Un tag donne à un commit un nom permanent comme v1.2.0, ce qui permet de reconstruire, comparer ou revenir exactement à ce qui a été livré. Un tag annoté garde aussi qui l'a posé, quand, et un message. Ça ne sert de référence que si le nom pointe toujours vers le même commit.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git tag v1.2.0\ngit push origin v1.2.0\n# un correctif arrive plus tard\ngit tag -f v1.2.0\ngit push -f origin v1.2.0   # le nom pointe maintenant ailleurs",
+        "after": "git tag -a v1.2.0 -m \"Release 1.2.0\"\ngit push origin v1.2.0\n# un correctif arrive plus tard : nouveau tag\ngit tag -a v1.2.1 -m \"Release 1.2.1\"\ngit push origin v1.2.1"
+      },
+      "pitfall": "Déplacer un tag déjà poussé avec `-f` : les collègues et la CI qui l'ont déjà récupéré gardent l'ancien commit, donc le même nom de version désigne deux états différents."
+    }
+  },
+  "git-c": {
+    "en": {
+      "why": "`cd` changes the working directory of the whole shell session, which is easy to forget and unsafe when several commands run in parallel or in a script. `git -C <path>` runs one git command as if started in that folder and leaves your current directory alone. With an absolute path there is no doubt about which repo it touches.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cd ../other-repo && git pull\ngit status   # which repo is this now?",
+        "after": "git -C /home/me/other-repo pull\ngit -C /home/me/app status"
+      },
+      "pitfall": "Passing a relative path: it resolves from the current directory (and chained `-C` options stack up), so the command can hit the wrong repo."
+    },
+    "fr": {
+      "why": "`cd` change le dossier courant de toute la session shell, facile à oublier et risqué quand plusieurs commandes tournent en parallèle ou dans un script. `git -C <chemin>` exécute une commande git comme si on était dans ce dossier et ne touche pas au dossier courant. Avec un chemin absolu, aucun doute sur le dépôt visé.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "cd ../autre-depot && git pull\ngit status   # c'est quel dépôt maintenant ?",
+        "after": "git -C /home/moi/autre-depot pull\ngit -C /home/moi/app status"
+      },
+      "pitfall": "Passer un chemin relatif : il se résout depuis le dossier courant (et des `-C` chaînés s'empilent), donc la commande peut viser le mauvais dépôt."
+    }
+  },
+  "pre-commit-hook": {
+    "en": {
+      "why": "A pre-commit hook is a script git runs before it records a commit, and a non-zero exit cancels the commit. Putting the fast checks there (lint on staged files, a secret scan) catches mistakes before they reach history or CI. It only protects you if it stays fast and nobody bypasses it.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit --no-verify -m \"wip\"",
+        "after": "#!/bin/sh\n# .git/hooks/pre-commit (chmod +x)\nif git diff --cached | grep -nE \"AKIA[0-9A-Z]{16}|BEGIN [A-Z ]*PRIVATE KEY\"; then\n  echo \"secret in staged diff\"; exit 1\nfi\ngit diff --cached --name-only --diff-filter=ACM -- '*.py' | xargs -r ruff check"
+      },
+      "pitfall": "A slow hook (full test suite) teaches everyone to use `--no-verify`; keep it to seconds, and remember that `.git/hooks` is not versioned, so share it through `core.hooksPath` or a tool."
+    },
+    "fr": {
+      "why": "Un hook de pre-commit est un script que git exécute avant d'enregistrer un commit, et une sortie non nulle annule le commit. On y met les contrôles rapides (lint des fichiers stagés, scan de secrets) pour attraper les erreurs avant l'historique ou la CI. Ça ne protège que s'il reste rapide et que personne ne le contourne.",
+      "example": {
+        "kind": "command",
+        "lang": "bash",
+        "before": "git commit --no-verify -m \"wip\"",
+        "after": "#!/bin/sh\n# .git/hooks/pre-commit (chmod +x)\nif git diff --cached | grep -nE \"AKIA[0-9A-Z]{16}|BEGIN [A-Z ]*PRIVATE KEY\"; then\n  echo \"secret dans le diff stagé\"; exit 1\nfi\ngit diff --cached --name-only --diff-filter=ACM -- '*.py' | xargs -r ruff check"
+      },
+      "pitfall": "Un hook lent (toute la suite de tests) apprend à tout le monde à faire `--no-verify` ; le garder à quelques secondes, et noter que `.git/hooks` n'est pas versionné : le partager via `core.hooksPath` ou un outil."
+    }
+  }
+}
