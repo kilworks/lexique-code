@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLexicon } from '../components/data';
 import { Icon } from '../components/Icon';
 import { usePrefs } from '../components/prefs';
-import { bestOf, pathOrder } from '../lib/quiz';
+import { bestOf, nextLesson, pathOrder } from '../lib/quiz';
 import { KEYS, read } from '../lib/storage';
 import '../styles/learn.css';
 
@@ -14,6 +14,7 @@ export default function Learn() {
   const lessons = pathOrder(lex.sections);
   const stored = read<unknown>(KEYS.quiz, null);
   const done = lessons.filter((s) => bestOf(stored, s.id)).length;
+  const current = nextLesson(lex.sections, stored);
 
   return (
     <div className="page learn">
@@ -27,6 +28,11 @@ export default function Learn() {
         <p className="learn__count">
           <strong>{done}</strong> of {lessons.length} quizzes taken
         </p>
+        {current && (
+          <Link to={`/learn/${current.id}`} className="btn btn--primary learn__cta">
+            {done ? 'Continue' : 'Start'}: <span lang={lang}>{shortTitle(current.title[lang])}</span> <Icon name="chevron-right" />
+          </Link>
+        )}
       </header>
 
       <ol className="path">
@@ -34,7 +40,7 @@ export default function Learn() {
           const best = bestOf(stored, s.id);
           const pct = best ? Math.round((best.best / best.total) * 100) : 0;
           return (
-            <li key={s.id} className="path__item">
+            <li key={s.id} className={`path__item${s === current ? ' path__item--current' : ''}`} aria-current={s === current ? 'step' : undefined}>
               <span className="path__num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
               <div className="path__body">
                 <h2 className="h3 path__title">
@@ -43,6 +49,7 @@ export default function Learn() {
                 <p className="path__meta">
                   {s.words.length} words
                   {i < 5 && <span className="path__tag">Core</span>}
+                  {s === current && <span className="path__tag path__tag--current">{done ? 'Up next' : 'Start here'}</span>}
                 </p>
               </div>
               <div className="path__progress">

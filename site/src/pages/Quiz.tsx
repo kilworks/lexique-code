@@ -11,7 +11,7 @@ import { shortTitle } from './Learn';
 import NotFound from './NotFound';
 import '../styles/learn.css';
 
-const ASK: Record<Question['kind'], string> = {
+export const ASK: Record<Question['kind'], string> = {
   'word-for-action': 'Which word triggers this action?',
   'meaning-of-word': 'What does this word mean?',
   'action-for-word': 'Which action does this word trigger?',
@@ -36,7 +36,7 @@ function Prompt({ q, lex, lang }: { q: Question; lex: Lexicon; lang: Lang }) {
             </span>
           ))}
         </p>
-        <p className="qprompt__sub"><span className="eyebrow" lang="en">Gives </span><Inline text={c[lang].result} /></p>
+        <p className="qprompt__sub"><span className="qprompt__label" lang="en">Gives: </span><Inline text={c[lang].result} /></p>
       </div>
     );
   }
@@ -193,12 +193,13 @@ export default function Quiz() {
 
   const right = picked === q.answer;
   const w = lex.words[q.answer];
+  const p = picked && !right ? lex.words[picked] : null;
 
   return (
     <div className="page quiz">
       {crumbs}
       <header className="quiz__head">
-        <h1 className="eyebrow" ref={headRef} tabIndex={-1}>
+        <h1 className="label" ref={headRef} tabIndex={-1}>
           Quiz: <span lang={lang}>{title}</span>, question {index + 1} of {total}
         </h1>
         <span className="pbar" aria-hidden="true"><span className="pbar__fill" style={{ width: `${(index / total) * 100}%` }} /></span>
@@ -235,6 +236,22 @@ export default function Quiz() {
                 <span className="answer-row__meaning"><Inline text={w[lang].meaning} /></span>
                 <span className="answer-row__action"><Inline text={w[lang].action} /></span>
               </div>
+              {p && (
+                <div className="qfeedback__picked">
+                  <p lang={lang}>
+                    <span lang="en">You picked </span><strong><Inline text={p[lang].word} /></strong>
+                    <span lang="en">: it means </span><Inline text={p[lang].meaning} />
+                    <span lang="en">, and triggers </span><Inline text={p[lang].action} />.
+                  </p>
+                  <p className="muted" lang="en">
+                    {q.kind === 'complete-combination'
+                      ? <>Both are real words, but only <strong lang={lang}><Inline text={w[lang].word} /></strong> is part of this combination.</>
+                      : q.show === 'word'
+                        ? <>That is a neighbour, not the word this {q.prompt} describes: <strong lang={lang}><Inline text={w[lang].word} /></strong> is.</>
+                        : <>That {q.show} belongs to <strong lang={lang}><Inline text={p[lang].word} /></strong>, not to <strong lang={lang}><Inline text={w[lang].word} /></strong>.</>}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

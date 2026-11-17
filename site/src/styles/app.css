@@ -67,6 +67,8 @@ code, kbd, pre { font-family: var(--font-mono); font-size: 0.9em; }
   color: var(--color-text-muted);
 }
 .muted { color: var(--color-text-muted); }
+/* block label: sentence case in the sans face (the uppercase eyebrow is kept for page kickers only) */
+.label { font-family: var(--font-sans); font-size: var(--text-base); font-weight: var(--weight-semibold); line-height: var(--leading-snug); color: var(--color-text); }
 .prose { max-width: var(--measure); }
 
 /* skip link */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import real from '../data/lexicon.json';
 import { fold } from './normalize';
-import { bestOf, chunk, makeQuiz, markMistakes, mistakes, pathOrder, recordScore, rng, sectionCombos, today, type Question } from './quiz';
+import { bestOf, chunk, makeQuiz, markMistakes, mistakes, nextLesson, pathOrder, recordScore, rng, sectionCombos, today, type Question } from './quiz';
 import type { Combination, Lexicon, Word } from './types';
 
 const w = (id: string, section: string, word = id, meaning = `${id} meaning`, action = `${id} action`): Word => ({
@@ -134,9 +134,35 @@ describe('complete the combination', () => {
     }
   });
 
+  it('never offers a distractor that forms another combination with a given term', () => {
+    // c1 blanks a0 or a1; a2..a5 combine with a1 elsewhere, so they would also look right
+    const lex = lexicon(sections, [combo('c1', ['a0', 'a1']), combo('c2', ['a1', 'a2', 'a3']), combo('c3', ['a1', 'a4', 'a5'])]);
+    for (let s = 0; s < 40; s++) {
+      for (const q of makeQuiz(lex, 'a', s).filter((x) => x.combo?.id === 'c1')) {
+        if (q.answer !== 'a0') continue;
+        for (const o of q.options) if (o !== q.answer) expect(['a1', 'a2', 'a3', 'a4', 'a5']).not.toContain(o);
+      }
+    }
+  });
+
   it('does not appear with a single combination', () => {
     const lex = lexicon(sections, [combo('c1', ['a0', 'a1'])]);
     for (let s = 0; s < 20; s++) expect(makeQuiz(lex, 'a', s).some((q) => q.kind === 'complete-combination')).toBe(false);
+  });
+});
+
+describe('lesson step check', () => {
+  it('asks only about the given words, with distractors from the section and no combination', () => {
+    const lex = lexicon({ a: ids('a', 12), b: ids('b', 12) }, [combo('c1', ['a0', 'b0']), combo('c2', ['a1', 'b1'])]);
+    for (let s = 0; s < 20; s++) {
+      const qs = makeQuiz(lex, 'a', s, 2, ['a3', 'a4', 'a5']);
+      expect(qs).toHaveLength(2);
+      checkQuiz(lex, qs);
+      for (const q of qs) {
+        expect(['a3', 'a4', 'a5']).toContain(q.answer);
+        expect(q.kind).not.toBe('complete-combination');
+      }
+    }
   });
 });
 
@@ -167,6 +193,14 @@ describe('path and lesson helpers', () => {
     const s = ['x', 'security', 'method', 'y', 'operations', 'verification', 'robustness', 'z'].map((id) => ({ id, kind: 'words' }));
     s.push({ id: 'combinations', kind: 'combinations' });
     expect(pathOrder(s).map((x) => x.id)).toEqual(['method', 'robustness', 'verification', 'security', 'operations', 'x', 'y', 'z']);
+  });
+
+  it('points to the first lesson of the path whose quiz was never taken', () => {
+    const s = ['x', 'method', 'robustness'].map((id) => ({ id, kind: 'words' }));
+    expect(nextLesson(s, null)?.id).toBe('method');
+    expect(nextLesson(s, { method: { best: 3, total: 10 } })?.id).toBe('robustness');
+    expect(nextLesson(s, { method: { best: 3, total: 10 }, robustness: { best: 1, total: 10 }, x: { best: 0, total: 10 } })).toBeNull();
+    expect(nextLesson(s, 'junk')?.id).toBe('method');
   });
 
   it('splits into balanced groups of about 6', () => {

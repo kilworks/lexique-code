@@ -90,6 +90,20 @@ export function Layout() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+  // one title per page, taken from its h1 (pages render it after the lexicon loads, and the quiz rewrites it)
+  useEffect(() => {
+    const main = document.getElementById('main');
+    if (!main) return;
+    const sync = () => {
+      const h1 = main.querySelector('h1')?.textContent?.trim();
+      const title = pathname === '/' || !h1 ? 'Code lexicon' : `${h1}, Code lexicon`;
+      if (document.title !== title) document.title = title;
+    };
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(main, { childList: true, subtree: true, characterData: true });
+    return () => obs.disconnect();
+  }, [pathname]);
   return (
     <>
       <a href="#main" className="skip-link" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>

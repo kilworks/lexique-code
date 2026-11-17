@@ -10,6 +10,8 @@ A lexicon of 528 words that turn a vague prompt into a precise one. For each wor
 
 `LEXICON.md` is the English lexicon and `LEXIQUE.md` the French original. They match row for row: same 24 sections, same rows, same order.
 
+To learn the words rather than read them, use the site: https://kilworks.github.io/lexique-code/ (glossary, a page per word with an example, flashcards, lessons with quizzes, and a prompt workshop). Its code is in `site/`, its per-word examples in `enrich/`.
+
 ## Contents
 
 - [Why a lexicon](#why-a-lexicon)

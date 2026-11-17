@@ -60,10 +60,12 @@ export function sectionCombos(lex: Lexicon, sectionId: string) {
  * word is the right answer twice). Distractors come from the same section, borrowed from the other
  * sections only when it is too small. Returns [] for an unknown or empty section.
  */
-export function makeQuiz(lex: Lexicon, sectionId: string, seed: number, length = QUIZ_LENGTH): Question[] {
+export function makeQuiz(lex: Lexicon, sectionId: string, seed: number, length = QUIZ_LENGTH, only?: readonly string[]): Question[] {
   const section = lex.sections.find((s) => s.id === sectionId && s.kind === 'words');
   if (!section) return [];
   const own = section.words.filter((w) => Object.hasOwn(lex.words, w));
+  // `only` (a lesson step): answers come from these words, distractors still from the whole section
+  const answers = only ? own.filter((w) => only.includes(w)) : own;
   const rand = rng(seed);
   const others = shuffle(
     lex.sections.filter((s) => s.kind === 'words' && s.id !== sectionId).flatMap((s) => s.words).filter((w) => Object.hasOwn(lex.words, w)),
@@ -91,20 +93,24 @@ export function makeQuiz(lex: Lexicon, sectionId: string, seed: number, length =
 
   // complete the combination: only when 2+ combinations involve the section, at most 2 questions
   const combos = sectionCombos(lex, sectionId);
-  if (combos.length >= 2) {
+  if (combos.length >= 2 && !only) {
     for (const c of shuffle(combos, rand)) {
       if (out.length >= Math.min(2, length)) break;
       const blanks = c.words.map((w, i) => [w, i] as const).filter(([w]) => lex.words[w]?.section === sectionId && !used.has(w));
       if (!blanks.length) continue;
       const [answer, blank] = blanks[Math.floor(rand() * blanks.length)];
-      const options = pickOptions(answer, 'word', new Set(c.words));
+      // no distractor that forms a combination with a given term: it would be a second right answer
+      const given = c.words.filter((_, i) => i !== blank);
+      const exclude = new Set(lex.combinations.filter((o) => o.words.some((w) => given.includes(w))).flatMap((o) => o.words));
+      exclude.delete(answer);
+      const options = pickOptions(answer, 'word', exclude);
       if (!options) continue;
       used.add(answer);
       out.push({ kind: 'complete-combination', answer, prompt: 'word', show: 'word', options, combo: { id: c.id, blank } });
     }
   }
 
-  for (const answer of shuffle(own, rand)) {
+  for (const answer of shuffle(answers, rand)) {
     if (out.length >= length) break;
     if (used.has(answer)) continue;
     const k = KINDS[Math.floor(rand() * KINDS.length)];
@@ -119,6 +125,11 @@ export function makeQuiz(lex: Lexicon, sectionId: string, seed: number, length =
 /** Word ids answered wrong. answers[i] is the chosen option for question i. */
 export function mistakes(questions: Question[], answers: (string | null)[]): string[] {
   return questions.filter((q, i) => answers[i] !== q.answer).map((q) => q.answer);
+}
+
+/** First lesson of the path whose quiz was never taken, null when all were. */
+export function nextLesson<S extends { id: string; kind: string }>(sections: readonly S[], stored: unknown): S | null {
+  return pathOrder(sections).find((s) => !bestOf(stored, s.id)) ?? null;
 }
 
 /** Recommended path: these sections first, then the others in lexicon order. */

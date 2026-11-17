@@ -44,6 +44,10 @@ export default function Word() {
   const prev = pos > 0 ? lex.words[siblings[pos - 1]] : undefined;
   const next = pos >= 0 && pos < siblings.length - 1 ? lex.words[siblings[pos + 1]] : undefined;
   const combos = lex.combinations.filter((c) => c.words.includes(word.id));
+  // the 6 closest words in section order (3 before, 3 after, shifted at the ends)
+  const others = siblings.filter((s) => s !== word.id && lex.words[s]);
+  const from = Math.max(0, Math.min(Math.max(pos, 0) - 3, others.length - 6));
+  const near = others.slice(from, from + 6);
   const inCards = myCards.includes(word.id);
 
   return (
@@ -62,7 +66,7 @@ export default function Word() {
           </header>
 
           <section className="action" aria-labelledby="action-title">
-            <h2 id="action-title" className="eyebrow" lang="en">What it triggers</h2>
+            <h2 id="action-title" className="label" lang="en">What it triggers</h2>
             <p className="action__text"><Inline text={row.action} /></p>
           </section>
 
@@ -100,7 +104,7 @@ export default function Word() {
 
         <aside className="word__side">
           <section className="side-block twin" lang={other} aria-labelledby="twin-title">
-            <h2 id="twin-title" className="eyebrow" lang="en">In {LANG_NAME[other]}</h2>
+            <h2 id="twin-title" className="label" lang="en">In {LANG_NAME[other]}</h2>
             <p className="twin__word"><Inline text={twin.word} /></p>
             <p className="twin__meaning"><Inline text={twin.meaning} /></p>
             <p className="twin__action"><Inline text={twin.action} /></p>
@@ -108,7 +112,7 @@ export default function Word() {
 
           {combos.length > 0 && (
             <section className="side-block" aria-labelledby="combos-title">
-              <h2 id="combos-title" className="eyebrow" lang="en">Combinations using it</h2>
+              <h2 id="combos-title" className="label" lang="en">Combinations using it</h2>
               <ul className="combos">
                 {combos.map((c) => (
                   <li key={c.id} className="combo">
@@ -136,14 +140,19 @@ export default function Word() {
 
           {section && siblings.length > 1 && (
             <section className="side-block" aria-labelledby="siblings-title">
-              <h2 id="siblings-title" className="eyebrow" lang="en">
-                Also in {section.title.en.split(' (')[0]}
+              <h2 id="siblings-title" className="label" lang="en">
+                Nearby in {section.title.en.split(' (')[0]}
               </h2>
-              <ul className="siblings">
-                {siblings.filter((s) => s !== word.id && lex.words[s]).map((s) => (
+              <ul className="siblings" lang={lang}>
+                {near.map((s) => (
                   <li key={s}><Link to={`/word/${s}`}><Inline text={lex.words[s][lang].word} /></Link></li>
                 ))}
               </ul>
+              {near.length < siblings.length - 1 && (
+                <Link to={`/glossary?s=${section.id}`} className="siblings__all">
+                  All {siblings.length} in <span lang={lang}>{section.title[lang].split(' (')[0]}</span>
+                </Link>
+              )}
             </section>
           )}
         </aside>

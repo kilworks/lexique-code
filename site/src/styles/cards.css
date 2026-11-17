@@ -33,15 +33,15 @@
   padding: var(--space-8) var(--space-6);
   background: var(--color-surface);
   border: var(--border-hairline) solid var(--color-border);
-  border-top: calc(var(--border-hairline) * 3) solid var(--color-accent);
   border-radius: var(--radius-md);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
 .flashcard__face--back { transform: rotateY(180deg); }
+.flashcard__ref { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text-muted); }
 .flashcard__word { font-family: var(--font-serif); font-size: var(--text-3xl); line-height: var(--leading-snug); }
 .flashcard__text { font-size: var(--text-lg); color: var(--color-text-muted); max-width: var(--measure); }
-.flashcard__face:not(.flashcard__face--back) .flashcard__text { color: var(--color-text); }
+.flashcard__face:not(.flashcard__face--back) .flashcard__text, .flashcard__face--back .flashcard__ref + .flashcard__text { color: var(--color-text); }
 .flashcard__action {
   max-width: var(--measure);
   padding-left: var(--space-3);

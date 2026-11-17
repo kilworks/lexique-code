@@ -68,6 +68,26 @@ describe('detect', () => {
     expect(found(text)).toEqual([['idempotent', 'idempotent']]);
   });
 
+  it('ignores everyday halves of `a / b` words but keeps the full form', () => {
+    const rm = buildMatcher(real as Lexicon);
+    const ids = (t: string) => detectedWords(detect(t, rm));
+    expect(ids('plan before coding')).not.toContain('before-after');
+    expect(ids('show a before / after of the output')).toContain('before-after');
+    expect(ids('show a before/after of the output')).toContain('before-after');
+    expect(ids('montre un avant / après')).toContain('before-after');
+  });
+
+  it('finds `x + y` words written as `x and y`, `x et y` or plain `x`', () => {
+    const rm = buildMatcher(real as Lexicon);
+    const ids = (t: string) => detectedWords(detect(t, rm));
+    const sample = 'Make the retry idempotent with backoff and jitter, add a regression test first, plan before coding.';
+    expect(ids(sample)).toContain('backoff-jitter');
+    expect(ids(sample)).not.toContain('before-after');
+    expect(ids('retry avec backoff et jitter')).toContain('backoff-jitter');
+    expect(ids('add a backoff')).toContain('backoff-jitter');
+    expect(ids('backoff + jitter')).toContain('backoff-jitter');
+  });
+
   it('stays fast on a 5k-char text against the real lexicon', () => {
     const rm = buildMatcher(real as Lexicon);
     const text = 'Make the deploy script idempotent and atomic, add a dry-run, find the root cause, '.repeat(62).slice(0, 5000);

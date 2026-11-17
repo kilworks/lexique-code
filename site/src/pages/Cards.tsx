@@ -193,6 +193,8 @@ function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: Revi
   const section = lex.sections.find((s) => s.id === word.section);
   const front = MODES.find((m) => m.value === mode)!.front;
   const box = Object.hasOwn(srs, id) ? srs[id].box : null;
+  // missed cards are requeued, so count what is left rather than a total that grows
+  const left = session.queue.length - session.pos;
 
   // keep focus on the control that matters after each flip or answer
   useEffect(() => {
@@ -222,7 +224,7 @@ function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: Revi
   return (
     <div className="page cards">
       <header className="cards__bar">
-        <h1 className="h3">Card {session.pos + 1} of {session.queue.length}</h1>
+        <h1 className="h3">{left} {left === 1 ? 'card' : 'cards'} left</h1>
         <button type="button" className="btn btn--ghost btn--sm" onClick={onEnd}>
           <Icon name="x" className="ico ico--sm" /> End session
         </button>
@@ -231,13 +233,14 @@ function Review({ session, mode, lang, srs, saved, flip, onAnswer, onEnd }: Revi
       <div className="flashcard" data-flipped={session.flipped} lang={lang}>
         <div className="flashcard__inner">
           <section className="flashcard__face" aria-hidden={session.flipped} aria-label="Question">
-            <p className="eyebrow" lang="en">{front}</p>
+            <p className="label" lang="en">{front}</p>
             <Face mode={mode} row={row} />
           </section>
           <section className="flashcard__face flashcard__face--back" aria-hidden={!session.flipped} aria-label="Answer">
-            <p className="flashcard__word"><Inline text={row.word} /></p>
-            <p className="flashcard__text"><Inline text={row.meaning} /></p>
-            <p className="flashcard__action"><Inline text={row.action} /></p>
+            {/* the front field is not repeated full size on the back; in word mode a small reference keeps the context */}
+            {mode !== 'word' ? <p className="flashcard__word"><Inline text={row.word} /></p> : <p className="flashcard__ref"><Inline text={row.word} /></p>}
+            {mode !== 'meaning' && <p className="flashcard__text"><Inline text={row.meaning} /></p>}
+            {mode !== 'action' && <p className="flashcard__action"><Inline text={row.action} /></p>}
           </section>
         </div>
         <p className="flashcard__meta" lang="en">

@@ -111,7 +111,7 @@ export default function Workshop() {
 
           {found.length > 0 && (
             <section aria-labelledby="hits-title" className="workshop__block">
-              <h2 id="hits-title" className="eyebrow">Words in your prompt</h2>
+              <h2 id="hits-title" className="label">Words in your prompt</h2>
               <ul className="hits" lang={lang}>
                 {found.map(({ word, snippets }) => (
                   <li key={word.id} className="hit">
@@ -131,7 +131,7 @@ export default function Workshop() {
 
           {suggestions.length > 0 && (
             <section aria-labelledby="sugg-title" className="workshop__block">
-              <h2 id="sugg-title" className="eyebrow">Combinations to complete</h2>
+              <h2 id="sugg-title" className="label">Combinations to complete</h2>
               <ul className="suggs" lang={lang}>
                 {suggestions.map(({ combination: c, present, missing }) => (
                   <li key={c.id} className="sugg">

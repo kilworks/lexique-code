@@ -4,6 +4,7 @@ import { Icon, type IconName } from '../components/Icon';
 import { Inline } from '../components/Inline';
 import { usePrefs } from '../components/prefs';
 import { dayIndex, summarize } from '../lib/progress';
+import { nextLesson } from '../lib/quiz';
 import { KEYS, read } from '../lib/storage';
 import '../styles/home.css';
 
@@ -28,6 +29,8 @@ export default function Home() {
     new Set(wordSections.map((s) => s.id)),
   );
   const started = myCards.length + progress.studied + progress.quizzes > 0;
+  const next = nextLesson(lex.sections, read<unknown>(KEYS.quiz, null));
+  const nextTitle = next ? next.title[lang].split(' (')[0] : '';
 
   return (
     <div className="page home">
@@ -38,12 +41,19 @@ export default function Home() {
             {ids.length} words, from <em>idempotent</em> to <em>pre-mortem</em>, each with what it means and what an agent does when you use it.
             Learn them once and your prompts get shorter and sharper.
           </p>
-          <Link to="/glossary" className="btn btn--primary">
-            <Icon name="search" /> Browse the glossary
-          </Link>
+          <div className="hero__actions">
+            {next && (
+              <Link to={`/learn/${next.id}`} className="btn btn--primary">
+                {progress.quizzes ? <>Continue: <span lang={lang}>{nextTitle}</span></> : 'Start the first lesson'} <Icon name="chevron-right" />
+              </Link>
+            )}
+            <Link to="/glossary" className={`btn ${next ? 'btn--secondary' : 'btn--primary'}`}>
+              <Icon name="search" /> Browse the glossary
+            </Link>
+          </div>
         </div>
         <aside className="wotd" aria-labelledby="wotd-title" lang={lang}>
-          <p className="eyebrow" id="wotd-title" lang="en">Word of the day</p>
+          <h2 className="label" id="wotd-title" lang="en">Word of the day</h2>
           <p className="wotd__word"><Link to={`/word/${word.id}`}><Inline text={row.word} /></Link></p>
           <p className="wotd__meaning"><Inline text={row.meaning} /></p>
           <p className="wotd__action"><Inline text={row.action} /></p>
@@ -69,12 +79,14 @@ export default function Home() {
 
       <section className="progress" aria-labelledby="progress-title">
         <h2 id="progress-title" className="h2">Your progress</h2>
-        <dl className="stats">
-          <div><dt>In my cards</dt><dd>{myCards.length}</dd></div>
-          <div><dt>Words studied</dt><dd>{progress.studied} <span className="stats__of">/ {ids.length}</span></dd></div>
-          <div><dt>Mastered</dt><dd>{progress.mastered}</dd></div>
-          <div><dt>Quizzes taken</dt><dd>{progress.quizzes} <span className="stats__of">/ {wordSections.length}</span></dd></div>
-        </dl>
+        {started && (
+          <dl className="stats">
+            <div><dt>In my cards</dt><dd>{myCards.length}</dd></div>
+            <div><dt>Words studied</dt><dd>{progress.studied} <span className="stats__of">/ {ids.length}</span></dd></div>
+            <div><dt>Mastered</dt><dd>{progress.mastered}</dd></div>
+            <div><dt>Quizzes taken</dt><dd>{progress.quizzes} <span className="stats__of">/ {wordSections.length}</span></dd></div>
+          </dl>
+        )}
         {started ? (
           <p className="muted">
             {progress.perfect > 0 && <>{progress.perfect} {progress.perfect === 1 ? 'section' : 'sections'} with a perfect quiz. </>}

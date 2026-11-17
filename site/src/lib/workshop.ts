@@ -20,13 +20,30 @@ export interface Suggestion {
 interface Entry { alias: string; words: string[] }
 export interface Matcher { entries: Entry[] }
 
+// Halves of `a / b` words that are everyday words: alone they say nothing about the lexicon word
+// (`plan before coding` is not `before / after`). The full `a / b` form still matches.
+const STOP = new Set(['before', 'after', 'avant', 'apres', 'quick', 'rapide', 'total', 'map', 'carte', 'empty', 'vide', 'missing', 'absent', 'null', 'nul', 'act', 'pre', 'pub', 'sub', 'local', 'permanent']);
+
+/** Extra spellings a learner writes: the full `a / b` cell (with or without spaces), `x and y` / `x et y` and plain `x` for `x + y`. */
+function variants(w: Lexicon['words'][string]): string[] {
+  const out: string[] = [];
+  for (const cell of [w.en.word, w.fr.word]) {
+    if (cell.includes(' / ')) out.push(cell, cell.replaceAll(' / ', '/'));
+  }
+  for (const a of [...w.aliases.en, ...w.aliases.fr]) {
+    if (!a.includes(' + ')) continue;
+    out.push(a.replaceAll(' + ', ' and '), a.replaceAll(' + ', ' et '), a.split(' + ')[0]);
+  }
+  return out;
+}
+
 /** Every EN and FR alias, folded, longest first (ties alphabetical so results are stable). */
 export function buildMatcher(lex: Lexicon): Matcher {
   const map = new Map<string, string[]>();
   for (const w of Object.values(lex.words)) {
-    for (const a of [...w.aliases.en, ...w.aliases.fr]) {
+    for (const a of [...w.aliases.en, ...w.aliases.fr, ...variants(w)]) {
       const f = fold(a);
-      if (!f) continue;
+      if (!f || STOP.has(f)) continue;
       const ids = map.get(f) ?? [];
       if (!ids.includes(w.id)) ids.push(w.id);
       map.set(f, ids);

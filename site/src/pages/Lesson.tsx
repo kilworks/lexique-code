@@ -1,13 +1,56 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useLexicon } from '../components/data';
 import { Icon } from '../components/Icon';
 import { Inline } from '../components/Inline';
 import { usePrefs } from '../components/prefs';
-import { chunk, pathOrder } from '../lib/quiz';
+import { chunk, makeQuiz, pathOrder } from '../lib/quiz';
+import type { Lang, Lexicon } from '../lib/types';
 import { shortTitle } from './Learn';
 import NotFound from './NotFound';
+import { ASK } from './Quiz';
 import '../styles/learn.css';
+
+/** Two quick questions on the words of one step, answered in place; nothing is stored. */
+function StepCheck({ lex, lang, sectionId, words, seed }: { lex: Lexicon; lang: Lang; sectionId: string; words: string[]; seed: number }) {
+  const questions = makeQuiz(lex, sectionId, seed, 2, words);
+  const [picks, setPicks] = useState<Record<number, string>>({});
+  if (!questions.length) return null;
+  return (
+    <section className="check" aria-labelledby="check-title">
+      <h3 id="check-title" className="label">Quick check</h3>
+      {questions.map((q, n) => {
+        const picked = picks[n];
+        const right = picked === q.answer;
+        return (
+          <div key={q.answer} className="check__q">
+            <p className="check__ask">
+              <span lang="en">{ASK[q.kind]}</span>{' '}
+              <span className={q.prompt === 'word' ? 'check__prompt check__prompt--word' : 'check__prompt'} lang={lang}><Inline text={lex.words[q.answer][lang][q.prompt]} /></span>
+            </p>
+            <ul className="qopts" lang={lang}>
+              {q.options.map((o) => {
+                const state = !picked ? '' : o === q.answer ? ' qopt--right' : o === picked ? ' qopt--wrong' : ' qopt--dim';
+                return (
+                  <li key={o}>
+                    <button type="button" className={`qopt qopt--compact${state}`} aria-disabled={!!picked} onClick={() => !picked && setPicks({ ...picks, [n]: o })}>
+                      <span className="qopt__text"><Inline text={lex.words[o][lang][q.show]} /></span>
+                      {picked && o === q.answer && <><Icon name="check" className="ico qopt__mark" /><span className="sr-only" lang="en"> (correct answer)</span></>}
+                      {picked && o === picked && !right && <><Icon name="x" className="ico qopt__mark" /><span className="sr-only" lang="en"> (your answer)</span></>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="check__verdict" role="status" lang="en">
+              {picked && (right ? 'Right.' : <>Not quite: the answer is <strong lang={lang}><Inline text={lex.words[q.answer][lang].word} /></strong>.</>)}
+            </p>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
 
 export default function Lesson() {
   const { section: id = '' } = useParams();
@@ -45,7 +88,7 @@ export default function Lesson() {
       <nav className="crumbs" aria-label="Breadcrumb">
         <Link to="/learn">Learning path</Link>
         <Icon name="chevron-right" className="ico ico--sm" />
-        <span>Lesson {pos + 1}</span>
+        <span lang={lang}>{shortTitle(section.title[lang])}</span>
       </nav>
 
       <header className="page-head">
@@ -58,7 +101,7 @@ export default function Lesson() {
       </div>
 
       <section className="lesson__step" aria-labelledby="step-title">
-        <h2 id="step-title" className="eyebrow" ref={headRef} tabIndex={-1}>
+        <h2 id="step-title" className="label" ref={headRef} tabIndex={-1}>
           Step {step} of {steps.length}
         </h2>
         <ol className="lesson__words" lang={lang}>
@@ -72,7 +115,7 @@ export default function Lesson() {
                 </h3>
                 <p className="lcard__meaning"><Inline text={w[lang].meaning} /></p>
                 <p className="lcard__action">
-                  <span className="eyebrow" lang="en">Triggers</span>
+                  <span className="lcard__label" lang="en">Triggers</span>
                   <span><Inline text={w[lang].action} /></span>
                 </p>
                 {why && <p className="lcard__why prose">{why}</p>}
@@ -80,6 +123,7 @@ export default function Lesson() {
             );
           })}
         </ol>
+        <StepCheck key={`${section.id}-${step}-${lang}`} lex={lex} lang={lang} sectionId={section.id} words={words} seed={pos * 100 + step} />
       </section>
 
       <nav className="lesson__nav" aria-label="Lesson steps">
